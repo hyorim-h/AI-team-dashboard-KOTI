@@ -125,6 +125,21 @@
   .gprog{font-weight:800;color:var(--text)}
   .gantt-legend{display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 14px;font-size:12px;color:var(--muted)}
   .gantt-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  /* 성과 관리 */
+  .perf-block{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+  .perf-bhead{padding:13px 18px;border-bottom:1px solid var(--line);background:var(--surface-2);display:flex;align-items:center;gap:10px}
+  .perf-tag{font-size:13px;font-weight:800;color:#fff;padding:3px 11px;border-radius:999px}
+  .perf-count{font-size:12.5px;color:var(--muted);font-weight:700}
+  .perf-scroll{overflow-x:auto}
+  .perf-table{width:100%;border-collapse:collapse;min-width:520px}
+  .perf-table th{font-size:11.5px;font-weight:800;color:var(--muted);text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);background:var(--surface)}
+  .perf-table td{font-size:13.5px;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .perf-table tr:last-child td{border-bottom:none}
+  .perf-table .perf-c{text-align:center;white-space:nowrap}
+  .perf-proj{font-weight:800;background:var(--surface-2);font-size:13px;vertical-align:middle}
+  .perf-badge{display:inline-block;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px}
+  .pb-ok{color:var(--ok);background:var(--ok-soft);border:1px solid color-mix(in srgb,var(--ok) 30%,var(--line))}
+  .pb-no{color:var(--warn);background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 30%,var(--line))}
   footer{padding:32px 0 48px;color:var(--muted);font-size:13px}
   footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
   @media(max-width:760px){
@@ -331,6 +346,67 @@
     return html;
   }
 
+  // ===== 성과 관리 =====
+  function renderPerf(perf){
+    if(!perf.length){
+      return '<section><div class="sec-head"><h2>🎯 성과 관리</h2></div>'
+        + '<div class="blocked"><p>성과가 없습니다. 노션 성과 DB에 추가하면 여기에 표시됩니다.</p></div></section>';
+    }
+
+    var total = perf.length;
+    var achieved = perf.filter(function(x){ return x.achieved === "여"; }).length;
+    var quant = perf.filter(function(x){ return x.type === "정량"; });
+    var qual = perf.filter(function(x){ return x.type === "정성"; });
+    var rate = total ? Math.round(achieved/total*100) : 0;
+
+    var html = '<section><div class="sec-head"><h2>🎯 성과 관리</h2></div>';
+    html += '<div class="kpis" style="margin-top:0">'
+      + '<div class="kpi"><b>'+total+'</b><span>전체 성과</span></div>'
+      + '<div class="kpi"><b style="color:var(--ok)">'+achieved+'</b><span>달성</span></div>'
+      + '<div class="kpi"><b style="color:var(--warn)">'+(total-achieved)+'</b><span>미달성</span></div>'
+      + '<div class="kpi"><b>'+rate+'%</b><span>달성률</span></div>'
+      + '</div>';
+
+    function block(title, items, badgeColor){
+      if(!items.length) return "";
+      var rows = "";
+      PROJECTS.forEach(function(p){
+        var group = items.filter(function(x){ return normProj(x.project) === normProj(p.name); });
+        if(!group.length) return;
+        group.forEach(function(x, i){
+          var ok = x.achieved === "여";
+          rows += '<tr>'
+            + (i===0 ? '<td class="perf-proj" rowspan="'+group.length+'">'+esc(p.name)+'</td>' : '')
+            + '<td>'+esc(x.name)+'</td>'
+            + '<td class="perf-c">'+esc(x.year)+'</td>'
+            + '<td class="perf-c">'+esc(x.owner)+'</td>'
+            + '<td class="perf-c"><span class="perf-badge '+(ok?"pb-ok":"pb-no")+'">'+(ok?"달성":"미달성")+'</span></td>'
+            + '</tr>';
+        });
+      });
+      var others = items.filter(function(x){
+        return !PROJECTS.some(function(p){ return normProj(p.name) === normProj(x.project); });
+      });
+      others.forEach(function(x){
+        var ok = x.achieved === "여";
+        rows += '<tr><td class="perf-proj">'+esc(x.project||"-")+'</td><td>'+esc(x.name)+'</td>'
+          + '<td class="perf-c">'+esc(x.year)+'</td><td class="perf-c">'+esc(x.owner)+'</td>'
+          + '<td class="perf-c"><span class="perf-badge '+(ok?"pb-ok":"pb-no")+'">'+(ok?"달성":"미달성")+'</span></td></tr>';
+      });
+      var done = items.filter(function(x){ return x.achieved === "여"; }).length;
+      return '<div class="perf-block"><div class="perf-bhead"><span class="perf-tag" style="background:'+badgeColor+'">'+title+'</span>'
+        + '<span class="perf-count">'+done+'/'+items.length+' 달성</span></div>'
+        + '<div class="perf-scroll"><table class="perf-table"><thead><tr>'
+        + '<th>과제</th><th>성과명</th><th class="perf-c">연차</th><th class="perf-c">담당자</th><th class="perf-c">달성</th>'
+        + '</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    }
+
+    html += block("정량 성과", quant, "var(--accent)");
+    html += block("정성 성과", qual, "#d98324");
+    html += '</section>';
+    return html;
+  }
+
   function render(data){
     REPORTS = buildReports(data.reports || []);
 
@@ -397,6 +473,9 @@
 
     // 간트 차트 섹션
     html += renderGantt(data.wbs || []);
+
+    // 성과 관리 섹션
+    html += renderPerf(data.perf || []);
 
     document.getElementById("content").innerHTML = html;
 
