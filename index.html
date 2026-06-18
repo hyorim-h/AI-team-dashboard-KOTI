@@ -347,10 +347,13 @@
   }
 
   // ===== 성과 관리 =====
-  function renderPerf(perf){
+  var PERF_YEAR = "2026년";  // 표출할 연도 (해가 바뀌면 이 값만 변경)
+
+  function renderPerf(perfAll){
+    var perf = (perfAll || []).filter(function(x){ return x.year === PERF_YEAR; });
     if(!perf.length){
-      return '<section><div class="sec-head"><h2>🎯 성과 관리</h2></div>'
-        + '<div class="blocked"><p>성과가 없습니다. 노션 성과 DB에 추가하면 여기에 표시됩니다.</p></div></section>';
+      return '<section><div class="sec-head"><h2>🎯 성과 관리 <span style="font-size:14px;font-weight:600;color:var(--muted)">· '+PERF_YEAR+'</span></h2></div>'
+        + '<div class="blocked"><p>'+PERF_YEAR+' 성과가 없습니다. 노션 성과 DB에 추가하면 여기에 표시됩니다.</p></div></section>';
     }
 
     var total = perf.length;
@@ -359,7 +362,7 @@
     var qual = perf.filter(function(x){ return x.type === "정성"; });
     var rate = total ? Math.round(achieved/total*100) : 0;
 
-    var html = '<section><div class="sec-head"><h2>🎯 성과 관리</h2></div>';
+    var html = '<section><div class="sec-head"><h2>🎯 성과 관리 <span style="font-size:14px;font-weight:600;color:var(--muted)">· '+PERF_YEAR+'</span></h2></div>';
     html += '<div class="kpis" style="margin-top:0">'
       + '<div class="kpi"><b>'+total+'</b><span>전체 성과</span></div>'
       + '<div class="kpi"><b style="color:var(--ok)">'+achieved+'</b><span>달성</span></div>'
@@ -378,7 +381,6 @@
           rows += '<tr>'
             + (i===0 ? '<td class="perf-proj" rowspan="'+group.length+'">'+esc(p.name)+'</td>' : '')
             + '<td>'+esc(x.name)+'</td>'
-            + '<td class="perf-c">'+esc(x.year)+'</td>'
             + '<td class="perf-c">'+esc(x.owner)+'</td>'
             + '<td class="perf-c"><span class="perf-badge '+(ok?"pb-ok":"pb-no")+'">'+(ok?"달성":"미달성")+'</span></td>'
             + '</tr>';
@@ -390,14 +392,14 @@
       others.forEach(function(x){
         var ok = x.achieved === "여";
         rows += '<tr><td class="perf-proj">'+esc(x.project||"-")+'</td><td>'+esc(x.name)+'</td>'
-          + '<td class="perf-c">'+esc(x.year)+'</td><td class="perf-c">'+esc(x.owner)+'</td>'
+          + '<td class="perf-c">'+esc(x.owner)+'</td>'
           + '<td class="perf-c"><span class="perf-badge '+(ok?"pb-ok":"pb-no")+'">'+(ok?"달성":"미달성")+'</span></td></tr>';
       });
       var done = items.filter(function(x){ return x.achieved === "여"; }).length;
       return '<div class="perf-block"><div class="perf-bhead"><span class="perf-tag" style="background:'+badgeColor+'">'+title+'</span>'
         + '<span class="perf-count">'+done+'/'+items.length+' 달성</span></div>'
         + '<div class="perf-scroll"><table class="perf-table"><thead><tr>'
-        + '<th>과제</th><th>성과명</th><th class="perf-c">연차</th><th class="perf-c">담당자</th><th class="perf-c">달성</th>'
+        + '<th>과제</th><th>성과명</th><th class="perf-c">담당자</th><th class="perf-c">달성</th>'
         + '</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
     }
 
