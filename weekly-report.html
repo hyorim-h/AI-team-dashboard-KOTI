@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="한국교통연구원 교통빅데이터본부 주간 리포트 작성 안내 — 매주 짧게 진행을 남겨 기록으로 쌓고 막힌 건 빨리 도움받습니다.">
+<title>주간 리포트 · 모빌리티 빅데이터팀</title>
+<style>
+  :root{
+    --bg:#f6f8fa; --surface:#ffffff; --surface-2:#eef3f6; --text:#13242b; --muted:#5b6b72;
+    --line:#dce4e8; --accent:#0e7c86; --accent-2:#13a3b0; --accent-soft:#e2f3f4;
+    --warn:#d64545; --warn-soft:#fbe9e9;
+    --chip:#eef3f6; --shadow:0 1px 2px rgba(16,40,48,.06),0 8px 24px rgba(16,40,48,.06);
+    --radius:16px; --maxw:1080px;
+  }
+  html[data-theme="dark"]{
+    --bg:#0c1417; --surface:#111d22; --surface-2:#15242a; --text:#e7eef1; --muted:#9bb0b7;
+    --line:#1f333a; --accent:#3fc2cd; --accent-2:#2aa7b3; --accent-soft:#10333a;
+    --warn:#ff7a7a; --warn-soft:#3a1717;
+    --chip:#15242a; --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--bg); color:var(--text);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    line-height:1.65; -webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px}
+
+  header.nav{position:sticky; top:0; z-index:20; background:color-mix(in srgb,var(--bg) 86%, transparent);
+    backdrop-filter:blur(10px); border-bottom:1px solid var(--line)}
+  .nav-in{max-width:var(--maxw); margin:0 auto; padding:12px 24px; display:flex; align-items:center; gap:18px}
+  .brand{display:flex; align-items:center; gap:11px; font-weight:800; letter-spacing:-.2px; text-decoration:none; color:inherit}
+  .logo-badge{height:52px; padding:0 15px; border-radius:11px; background:#ffffff; display:flex; align-items:center;
+    justify-content:center; min-width:56px; color:#0a2a6b; font-weight:900; font-size:16px; letter-spacing:.5px;
+    box-shadow:inset 0 0 0 1px var(--line)}
+  .logo-badge img{height:36px; width:auto; display:block}
+  .brand>span:last-child{white-space:nowrap}
+  .brand small{display:block; font-weight:600; font-size:11px; color:var(--muted); letter-spacing:.3px}
+  .nav-links{margin-left:auto; display:flex; gap:4px; flex-wrap:wrap; align-items:center}
+  .nav-links a{font-size:13.5px; color:var(--muted); text-decoration:none; padding:7px 11px; border-radius:9px; white-space:nowrap}
+  .nav-links a:hover{color:var(--text); background:var(--surface-2)}
+  .nav-links a.ext{color:var(--accent); font-weight:600}
+  .nav-sep{width:1px; height:18px; background:var(--line); margin:0 4px}
+  .toggle{border:1px solid var(--line); background:var(--surface); color:var(--text); width:38px;height:38px;
+    border-radius:10px; cursor:pointer; font-size:16px; display:grid; place-items:center}
+
+  .hero{padding:74px 0 54px; border-bottom:1px solid var(--line)}
+  .eyebrow{font-size:12px; font-weight:800; letter-spacing:2px; color:var(--accent); text-transform:uppercase}
+  .hero h1{font-size:clamp(30px,5vw,52px); line-height:1.12; margin:14px 0 18px; letter-spacing:-1px; font-weight:850}
+  .hero h1 em{font-style:normal; color:var(--accent); background:linear-gradient(transparent 62%,var(--accent-soft) 62%)}
+  .hero p{font-size:18px; color:var(--muted); max-width:700px; margin:0 0 28px}
+  .cta{display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff; text-decoration:none;
+    font-weight:700; padding:13px 20px; border-radius:12px; box-shadow:var(--shadow)}
+  .cta.alt{background:var(--surface); color:var(--text); border:1px solid var(--line); margin-left:10px}
+
+  section.block{padding:60px 0; border-bottom:1px solid var(--line)}
+  .sec-no{font-size:12px; font-weight:800; letter-spacing:1.5px; color:var(--accent)}
+  .sec-title{font-size:clamp(24px,3.4vw,34px); font-weight:820; letter-spacing:-.6px; margin:8px 0 18px}
+  .sec-title em{font-style:normal; color:var(--accent)}
+  .lead{font-size:17px; color:var(--muted); max-width:760px}
+
+  /* steps */
+  .steps{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:30px}
+  .step-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:24px; box-shadow:var(--shadow)}
+  .step-card .num{width:38px;height:38px;border-radius:11px; background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#fff; font-weight:850; font-size:18px; display:grid; place-items:center; margin-bottom:14px}
+  .step-card h3{margin:0 0 6px; font-size:17px}
+  .step-card p{margin:0; font-size:14px; color:var(--muted)}
+  .step-card code{font-family:ui-monospace,monospace; font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:1px 6px; border-radius:6px}
+
+  /* report items */
+  .items{list-style:none; margin:30px 0 0; padding:0; display:flex; flex-direction:column; gap:11px}
+  .items li{display:flex; gap:14px; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    padding:15px 17px; box-shadow:var(--shadow)}
+  .items li .n{flex:none; width:28px;height:28px;border-radius:8px; background:var(--accent-soft); color:var(--accent);
+    font-weight:800; display:grid; place-items:center; font-size:14px}
+  .items li b{display:block; font-size:15px; margin-bottom:2px}
+  .items li span{font-size:13.5px; color:var(--muted)}
+
+  .callouts{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:30px}
+  .callout{border-radius:14px; padding:18px 20px; font-size:14.5px; border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow)}
+  .callout b{display:block; margin-bottom:5px; font-size:15px}
+  .callout.warn{border-color:color-mix(in srgb,var(--warn) 40%,var(--line)); background:var(--warn-soft)}
+  .callout.warn b{color:var(--warn)}
+  .callout .flag{color:var(--warn); font-weight:800}
+
+  .meta{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:30px}
+  .meta .m{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow)}
+  .meta .m .tag{font-size:12px; font-weight:800; color:var(--accent); letter-spacing:.5px}
+  .meta .m h3{margin:6px 0 6px; font-size:17px}
+  .meta .m p{margin:0; font-size:14px; color:var(--muted)}
+  .cmd{font-family:ui-monospace,monospace; background:var(--surface-2); border:1px solid var(--line);
+    border-radius:8px; padding:2px 8px; font-size:13.5px; color:var(--accent)}
+  .note{margin-top:18px; font-size:14px; color:var(--muted); background:var(--surface-2); border:1px dashed var(--line);
+    border-radius:12px; padding:14px 16px}
+
+  footer{padding:40px 0 60px; color:var(--muted); font-size:13.5px}
+  footer .wrap{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap}
+
+  @media(max-width:760px){
+    .steps,.callouts,.meta{grid-template-columns:1fr}
+    .nav-links{display:none}
+    .hero{padding:54px 0 40px}
+  }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="nav-in">
+    <div class="brand">
+      <span class="logo-badge">
+        <img src="assets/koti-logo.png" alt="KOTI"
+             onerror="this.style.display='none';this.parentNode.textContent='KOTI';">
+      </span>
+      <span>모빌리티 빅데이터 LLM-Wiki
+        <small>한국교통연구원 교통빅데이터본부</small></span>
+    </div>
+    <nav class="nav-links">
+      <a class="ext" href="index.html">대시보드</a>
+      <a class="ext" href="llm-wiki.html">LLM-Wiki</a>
+      <a class="ext" href="weekly-report.html">주간 리포트</a>
+      <span class="nav-sep"></span>
+      <a class="ext" href="https://www.koti.re.kr" target="_blank" rel="noopener">연구원 홈페이지 ↗</a>
+    </nav>
+    <button class="toggle" id="themeBtn" title="라이트/다크 전환" aria-label="테마 전환">🌙</button>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <div class="eyebrow">모빌리티 빅데이터팀 · WEEKLY REPORT</div>
+    <h1>매주 <em>리포트</em>를 씁니다</h1>
+    <p>매주 짧게 진행을 남기면 내 작업이 기록으로 쌓이고, 막힌 건 빨리 도움받습니다.
+       길게 쓸 필요 없이 항목 몇 개만 채우면 됩니다.</p>
+    <a class="cta" href="#" title="링크 추후 지정">📋 주간 리포트 DB 열기 →</a>
+    <a class="cta alt" href="#how">작성법 보기</a>
+  </div>
+</section>
+
+<!-- 01 WHY -->
+<section class="block" id="why">
+  <div class="wrap">
+    <div class="sec-no">01 · 왜 쓰나요</div>
+    <h2 class="sec-title">짧게 남기면 <em>기록이 됩니다</em></h2>
+    <p class="lead">주간 리포트는 평가가 아니라 <strong>기록과 협업</strong>을 위한 것입니다. 매주 한 일을 짧게 남기면
+      내 연구가 시간순으로 쌓이고, 막힌 부분은 연구책임자가 빨리 알아 도움을 줄 수 있습니다.
+      국가교통조사사업, 자율주행R&D, 탄소공간지도R&D, R&D 기획연구 등 여러 과제가 동시에 도는 우리 팀에서,
+      <strong>누가 무엇을 어디까지 했는지</strong> 한눈에 모이는 것이 핵심입니다.</p>
+    <div class="note">💡 <strong>시작 전 준비</strong> — 주간 리포트 작성에는 <strong>팀 협업 도구(주간 리포트 DB)</strong> 접근 권한이 필요합니다.
+      아직 초대를 못 받았다면 본부 관리자에게 요청하세요. (DB 링크는 셋업 후 연결 예정)</div>
+  </div>
+</section>
+
+<!-- 02 HOW -->
+<section class="block" id="how">
+  <div class="wrap">
+    <div class="sec-no">02 · 이렇게 작성합니다</div>
+    <h2 class="sec-title">세 단계면 <em>끝</em></h2>
+    <p class="lead">다른 도구 필요 없이, 정해진 DB에서 항목 몇 개만 채우면 됩니다.</p>
+    <div class="steps">
+      <div class="step-card">
+        <div class="num">1</div>
+        <h3>내 항목 열기</h3>
+        <p>"주간 리포트" DB에서 <strong>내 이름 + 이번 주차</strong> 항목을 엽니다. 매주 미리 만들어집니다.</p>
+      </div>
+      <div class="step-card">
+        <div class="num">2</div>
+        <h3>칸 채우기</h3>
+        <p>아래 <strong>리포트 항목</strong>을 채웁니다. 길게 쓸 필요 없이 구체적으로 한 줄씩.</p>
+      </div>
+      <div class="step-card">
+        <div class="num">3</div>
+        <h3>제출완료로</h3>
+        <p>다 쓰면 상태를 <code>제출완료</code>로 바꿉니다. 그 다음은 대시보드에 자동 반영됩니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 ITEMS -->
+<section class="block" id="items">
+  <div class="wrap">
+    <div class="sec-no">03 · 리포트 항목</div>
+    <h2 class="sec-title">채울 <em>여섯 칸</em></h2>
+    <ul class="items">
+      <li><span class="n">1</span><div><b>이번 주 한 일</b><span>이번 주에 실제로 진행한 것 (분석·코드·데이터 구축·읽은 논문 등 구체적으로)</span></div></li>
+      <li><span class="n">2</span><div><b>진행 중</b><span>아직 끝나지 않고 계속하고 있는 작업</span></div></li>
+      <li><span class="n">3</span><div><b>막힌 것 / 도움 필요</b><span>막혀 있거나 조언·리소스·데이터가 필요한 부분 (있으면 '막힌것' 체크박스도 켜기)</span></div></li>
+      <li><span class="n">4</span><div><b>다음 주 계획</b><span>다음 주에 할 일</span></div></li>
+      <li><span class="n">5</span><div><b>관련 논문 · 위키 노트</b><span>이번 주와 관련된 논문이나 내 LLM-Wiki 노트 링크</span></div></li>
+      <li><span class="n">6</span><div><b>검토 필요사항</b><span>연구책임자가 봐줬으면 하는 것 (결정 필요·리뷰 요청 등)</span></div></li>
+    </ul>
+    <div class="callouts">
+      <div class="callout warn">
+        <b>🚩 막히면 '막힌것' 체크박스를 켜세요</b>
+        체크하면 3번 항목이 <span class="flag">대시보드 맨 위 '막힌 것 · 도움 필요' 패널에 빨갛게</span> 올라가고
+        내 카드에도 🚩가 붙습니다. 연구책임자가 가장 먼저 보는 자리라 <strong>더 빨리 도움받습니다.</strong>
+      </div>
+      <div class="callout">
+        <b>💬 받은 코멘트는 대시보드에서 바로</b>
+        연구책임자가 남긴 코멘트는 대시보드에서 내 이름을 누르면 <strong>리포트 맨 위에 강조</strong>되어 보입니다.
+        (협업 도구에서도 그대로 확인 가능)
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 OPS -->
+<section class="block" id="ops">
+  <div class="wrap">
+    <div class="sec-no">04 · 운영</div>
+    <h2 class="sec-title">마감과 <em>검토</em></h2>
+    <div class="meta">
+      <div class="m">
+        <div class="tag">제출 마감</div>
+        <h3>매주 금요일 오후 5시</h3>
+        <p>각 연구책임자는 팀원의 제출 여부를 상시 확인합니다.</p>
+      </div>
+      <div class="m">
+        <div class="tag">검토</div>
+        <h3>연구책임자 검토</h3>
+        <p>제출한 리포트는 연구책임자가 검토합니다. 매번 답을 달지는 않고, 필요한 경우에만 코멘트를 남깁니다.</p>
+      </div>
+    </div>
+    <div class="note">📊 <strong>한눈에 보는 라이브 대시보드</strong> — 과제별 현황·일정·개인 연구·제출 현황을 실시간으로 모아 봅니다.
+      DB에 쓰면 잠시 뒤 자동 반영됩니다. (대시보드 페이지는 준비 중 — 셋업 후 상단 메뉴에서 연결)</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>주간 리포트 · 한국교통연구원 교통빅데이터본부</span>
+    <span>패턴 참조: TUPA Lab Weekly Report</span>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    var root=document.documentElement, btn=document.getElementById('themeBtn');
+    function set(t){root.setAttribute('data-theme',t); btn.textContent=(t==='dark'?'☀️':'🌙');
+      try{localStorage.setItem('mbd-wiki-theme',t)}catch(e){}}
+    var saved; try{saved=localStorage.getItem('mbd-wiki-theme')}catch(e){}
+    if(!saved){saved=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';}
+    set(saved);
+    btn.addEventListener('click',function(){set(root.getAttribute('data-theme')==='dark'?'light':'dark')});
+  })();
+</script>
+</body>
+</html>

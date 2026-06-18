@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>프로젝트 현황 대시보드 · 모빌리티 빅데이터팀</title>
+<style>
+  :root{
+    --bg:#f6f8fa; --surface:#ffffff; --surface-2:#eef3f6; --text:#13242b; --muted:#5b6b72;
+    --line:#dce4e8; --accent:#0e7c86; --accent-2:#13a3b0; --accent-soft:#e2f3f4;
+    --warn:#d64545; --warn-soft:#fbe9e9; --ok:#1d9a6c; --ok-soft:#e1f4ec;
+    --pend:#7b8a91; --pend-soft:#eef3f6;
+    --shadow:0 1px 2px rgba(16,40,48,.06),0 8px 24px rgba(16,40,48,.06);
+    --radius:16px; --maxw:1180px;
+  }
+  html[data-theme="dark"]{
+    --bg:#0c1417; --surface:#111d22; --surface-2:#15242a; --text:#e7eef1; --muted:#9bb0b7;
+    --line:#1f333a; --accent:#3fc2cd; --accent-2:#2aa7b3; --accent-soft:#10333a;
+    --warn:#ff7a7a; --warn-soft:#3a1717; --ok:#43c794; --ok-soft:#103024;
+    --pend:#7d9098; --pend-soft:#15242a;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box} html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  header.nav{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .nav-in{max-width:var(--maxw);margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;text-decoration:none;color:inherit}
+  .logo-badge{height:52px;padding:0 15px;border-radius:11px;background:#fff;display:flex;align-items:center;
+    justify-content:center;color:#0a2a6b;font-weight:900;font-size:16px;box-shadow:inset 0 0 0 1px var(--line)}
+  .logo-badge img{height:36px;display:block}
+  .brand small{display:block;font-weight:600;font-size:11px;color:var(--muted)}
+  .nav-links{margin-left:auto;display:flex;gap:4px;align-items:center}
+  .nav-links a{font-size:13.5px;color:var(--muted);text-decoration:none;padding:7px 11px;border-radius:9px}
+  .nav-links a:hover{color:var(--text);background:var(--surface-2)}
+  .nav-links a.cur{color:var(--text);background:var(--surface-2);font-weight:700}
+  .nav-links a.ext{color:var(--accent);font-weight:600}
+  .nav-sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+  .toggle{border:1px solid var(--line);background:var(--surface);color:var(--text);
+    width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;display:grid;place-items:center}
+  .titlebar{padding:34px 0 22px}
+  .titlebar .eyebrow{font-size:12px;font-weight:800;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  .titlebar h1{font-size:clamp(24px,3.6vw,36px);font-weight:850;letter-spacing:-.6px;margin:8px 0 4px}
+  .titlebar .sub{color:var(--muted);font-size:14px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0 8px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}
+  .kpi b{font-size:26px;font-weight:850;letter-spacing:-.5px;display:block}
+  .kpi span{font-size:12.5px;color:var(--muted)}
+  section{padding:14px 0}
+  .sec-head{display:flex;align-items:center;gap:10px;margin:18px 0 14px}
+  .sec-head h2{font-size:19px;font-weight:800;margin:0}
+  .blocked{background:var(--pend-soft);border:1px dashed var(--line);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+  .blocked .bhead{display:flex;align-items:center;gap:8px;font-weight:800;margin-bottom:6px}
+  .blocked p{margin:0;font-size:13.5px;color:var(--muted)}
+  .blocked.active{background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 40%,var(--line))}
+  .blocked.active .bhead{color:var(--warn)}
+  .projects{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .proj{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+  .proj .phead{padding:16px 18px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+  .proj .phead h3{margin:0 0 3px;font-size:16px;font-weight:800}
+  .proj .phead .meta{font-size:12px;color:var(--muted)}
+  .proj .pbar{height:5px;background:var(--line)}
+  .proj .pbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+  .members{padding:12px;display:flex;flex-direction:column;gap:9px;flex:1}
+  .member{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;
+    padding:11px 13px;background:var(--surface);cursor:pointer;transition:border-color .15s,transform .05s}
+  .member:hover{border-color:var(--accent)}
+  .member:active{transform:scale(.995)}
+  .member .name{font-weight:800;font-size:14.5px}
+  .member .role{font-size:11.5px;color:var(--muted)}
+  .member .st{margin-left:auto;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;
+    color:var(--pend);background:var(--pend-soft);border:1px solid var(--line)}
+  .member .chev{color:var(--muted);font-size:13px;margin-left:4px}
+  .avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#fff;font-size:12px;font-weight:800;display:grid;place-items:center;flex:none}
+  /* 모달 */
+  .ov{display:none;position:fixed;inset:0;background:rgba(10,20,24,.55);z-index:100;align-items:center;justify-content:center;padding:20px}
+  .ov.open{display:flex}
+  .modal{background:var(--surface);border-radius:20px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow)}
+  .mhead{display:flex;align-items:center;gap:12px;padding:20px 22px 16px;border-bottom:1px solid var(--line)}
+  .mhead .name{font-size:17px;font-weight:800}
+  .mhead .role{font-size:13px;color:var(--muted)}
+  .mhead .x{margin-left:auto;background:none;border:1px solid var(--line);color:var(--muted);
+    width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px}
+  .mbody{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+  .comment{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 25%,var(--line));
+    border-radius:12px;padding:14px 16px}
+  .clab{font-size:12px;font-weight:800;color:var(--accent);margin-bottom:5px}
+  .ctext{font-size:14px}
+  .field{border:1px solid var(--line);border-radius:12px;padding:13px 15px;background:var(--surface-2)}
+  .flab{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:4px}
+  .fval{font-size:14px;white-space:pre-wrap}
+  .fval.empty{color:var(--muted);font-style:italic}
+  .notion-link{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--accent);text-decoration:none;margin-top:4px}
+  footer{padding:32px 0 48px;color:var(--muted);font-size:13px}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  @media(max-width:760px){
+    .projects,.kpis{grid-template-columns:1fr}
+    .nav-links{display:none}
+  }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="index.html">
+      <span class="logo-badge">
+        <img src="assets/koti-logo.png" alt="KOTI" onerror="this.style.display='none';this.parentNode.textContent='KOTI';">
+      </span>
+      <span>모빌리티 빅데이터 대시보드<small>한국교통연구원 교통빅데이터본부</small></span>
+    </a>
+    <nav class="nav-links">
+      <a class="cur" href="index.html">대시보드</a>
+      <a href="llm-wiki.html">LLM-Wiki</a>
+      <a href="weekly-report.html">주간 리포트</a>
+      <span class="nav-sep"></span>
+      <a class="ext" href="https://www.koti.re.kr" target="_blank" rel="noopener">연구원 홈페이지 ↗</a>
+    </nav>
+    <button class="toggle" id="themeBtn" title="라이트/다크 전환">🌙</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="titlebar">
+    <div class="eyebrow">모빌리티 빅데이터팀 · DASHBOARD</div>
+    <h1>프로젝트 현황 대시보드</h1>
+    <div class="sub">마지막 업데이트: 2026-06-18 06:06 UTC · 1시간마다 자동 갱신</div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><b>1</b><span>이번 주 제출완료</span></div>
+    <div class="kpi"><b>10</b><span>대기 중</span></div>
+    <div class="kpi"><b style="color:var(--warn)">1</b><span>🚩 도움 필요</span></div>
+    <div class="kpi"><b>11</b><span>총 참여 인원</span></div>
+  </div>
+
+  <section>
+    <div class="sec-head"><h2>🚩 막힌 것 · 도움 필요</h2></div>
+    <div class="blocked" id="blockedPanel">
+      <div class="bhead" style="color:var(--muted)">🚩 막힌 것 · 도움 필요</div>
+      <p>이번 주 막힌 항목이 없습니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>📋 프로젝트별 현황</h2></div>
+    <div class="projects" id="projects">
+      
+      <div class="proj">
+        <div class="phead">
+          <h3>국가교통조사사업</h3>
+          <div class="meta">참여 3명 · 제출 0/3</div>
+        </div>
+        <div class="pbar"><i style="width:0%"></i></div>
+        <div class="members">
+        <div class="member" data-pj="국가교통조사사업" data-name="이종우">
+          <span class="avatar">이</span>
+          <div>
+            <div class="name">이종우</div>
+            
+          </div>
+          <span class="st">대기</span>
+          <span class="chev">›</span>
+        </div>
+        <div class="member" data-pj="국가교통조사사업" data-name="전준수">
+          <span class="avatar">전</span>
+          <div>
+            <div class="name">전준수</div>
+            
+          </div>
+          <span class="st">대기</span>
+          <span class="chev">›</span>
+        </div>
+        <div class="member" data-pj="국가교통조사사업" data-name="이채영">
+          <span class="avatar">이</span>
+          <div>
+            <div class="name">이채영</div>
+            
+          </div>
+          <span class="st">대기</span>
+          <span class="chev">›</span>
+        </div></div>
+      </div>
+
+      <div class="proj">
+        <div class="phead">
+          <h3>자율주행R&amp;D</h3>
+          <div class="meta">참여 4명 · 제출 0/4</div>
+        </div>
+        <div class="pbar"><i style="width:0%"></i></div>
+        <div class="members">
+        <div class="member" data-pj="자율주행R&amp;D" data-name="이종우">
+          <span class="avatar">이</span>
+          <div>
+            <div class="name">이종우</div>
+            
+          </div>
+          <span class="st">대기</span>
+          <span class="chev">›</span>
+        </div>
+        <div class="member" data-pj="자율주행R&amp;D" data-name="전준수">
+          <span class="avatar">전</span>
+          <div>
+            <div class="name">전준수</div>
+            
+          </div>
+          <span class="st">대기</span>
+          <span class="chev">›</span>
+        </div>
+        <div class="member" data-pj="자율주행R&amp;D" data-name="한효림">
+          <span class="avatar">한</span>
+          <div>
+            <div class="name">한효림</div>
+            
+          </div>
+          <span class="st">대기</span>
+          <span class="chev">›</span>
+        </div>
+        <div class="member" data-pj="자율주행R&amp;D" data-name="김예원">
+          <span class="avatar">김</span>
+          <div>
+            <div class="name">김예원</div>
+            
+          </div>
+          <span class="st">대기</span>
+          <span class="chev">›</span>
+        </div></div>
+      </div>
+
+      <div class="proj">
+        <div class="phead">
+          <h3>탄소공간지도R&amp;D</h3>
+          <div class="meta">참여 4명 · 제출 0/4</div>
+        </div>
+        <div class="pbar"><i style="width:0%"></i></div>
+        <div class="members">
+        <div class="member" data-pj="탄소공간지도R&amp;D" data-name="정승환">
+          <span class="avatar">정</span>
+          <div>
+            <div class="name">정승환</div>
+            
+          </div>
+          <span class="st">대기</span>
+          <span class="chev">›</span>
+        </div>
+        <div class="member" data-pj="탄소공간지도R&amp;D" data-name="이채영">
+          <span class="avatar">이</span>
+          <div>
+            <div class="name">이채영</div>
+            
+          </div>
+          <span class="st">대기</span>
+          <span class="chev">›</span>
+        </div>
+        <div class="member" data-pj="탄소공간지도R&amp;D" data-name="김예원">
+          <span class="avatar">김</span>
+          <div>
+            <div class="name">김예원</div>
+            
+          </div>
+          <span class="st">대기</span>
+          <span class="chev">›</span>
+        </div>
+        <div class="member" data-pj="탄소공간지도R&amp;D" data-name="한효림">
+          <span class="avatar">한</span>
+          <div>
+            <div class="name">한효림</div>
+            
+          </div>
+          <span class="st">대기</span>
+          <span class="chev">›</span>
+        </div></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 모달 -->
+<div class="ov" id="ov">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="mhead">
+      <span class="avatar" id="mAvatar">·</span>
+      <div><div class="name" id="mName">—</div><div class="role" id="mRole">—</div></div>
+      <button class="x" id="mClose" aria-label="닫기">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="comment">
+        <div class="clab">💬 연구책임자 코멘트</div>
+        <div class="ctext" id="mComment">—</div>
+      </div>
+      <div class="field"><div class="flab">1 · 이번 주 한 일</div><div class="fval empty" id="f1">—</div></div>
+      <div class="field"><div class="flab">2 · 진행 중</div><div class="fval empty" id="f2">—</div></div>
+      <div class="field"><div class="flab">3 · 막힌 것 / 도움 필요</div><div class="fval empty" id="f3">—</div></div>
+      <div class="field"><div class="flab">4 · 다음 주 계획</div><div class="fval empty" id="f4">—</div></div>
+      <div class="field"><div class="flab">5 · 관련 논문 · 위키 노트</div><div class="fval empty" id="f5">—</div></div>
+      <div class="field"><div class="flab">6 · 검토 필요사항</div><div class="fval empty" id="f6">—</div></div>
+      <a class="notion-link" id="mNotionLink" href="#" target="_blank" rel="noopener" style="display:none">
+        📝 노션에서 전체 보기 ↗
+      </a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>프로젝트 현황 대시보드 · 한국교통연구원 교통빅데이터본부</span>
+    <span>Notion 자동 연동 · GitHub Actions</span>
+  </div>
+</footer>
+
+<script>
+  var REPORTS = {
+  "자율주행 R&D::한효림": {"status": "submitted", "blocked": true, "comment": "ㅇㅇ", "f1": "ㅇㅇ", "f2": "ㅇㅇ", "f3": "ㅇㅇ", "f4": "ㅇㅇ", "f5": "", "f6": "ㅇㅇ", "week": "6월 3주차", "page_url": "https://app.notion.com/p/6-3-383ce6a25dc68038a55ad4664351b8ad"}
+};
+
+  function rep(pj, name) { return REPORTS[pj + "::" + name] || {status:"pending", blocked:false}; }
+
+  var ov = document.getElementById("ov");
+  function openM(pj, name) {
+    var r = rep(pj, name);
+    document.getElementById("mAvatar").textContent = name.charAt(0);
+    document.getElementById("mName").textContent = name + (r.blocked ? " 🚩" : "");
+    document.getElementById("mRole").textContent = pj + " · " + (r.week || "") + " · " + (r.status === "submitted" ? "제출완료" : "대기");
+    var cm = document.getElementById("mComment");
+    cm.textContent = r.comment || "—";
+    [1,2,3,4,5,6].forEach(function(n) {
+      var v = r["f"+n]; var el = document.getElementById("f"+n);
+      el.textContent = v || "—"; el.className = "fval" + (v ? "" : " empty");
+    });
+    var link = document.getElementById("mNotionLink");
+    if (r.page_url) { link.href = r.page_url; link.style.display = "inline-flex"; }
+    else { link.style.display = "none"; }
+    ov.classList.add("open");
+  }
+  document.getElementById("projects").addEventListener("click", function(e) {
+    var m = e.target.closest(".member"); if (m) openM(m.dataset.pj, m.dataset.name);
+  });
+  function closeM() { ov.classList.remove("open"); }
+  document.getElementById("mClose").addEventListener("click", closeM);
+  ov.addEventListener("click", function(e) { if (e.target === ov) closeM(); });
+  document.addEventListener("keydown", function(e) { if (e.key === "Escape") closeM(); });
+
+  (function() {
+    var root = document.documentElement, btn = document.getElementById("themeBtn");
+    function set(t) { root.setAttribute("data-theme", t); btn.textContent = (t==="dark"?"☀️":"🌙");
+      try{localStorage.setItem("mbd-theme",t)}catch(e){} }
+    var saved; try{saved=localStorage.getItem("mbd-theme")}catch(e){}
+    if (!saved) { saved = matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light"; }
+    set(saved);
+    btn.addEventListener("click", function() { set(root.getAttribute("data-theme")==="dark"?"light":"dark"); });
+  })();
+</script>
+</body>
+</html>
