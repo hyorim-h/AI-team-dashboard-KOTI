@@ -99,6 +99,26 @@
   .fval.empty{color:var(--muted);font-style:italic}
   .notion-link{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--accent);text-decoration:none;margin-top:4px}
   .state{padding:60px 20px;text-align:center;color:var(--muted);font-size:15px}
+  /* 간트 차트 */
+  .gantt-proj{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+  .gantt-proj .ghead{padding:14px 18px;border-bottom:1px solid var(--line);background:var(--surface-2);font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px}
+  .gantt-proj .ghead .gcount{font-size:12px;font-weight:600;color:var(--muted)}
+  .gantt-scroll{overflow-x:auto}
+  .gantt-grid{min-width:680px;padding:12px 18px 18px}
+  .gantt-months{display:flex;border-bottom:1px solid var(--line);margin-bottom:8px;position:relative;height:22px}
+  .gantt-month{font-size:11px;color:var(--muted);font-weight:700;position:absolute;top:0;border-left:1px solid var(--line);padding-left:4px}
+  .gantt-row{display:flex;align-items:center;gap:10px;margin:7px 0}
+  .gantt-label{width:170px;flex:none;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gantt-label .gowner{color:var(--muted);font-size:11px}
+  .gantt-track{position:relative;flex:1;height:24px;background:var(--surface-2);border-radius:6px}
+  .gantt-bar{position:absolute;top:3px;height:18px;border-radius:5px;display:flex;align-items:center;padding:0 7px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;cursor:default}
+  .gantt-bar .gfill{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.28);border-radius:5px 0 0 5px}
+  .gantt-bar span{position:relative;z-index:1}
+  .gb-예정{background:#8a99a0} .gb-진행중{background:var(--accent)} .gb-완료{background:var(--ok)} .gb-지연{background:var(--warn)}
+  .gantt-today{position:absolute;top:-4px;bottom:0;width:2px;background:var(--warn);z-index:2}
+  .gantt-today::after{content:"오늘";position:absolute;top:-16px;left:-12px;font-size:10px;color:var(--warn);font-weight:800}
+  .gantt-legend{display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 16px;font-size:12px;color:var(--muted)}
+  .gantt-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
   footer{padding:32px 0 48px;color:var(--muted);font-size:13px}
   footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
   @media(max-width:760px){
@@ -204,6 +224,90 @@
     return latest;
   }
 
+  // ===== 간트 차트 =====
+  function parseDate(s){ var d = new Date(s + "T00:00:00"); return isNaN(d) ? null : d; }
+  function dayDiff(a, b){ return Math.round((b - a) / 86400000); }
+
+  function renderGantt(wbs){
+    if(!wbs.length){
+      return '<section><div class="sec-head"><h2>📅 과제별 WBS 일정</h2></div>'
+        + '<div class="blocked"><p>WBS 작업이 없습니다. 노션 WBS DB에 작업을 추가하면 여기에 표시됩니다.</p></div></section>';
+    }
+
+    // 전체 기간 범위 계산
+    var allStart = null, allEnd = null;
+    wbs.forEach(function(w){
+      var s = parseDate(w.start), e = parseDate(w.end);
+      if(s && (!allStart || s < allStart)) allStart = s;
+      if(e && (!allEnd || e > allEnd)) allEnd = e;
+    });
+    if(!allStart || !allEnd) return "";
+
+    // 양 끝에 여백 3일
+    allStart = new Date(allStart.getTime() - 3*86400000);
+    allEnd = new Date(allEnd.getTime() + 3*86400000);
+    var totalDays = dayDiff(allStart, allEnd) || 1;
+
+    function pct(d){ return (dayDiff(allStart, d) / totalDays * 100); }
+
+    // 월 구분선
+    var months = "";
+    var cur = new Date(allStart.getFullYear(), allStart.getMonth(), 1);
+    while(cur <= allEnd){
+      var left = pct(cur);
+      if(left >= 0 && left <= 100){
+        months += '<div class="gantt-month" style="left:'+left+'%">'+(cur.getMonth()+1)+'월</div>';
+      }
+      cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+    }
+
+    // 오늘 선
+    var today = new Date(); today.setHours(0,0,0,0);
+    var todayLeft = pct(today);
+    var todayMark = (todayLeft >= 0 && todayLeft <= 100)
+      ? '<div class="gantt-today" style="left:'+todayLeft+'%"></div>' : "";
+
+    var html = '<section><div class="sec-head"><h2>📅 과제별 WBS 일정</h2></div>';
+    html += '<div class="gantt-legend">'
+      + '<span><i style="background:#8a99a0"></i>예정</span>'
+      + '<span><i style="background:var(--accent)"></i>진행중</span>'
+      + '<span><i style="background:var(--ok)"></i>완료</span>'
+      + '<span><i style="background:var(--warn)"></i>지연</span>'
+      + '<span>· 막대 안 밝은 영역 = 진척률</span></div>';
+
+    PROJECTS.forEach(function(p){
+      var tasks = wbs.filter(function(w){ return normProj(w.project) === normProj(p.name); });
+      if(!tasks.length) return;
+      tasks.sort(function(a,b){ return parseDate(a.start) - parseDate(b.start); });
+
+      html += '<div class="gantt-proj"><div class="ghead">'+esc(p.name)
+        + ' <span class="gcount">· '+tasks.length+'개 작업</span></div>';
+      html += '<div class="gantt-scroll"><div class="gantt-grid">';
+      html += '<div class="gantt-months">'+months+'</div>';
+
+      tasks.forEach(function(w){
+        var s = parseDate(w.start), e = parseDate(w.end);
+        if(!s || !e) return;
+        var left = pct(s);
+        var width = Math.max(dayDiff(s, e) / totalDays * 100, 1.5);
+        var st = w.status || "예정";
+        var prog = Math.max(0, Math.min(100, w.progress || 0));
+        var dateRange = w.start + " ~ " + w.end;
+        html += '<div class="gantt-row" style="position:relative">';
+        html += '<div class="gantt-label">'+esc(w.task)+'<br><span class="gowner">'+esc(w.owner||"")+'</span></div>';
+        html += '<div class="gantt-track">'+todayMark
+          + '<div class="gantt-bar gb-'+esc(st)+'" style="left:'+left+'%;width:'+width+'%" title="'+esc(dateRange)+' · '+prog+'%">'
+          + '<div class="gfill" style="width:'+prog+'%"></div>'
+          + '<span>'+prog+'%</span></div></div>';
+        html += '</div>';
+      });
+      html += '</div></div></div>';
+    });
+
+    html += '</section>';
+    return html;
+  }
+
   function render(data){
     REPORTS = buildReports(data.reports || []);
 
@@ -222,7 +326,7 @@
     html += '<div class="kpis">'
       + '<div class="kpi"><b>'+submitted+'</b><span>이번 주 제출완료</span></div>'
       + '<div class="kpi"><b>'+pending+'</b><span>대기 중</span></div>'
-      + '<div class="kpi"><b style="color:var(--warn)">'+blocked+'</b><span>🚩 도움 필요</span></div>'
+      + '<div class="kpi"><b style="color:var(--warn)">'+blocked+'</b><span>🔍 검토 필요</span></div>'
       + '<div class="kpi"><b>'+total+'</b><span>총 참여 인원</span></div>'
       + '</div>';
 
@@ -236,11 +340,11 @@
         }
       });
     });
-    html += '<section><div class="sec-head"><h2>🚩 막힌 것 · 도움 필요</h2></div>';
+    html += '<section><div class="sec-head"><h2>🔍 검토 필요</h2></div>';
     if(blkItems.length){
-      html += '<div class="blocked active"><div class="bhead">🚩 지금 도움이 필요한 항목 '+blkItems.length+'건</div>'+blkItems.join("")+'</div>';
+      html += '<div class="blocked active"><div class="bhead">🔍 검토가 필요한 항목 '+blkItems.length+'건</div>'+blkItems.join("")+'</div>';
     } else {
-      html += '<div class="blocked"><div class="bhead" style="color:var(--muted)">🚩 막힌 것 · 도움 필요</div><p>이번 주 막힌 항목이 없습니다.</p></div>';
+      html += '<div class="blocked"><div class="bhead" style="color:var(--muted)">🔍 검토 필요</div><p>이번 주 검토 필요 항목이 없습니다.</p></div>';
     }
     html += '</section>';
 
@@ -252,7 +356,7 @@
         var r = REPORTS[p.name+"::"+m];
         var ok = r && r.status==="submitted";
         if(ok) sub++;
-        var flag = (r && r.blocked) ? " 🚩" : "";
+        var flag = (r && r.blocked) ? " 🔍" : "";
         var week = (r && r.week) ? '<div class="role">'+esc(r.week)+'</div>' : "";
         rows += '<div class="member" data-pj="'+esc(p.name)+'" data-name="'+esc(m)+'">'
           + '<span class="avatar">'+esc(m.charAt(0))+'</span>'
@@ -267,6 +371,9 @@
         + '<div class="members">'+rows+'</div></div>';
     });
     html += '</div></section>';
+
+    // 간트 차트 섹션
+    html += renderGantt(data.wbs || []);
 
     document.getElementById("content").innerHTML = html;
 
@@ -294,7 +401,7 @@
   function openM(pj, name){
     var r = REPORTS[pj+"::"+name] || {status:"pending", blocked:false};
     document.getElementById("mAvatar").textContent = name.charAt(0);
-    document.getElementById("mName").textContent = name + (r.blocked?" 🚩":"");
+    document.getElementById("mName").textContent = name + (r.blocked?" 🔍":"");
     document.getElementById("mRole").textContent = pj + " · " + (r.week||"") + " · " + (r.status==="submitted"?"제출완료":"대기");
     document.getElementById("mComment").textContent = r.comment || "—";
     [1,2,3,4,5,6].forEach(function(n){
