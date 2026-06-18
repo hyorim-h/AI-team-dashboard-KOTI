@@ -128,7 +128,7 @@
   <div class="titlebar">
     <div class="eyebrow">모빌리티 빅데이터팀 · DASHBOARD</div>
     <h1>프로젝트 현황 대시보드</h1>
-    <div class="sub">마지막 업데이트: 2026-06-18 06:29 UTC · 1시간마다 자동 갱신</div>
+    <div class="sub">마지막 업데이트: 2026-06-18 06:36 UTC · 1시간마다 자동 갱신</div>
   </div>
 
   <div class="kpis">
@@ -140,9 +140,9 @@
 
   <section>
     <div class="sec-head"><h2>🚩 막힌 것 · 도움 필요</h2></div>
-    <div class="blocked" id="blockedPanel">
-      <div class="bhead" style="color:var(--muted)">🚩 막힌 것 · 도움 필요</div>
-      <p>이번 주 막힌 항목이 없습니다.</p>
+    <div class="blocked active" id="blockedPanel">
+      <div class="bhead">🚩 지금 도움이 필요한 항목 1건</div>
+      <p style="margin:6px 0">• <strong>한효림</strong> (자율주행R&amp;D) — ㅇㅇ</p>
     </div>
   </section>
 
@@ -189,9 +189,9 @@
       <div class="proj">
         <div class="phead">
           <h3>자율주행R&amp;D</h3>
-          <div class="meta">참여 4명 · 제출 0/4</div>
+          <div class="meta">참여 4명 · 제출 1/4</div>
         </div>
-        <div class="pbar"><i style="width:0%"></i></div>
+        <div class="pbar"><i style="width:25%"></i></div>
         <div class="members">
         <div class="member" data-pj="자율주행R&amp;D" data-name="이종우">
           <span class="avatar">이</span>
@@ -214,10 +214,10 @@
         <div class="member" data-pj="자율주행R&amp;D" data-name="한효림">
           <span class="avatar">한</span>
           <div>
-            <div class="name">한효림</div>
-            
+            <div class="name">한효림 🚩</div>
+            <div class="role">6월 3주차</div>
           </div>
-          <span class="st">대기</span>
+          <span class="st">제출완료</span>
           <span class="chev">›</span>
         </div>
         <div class="member" data-pj="자율주행R&amp;D" data-name="김예원">
@@ -314,7 +314,7 @@
 
 <script>
   var REPORTS = {
-  "자율주행 R&D::한효림": {"status": "submitted", "blocked": true, "comment": "ㅇㅇ", "f1": "ㅇㅇ", "f2": "ㅇㅇ", "f3": "ㅇㅇ", "f4": "ㅇㅇ", "f5": "", "f6": "ㅇㅇ", "week": "6월 3주차", "page_url": "https://app.notion.com/p/6-3-383ce6a25dc68038a55ad4664351b8ad"}
+  "자율주행R&D::한효림": {"status": "submitted", "blocked": true, "comment": "ㅇㅇ", "f1": "ㅇㅇ", "f2": "ㅇㅇ", "f3": "ㅇㅇ", "f4": "ㅇㅇ", "f5": "", "f6": "ㅇㅇ", "week": "6월 3주차", "page_url": "https://app.notion.com/p/6-3-383ce6a25dc68038a55ad4664351b8ad"}
 };
 
   function rep(pj, name) { return REPORTS[pj + "::" + name] || {status:"pending", blocked:false}; }
