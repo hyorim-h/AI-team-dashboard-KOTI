@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="한국교통연구원 모빌리티 빅데이터팀 LLM-Wiki — 읽은 논문·연구보고서를 검색·재사용 가능한 지식으로 쌓는 팀 공통 작업 가이드.">
+<title>모빌리티 빅데이터 LLM-Wiki · 팀 가이드</title>
+<style>
+  :root{
+    --bg:#f6f8fa; --surface:#ffffff; --surface-2:#eef3f6; --text:#13242b; --muted:#5b6b72;
+    --line:#dce4e8; --accent:#0e7c86; --accent-2:#13a3b0; --accent-soft:#e2f3f4;
+    --chip:#eef3f6; --shadow:0 1px 2px rgba(16,40,48,.06),0 8px 24px rgba(16,40,48,.06);
+    --radius:16px; --maxw:1080px;
+  }
+  html[data-theme="dark"]{
+    --bg:#0c1417; --surface:#111d22; --surface-2:#15242a; --text:#e7eef1; --muted:#9bb0b7;
+    --line:#1f333a; --accent:#3fc2cd; --accent-2:#2aa7b3; --accent-soft:#10333a;
+    --chip:#15242a; --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    line-height:1.65; -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px}
+
+  /* nav */
+  header.nav{position:sticky; top:0; z-index:20; background:color-mix(in srgb,var(--bg) 86%, transparent);
+    backdrop-filter:blur(10px); border-bottom:1px solid var(--line)}
+  .nav-in{max-width:var(--maxw); margin:0 auto; padding:12px 24px; display:flex; align-items:center; gap:18px}
+  .brand{display:flex; align-items:center; gap:11px; font-weight:800; letter-spacing:-.2px; text-decoration:none; color:inherit}
+  .logo-badge{height:52px; padding:0 15px; border-radius:11px; background:#ffffff; display:flex; align-items:center;
+    justify-content:center; min-width:56px; color:#0a2a6b; font-weight:900; font-size:16px; letter-spacing:.5px;
+    box-shadow:inset 0 0 0 1px var(--line)}
+  .logo-badge img{height:36px; width:auto; display:block}
+  .brand>span:last-child{white-space:nowrap}
+  .brand small{display:block; font-weight:600; font-size:11px; color:var(--muted); letter-spacing:.3px}
+  .nav-links{margin-left:auto; display:flex; gap:4px; flex-wrap:wrap; align-items:center}
+  .nav-links a{font-size:13.5px; color:var(--muted); text-decoration:none; padding:7px 11px; border-radius:9px; white-space:nowrap}
+  .nav-links a:hover{color:var(--text); background:var(--surface-2)}
+  .nav-links a.ext{color:var(--accent); font-weight:600}
+  .nav-sep{width:1px; height:18px; background:var(--line); margin:0 4px}
+  .toggle{border:1px solid var(--line); background:var(--surface); color:var(--text); width:38px;height:38px;
+    border-radius:10px; cursor:pointer; font-size:16px; display:grid; place-items:center}
+
+  /* hero */
+  .hero{padding:74px 0 54px; border-bottom:1px solid var(--line)}
+  .eyebrow{font-size:12px; font-weight:800; letter-spacing:2px; color:var(--accent); text-transform:uppercase}
+  .hero h1{font-size:clamp(30px,5vw,52px); line-height:1.12; margin:14px 0 18px; letter-spacing:-1px; font-weight:850}
+  .hero h1 em{font-style:normal; color:var(--accent); background:linear-gradient(transparent 62%,var(--accent-soft) 62%)}
+  .hero p{font-size:18px; color:var(--muted); max-width:680px; margin:0 0 28px}
+  .cta{display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff; text-decoration:none;
+    font-weight:700; padding:13px 20px; border-radius:12px; box-shadow:var(--shadow)}
+  .cta.alt{background:var(--surface); color:var(--text); border:1px solid var(--line); margin-left:10px}
+  .hero-stats{display:flex; gap:30px; flex-wrap:wrap; margin-top:38px}
+  .hero-stats div{display:flex; flex-direction:column}
+  .hero-stats b{font-size:26px; font-weight:850; letter-spacing:-.5px}
+  .hero-stats span{font-size:12.5px; color:var(--muted)}
+
+  section.block{padding:60px 0; border-bottom:1px solid var(--line)}
+  .sec-no{font-size:12px; font-weight:800; letter-spacing:1.5px; color:var(--accent)}
+  .sec-title{font-size:clamp(24px,3.4vw,34px); font-weight:820; letter-spacing:-.6px; margin:8px 0 18px}
+  .sec-title em{font-style:normal; color:var(--accent)}
+  .lead{font-size:17px; color:var(--muted); max-width:760px}
+
+  .grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:30px}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:22px; box-shadow:var(--shadow)}
+  .card .path{display:inline-block; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px;
+    color:var(--accent); background:var(--accent-soft); padding:3px 9px; border-radius:7px; margin-bottom:12px}
+  .card h3{margin:0 0 6px; font-size:17px}
+  .card p{margin:0; font-size:14px; color:var(--muted)}
+
+  /* pipeline */
+  .pipe{display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:30px}
+  .pipe .step{background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:11px 15px;
+    font-weight:700; font-size:14px; box-shadow:var(--shadow)}
+  .pipe .step small{display:block; font-weight:500; font-size:11.5px; color:var(--muted); font-family:ui-monospace,monospace}
+  .pipe .arrow{color:var(--accent); font-weight:900}
+  .pipe .step.end{background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff; border:none}
+  .pipe .step.end small{color:rgba(255,255,255,.85)}
+
+  /* rules + ingest */
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:26px; margin-top:30px}
+  .flow{display:flex; flex-direction:column; gap:10px}
+  .flow .f{display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--line);
+    border-radius:12px; padding:13px 15px; box-shadow:var(--shadow)}
+  .flow .f .n{flex:none; width:26px;height:26px;border-radius:8px; background:var(--accent-soft); color:var(--accent);
+    font-weight:800; display:grid; place-items:center; font-size:13px}
+  .flow .f code{font-family:ui-monospace,monospace; font-size:13px; color:var(--accent)}
+  .rules{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:11px}
+  .rules li{display:flex; gap:12px; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    padding:13px 15px; font-size:14.5px; box-shadow:var(--shadow)}
+  .rules li b{flex:none; width:24px;height:24px;border-radius:50%; background:var(--accent); color:#fff;
+    font-size:12.5px; font-weight:800; display:grid; place-items:center}
+  .note{margin-top:18px; font-size:14px; color:var(--muted); background:var(--surface-2); border:1px dashed var(--line);
+    border-radius:12px; padding:14px 16px}
+  .cmd{font-family:ui-monospace,monospace; background:var(--surface-2); border:1px solid var(--line);
+    border-radius:8px; padding:2px 8px; font-size:13.5px; color:var(--accent)}
+
+  /* categories */
+  .cats{display:flex; flex-wrap:wrap; gap:10px; margin-top:26px}
+  .cat{display:flex; align-items:center; gap:9px; background:var(--surface); border:1px solid var(--line);
+    border-radius:999px; padding:8px 14px; font-size:13.5px; font-weight:600; box-shadow:var(--shadow)}
+  .cat .cnt{background:var(--accent-soft); color:var(--accent); font-weight:800; border-radius:999px; padding:1px 9px; font-size:12px}
+
+  /* phases */
+  .phase{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:28px}
+  .phase .p{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:22px; box-shadow:var(--shadow)}
+  .phase .p .tag{font-size:12px; font-weight:800; color:var(--accent); letter-spacing:.5px}
+  .phase .p h3{margin:6px 0 8px; font-size:18px}
+  .phase .p p{margin:0; font-size:14px; color:var(--muted)}
+
+  footer{padding:40px 0 60px; color:var(--muted); font-size:13.5px}
+  footer .wrap{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap}
+
+  @media(max-width:760px){
+    .grid3,.two,.phase{grid-template-columns:1fr}
+    .nav-links{display:none}
+    .hero{padding:54px 0 40px}
+  }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="nav-in">
+    <div class="brand">
+      <span class="logo-badge">
+        <img src="assets/koti-logo.png" alt="KOTI"
+             onerror="this.style.display='none';this.parentNode.textContent='KOTI';">
+      </span>
+      <span>모빌리티 빅데이터 LLM-Wiki
+        <small>한국교통연구원 교통빅데이터본부</small></span>
+    </div>
+    <nav class="nav-links">
+      <a class="ext" href="index.html">대시보드</a>
+      <a class="ext" href="llm-wiki.html">LLM-Wiki</a>
+      <a class="ext" href="weekly-report.html">주간 리포트</a>
+      <span class="nav-sep"></span>
+      <a class="ext" href="https://www.koti.re.kr" target="_blank" rel="noopener">연구원 홈페이지 ↗</a>
+    </nav>
+    <button class="toggle" id="themeBtn" title="라이트/다크 전환" aria-label="테마 전환">🌙</button>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <div class="eyebrow">모빌리티 빅데이터팀 · LLM-WIKI</div>
+    <h1>읽은 논문·보고서를<br><em>팀 공통의 지식</em>으로</h1>
+    <p>PDF가 폴더에 쌓이기만 하고 잊히지 않도록, AI가 요약·정리해 언제든 꺼내 쓰는 지식으로 만듭니다.
+       연구진들이 <strong>같은 폴더 구조·같은 규칙</strong>으로 작업해, 나중에 하나의 팀 지식지도로 합칩니다.</p>
+    <a class="cta" href="#" title="링크 추후 지정">🧩 위키 스타터 받기 (GitHub) →</a>
+    <a class="cta alt" href="#how">▶ 시작하기</a>
+    <div class="hero-stats">
+      <div><b>3+1</b><span>저장 형태 (원본·요약·노트 + 서지DB)</span></div>
+      <div><b>4</b><span>믿을 수 있는 위키 규칙</span></div>
+      <div><b>1</b><span>단일 매뉴얼 · AGENTS.md</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 01 WHY -->
+<section class="block" id="why">
+  <div class="wrap">
+    <div class="sec-no">01 · 왜 하나요</div>
+    <h2 class="sec-title">읽은 자료를 <em>지식으로</em></h2>
+    <p class="lead">논문·연구보고서를 아무리 많이 읽어도 파일은 폴더에 쌓이기만 하고 시간이 지나면 잊힙니다.
+      읽은 자료를 AI가 요약·구조화해 두면, <strong>같은 자료를 두 번 읽지 않고</strong> 질문하면 웹이 아니라
+      <strong>내가 읽은 자료를 근거로</strong> 답합니다. 노트가 쌓일수록 모빌리티 빅데이터·자율주행 혼재·탄소공간지도·SOC 수요예측 같은
+      우리 R&D 분야 전체를 더 빠르게 파악할 수 있습니다.</p>
+  </div>
+</section>
+
+<!-- 02 STORE -->
+<section class="block" id="store">
+  <div class="wrap">
+    <div class="sec-no">02 · 어떻게 저장되나</div>
+    <h2 class="sec-title">자료 한 편을 <em>세 가지로</em></h2>
+    <p class="lead">같은 자료를 원본 · 요약 · 구조화 노트, 세 형태로 보관합니다. 상황에 맞게 골라 찾고,
+       세 파일은 같은 <strong>doc_id(stem)</strong>로 묶입니다. 여기에 서지 마스터 DB가 전체를 한 줄씩 누적합니다.</p>
+    <div class="grid3">
+      <div class="card">
+        <span class="path">papers/</span>
+        <h3>원본 PDF·HWP</h3>
+        <p>정확히 인용하거나 다시 확인할 때. 파일명은 사람이 읽기 쉬운 <em>제목_저널(or 발행처)_연도</em>.</p>
+      </div>
+      <div class="card">
+        <span class="path">sources/</span>
+        <h3>요약</h3>
+        <p>자료 1편 = 요약 1개. 빠르게 훑어보고 싶을 때. 핵심 주장에 원문 페이지를 표기.</p>
+      </div>
+      <div class="card">
+        <span class="path">wiki/</span>
+        <h3>구조화 노트</h3>
+        <p>키워드·개념을 서로 연결한 노트(frontmatter·백링크). 검색과 종합의 중심.</p>
+      </div>
+    </div>
+    <div class="note">＋ <span class="cmd">db/서지마스터.xlsx</span> 자료 1편 = 1행으로 누적 · <span class="cmd">_inbox/</span> 처리 대기함 ·
+      <span class="cmd">wiki/_taxonomy.md</span> 통제 태그 어휘(단일 출처). 노트는 <strong>주제별 카테고리</strong>로 분류하고,
+      자주 나오는 개념·방법은 <span class="cmd">concepts/</span>·<span class="cmd">methods/</span>에 따로 모읍니다.</div>
+
+    <div class="cats">
+      <span style="font-size:13px;color:var(--muted);align-self:center">분류 예시 (교통안전 코퍼스):</span>
+      <span class="cat">실시간 충돌예측 <span class="cnt">15</span></span>
+      <span class="cat">대리안전지표(SSM) <span class="cnt">9</span></span>
+      <span class="cat">위험지점 식별 <span class="cnt">6</span></span>
+      <span class="cat">SPF·사고빈도 <span class="cnt">6</span></span>
+      <span class="cat">졸음운전 <span class="cnt">2</span></span>
+      <span class="cat">급제동 안전 <span class="cnt">2</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- 03 CHAIN -->
+<section class="block" id="chain">
+  <div class="wrap">
+    <div class="sec-no">03 · 쌓여서 연구로</div>
+    <h2 class="sec-title">한 단계씩 <em>내 연구로</em></h2>
+    <p class="lead">읽은 자료가 차곡차곡 쌓여 결국 우리 R&D로 이어집니다. 앞 단계가 탄탄할수록 다음 단계가 잘 나옵니다.</p>
+    <div class="pipe">
+      <span class="step">처리 대기<small>_inbox/</small></span>
+      <span class="arrow">→</span>
+      <span class="step">원본<small>papers/</small></span>
+      <span class="arrow">→</span>
+      <span class="step">요약<small>sources/</small></span>
+      <span class="arrow">→</span>
+      <span class="step">구조화 노트<small>wiki/</small></span>
+      <span class="arrow">→</span>
+      <span class="step">분야 종합<small>overviews/</small></span>
+      <span class="arrow">→</span>
+      <span class="step">서지DB<small>db/</small></span>
+      <span class="arrow">→</span>
+      <span class="step end">내 연구<small>분석·발표·코드</small></span>
+    </div>
+  </div>
+</section>
+
+<!-- 04 HOW -->
+<section class="block" id="how">
+  <div class="wrap">
+    <div class="sec-no">04 · 넣는 법과 규칙</div>
+    <h2 class="sec-title"><em>한 마디</em>로 위키에 정리</h2>
+    <p class="lead">새 자료를 <span class="cmd">_inbox/</span>에 넣고 <strong>"이 자료 ingest해줘"</strong> 한 마디면,
+       AI가 이름 정리 → 요약 → 구조화 노트 → 연결 → DB 등록까지 자동으로 합니다. 처리가 끝나면 원본은 <span class="cmd">papers/</span>로 이동합니다.</p>
+    <div class="two">
+      <div>
+        <div class="flow">
+          <div class="f"><span class="n">1</span><span><code>_inbox/</code> 에 PDF·HWP 넣기</span></div>
+          <div class="f"><span class="n">2</span><span>"이 자료 ingest해줘"</span></div>
+          <div class="f"><span class="n">3</span><span>요약·구조화 노트 자동 생성 + 개념·종합 노트에 연결</span></div>
+          <div class="f"><span class="n">4</span><span>원본은 제목식으로 <code>papers/</code> 이동 · DB 1행 추가</span></div>
+        </div>
+        <div class="note">사람이 읽는 파일명은 <strong>제목식</strong>, 시스템 추적용 <strong>doc_id(stem)</strong>는 별도.
+          둘은 노트 frontmatter의 <span class="cmd">paper_file</span>로 연결돼, 파일명이 바뀌어도 추적이 끊기지 않습니다.</div>
+      </div>
+      <div>
+        <p style="font-weight:800; margin:0 0 12px">믿을 수 있는 위키를 만드는 4가지 규칙</p>
+        <ul class="rules">
+          <li><b>1</b><span>기본은 <strong>내 위키만</strong> 본다 (웹 검색은 따로 요청할 때만)</span></li>
+          <li><b>2</b><span>답은 먼저 내가 정리한 <strong>요약·노트를 근거로</strong></span></li>
+          <li><b>3</b><span>부족하면 <strong>원본을 다시</strong> 읽는다</span></li>
+          <li><b>4</b><span>위키에 없으면 추측 말고 <strong>"자료를 추가해 주세요"</strong></span></li>
+        </ul>
+        <div class="note">모르는 값은 지어내지 않고 <strong>'unknown'</strong>으로, 신뢰도 낮은 항목은
+          <strong>[확인필요]</strong>로 표시합니다. 이 규칙들이 그럴듯한 거짓(환각)을 막아 위키를 믿을 수 있게 합니다.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 OPS -->
+<section class="block" id="ops">
+  <div class="wrap">
+    <div class="sec-no">05 · 운영 방침</div>
+    <h2 class="sec-title">각자 먼저, <em>나중에 팀</em></h2>
+    <p class="lead">먼저 각자 자기 위키를 쌓으며 흐름을 익히고, 충분히 익숙해지면 팀 단위로 합쳐 공동 지식지도로 키웁니다.</p>
+    <div class="phase">
+      <div class="p">
+        <div class="tag">1단계 · 최소 1개월</div>
+        <h3>각자 구축</h3>
+        <p>연구진들이 각자 동일한 폴더 구조·규칙으로 자기 위키를 직접 쌓으며 워크플로를 체득합니다.</p>
+      </div>
+      <div class="p">
+        <div class="tag">2단계</div>
+        <h3>팀 통합</h3>
+        <p>익숙해지면 개인 위키를 팀 단위로 합쳐, 모빌리티 빅데이터 분야 공동 지식지도로 확장합니다.</p>
+      </div>
+    </div>
+    <div class="note">모든 작성 규칙은 스타터 안의 <span class="cmd">AGENTS.md</span> 한 파일에 정리돼 있고,
+      AI(Claude·Codex)가 작업 전 가장 먼저 읽습니다. 진입점은 <span class="cmd">CLAUDE.md</span>, 셋업 안내는 <span class="cmd">README.md</span>.</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>모빌리티 빅데이터 LLM-Wiki · 한국교통연구원 모빌리티 빅데이터팀</span>
+    <span>패턴 참조: TUPA Lab LLM-Wiki / Karpathy LLM-Wiki</span>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    var root=document.documentElement, btn=document.getElementById('themeBtn');
+    function set(t){root.setAttribute('data-theme',t); btn.textContent=(t==='dark'?'☀️':'🌙');
+      try{localStorage.setItem('mbd-wiki-theme',t)}catch(e){}}
+    var saved; try{saved=localStorage.getItem('mbd-wiki-theme')}catch(e){}
+    if(!saved){saved=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';}
+    set(saved);
+    btn.addEventListener('click',function(){set(root.getAttribute('data-theme')==='dark'?'light':'dark')});
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="한국교통연구원 교통빅데이터본부 프로젝트 현황 대시보드 안내 — 주간 리포트를 쓰면 대시보드 한 곳에서 프로젝트별로 모니터링합니다.">
+<title>대시보드 안내 · 모빌리티 빅데이터팀</title>
+<style>
+  :root{
+    --bg:#f6f8fa; --surface:#ffffff; --surface-2:#eef3f6; --text:#13242b; --muted:#5b6b72;
+    --line:#dce4e8; --accent:#0e7c86; --accent-2:#13a3b0; --accent-soft:#e2f3f4;
+    --warn:#d64545; --warn-soft:#fbe9e9; --ok:#1d9a6c; --ok-soft:#e1f4ec;
+    --shadow:0 1px 2px rgba(16,40,48,.06),0 8px 24px rgba(16,40,48,.06); --radius:16px; --maxw:1080px;
+  }
+  html[data-theme="dark"]{
+    --bg:#0c1417; --surface:#111d22; --surface-2:#15242a; --text:#e7eef1; --muted:#9bb0b7;
+    --line:#1f333a; --accent:#3fc2cd; --accent-2:#2aa7b3; --accent-soft:#10333a;
+    --warn:#ff7a7a; --warn-soft:#3a1717; --ok:#43c794; --ok-soft:#103024;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--bg); color:var(--text);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    line-height:1.65; -webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px}
+
+  header.nav{position:sticky; top:0; z-index:20; background:color-mix(in srgb,var(--bg) 86%, transparent);
+    backdrop-filter:blur(10px); border-bottom:1px solid var(--line)}
+  .nav-in{max-width:var(--maxw); margin:0 auto; padding:12px 24px; display:flex; align-items:center; gap:18px}
+  .brand{display:flex; align-items:center; gap:11px; font-weight:800; letter-spacing:-.2px; color:inherit}
+  .brand>span:last-child{white-space:nowrap}
+  .logo-badge{height:52px; padding:0 15px; border-radius:11px; background:#ffffff; display:flex; align-items:center;
+    justify-content:center; min-width:56px; color:#0a2a6b; font-weight:900; font-size:16px; letter-spacing:.5px;
+    box-shadow:inset 0 0 0 1px var(--line)}
+  .logo-badge img{height:36px; width:auto; display:block}
+  .brand small{display:block; font-weight:600; font-size:11px; color:var(--muted); letter-spacing:.3px}
+  .nav-links{margin-left:auto; display:flex; gap:4px; flex-wrap:wrap; align-items:center}
+  .nav-links a{font-size:13.5px; color:var(--muted); text-decoration:none; padding:7px 11px; border-radius:9px; white-space:nowrap}
+  .nav-links a:hover{color:var(--text); background:var(--surface-2)}
+  .nav-links a.cur{color:var(--text); background:var(--surface-2); font-weight:700}
+  .nav-links a.ext{color:var(--accent); font-weight:600}
+  .nav-sep{width:1px; height:18px; background:var(--line); margin:0 4px}
+  .toggle{border:1px solid var(--line); background:var(--surface); color:var(--text); width:38px;height:38px;
+    border-radius:10px; cursor:pointer; font-size:16px; display:grid; place-items:center}
+
+  .hero{padding:74px 0 54px; border-bottom:1px solid var(--line)}
+  .eyebrow{font-size:12px; font-weight:800; letter-spacing:2px; color:var(--accent); text-transform:uppercase}
+  .hero h1{font-size:clamp(30px,5vw,50px); line-height:1.12; margin:14px 0 18px; letter-spacing:-1px; font-weight:850}
+  .hero h1 em{font-style:normal; color:var(--accent); background:linear-gradient(transparent 62%,var(--accent-soft) 62%)}
+  .hero p{font-size:18px; color:var(--muted); max-width:680px; margin:0 0 28px}
+  .cta{display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff; text-decoration:none;
+    font-weight:700; padding:13px 20px; border-radius:12px; box-shadow:var(--shadow)}
+  .cta.alt{background:var(--surface); color:var(--text); border:1px solid var(--line); margin-left:10px}
+
+  section.block{padding:60px 0; border-bottom:1px solid var(--line)}
+  .sec-no{font-size:12px; font-weight:800; letter-spacing:1.5px; color:var(--accent)}
+  .sec-title{font-size:clamp(24px,3.4vw,34px); font-weight:820; letter-spacing:-.6px; margin:8px 0 18px}
+  .sec-title em{font-style:normal; color:var(--accent)}
+  .lead{font-size:17px; color:var(--muted); max-width:760px}
+
+  .pipe{display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:30px}
+  .pipe .step{background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:11px 15px; font-weight:700; font-size:14px; box-shadow:var(--shadow)}
+  .pipe .step small{display:block; font-weight:500; font-size:11.5px; color:var(--muted)}
+  .pipe .arrow{color:var(--accent); font-weight:900}
+  .pipe .step.end{background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff; border:none}
+  .pipe .step.end small{color:rgba(255,255,255,.85)}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:30px}
+  .feat{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:22px; box-shadow:var(--shadow)}
+  .feat .ic{width:40px;height:40px;border-radius:11px; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; font-size:20px; margin-bottom:12px}
+  .feat h3{margin:0 0 6px; font-size:17px}
+  .feat p{margin:0 0 14px; font-size:14px; color:var(--muted)}
+  .preview{background:var(--surface-2); border:1px solid var(--line); border-radius:11px; padding:12px; font-size:12.5px}
+  .row{display:flex; align-items:center; gap:8px; padding:5px 0}
+  .row .av{width:20px;height:20px;border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff; font-size:10px; font-weight:800; display:grid; place-items:center; flex:none}
+  .pill{margin-left:auto; font-size:10.5px; font-weight:800; padding:1px 8px; border-radius:999px}
+  .pill.ok{color:var(--ok); background:var(--ok-soft)} .pill.pd{color:var(--muted); background:var(--surface)}
+  .blkbox{background:var(--warn-soft); border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line)); color:var(--warn); border-radius:9px; padding:8px 10px; font-size:12.5px; font-weight:600}
+  .barwrap{display:flex; align-items:center; gap:8px; padding:5px 0}
+  .barwrap .lab{font-size:12px; min-width:120px}
+  .barwrap .tr{flex:1; height:7px; background:var(--line); border-radius:999px; overflow:hidden}
+  .barwrap .tr i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+  .barwrap .pct{font-size:11.5px; font-weight:800; color:var(--accent); min-width:34px; text-align:right}
+  .mini-cal{display:grid; grid-template-columns:repeat(7,1fr); gap:3px}
+  .mini-cal div{aspect-ratio:1; border-radius:5px; background:var(--surface); border:1px solid var(--line); font-size:9.5px; display:grid; place-items:center; color:var(--muted)}
+  .mini-cal div.ev{background:var(--accent-soft); color:var(--accent); font-weight:800; border-color:transparent}
+
+  .phase{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:28px}
+  .phase .p{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:22px; box-shadow:var(--shadow)}
+  .phase .p .tag{font-size:12px; font-weight:800; color:var(--accent); letter-spacing:.5px}
+  .phase .p h3{margin:6px 0 8px; font-size:17px}
+  .phase .p p{margin:0; font-size:14px; color:var(--muted)}
+
+  .note{margin-top:22px; font-size:14px; color:var(--muted); background:var(--surface-2); border:1px dashed var(--line); border-radius:12px; padding:14px 16px}
+  .cmd{font-family:ui-monospace,monospace; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:2px 8px; font-size:13px; color:var(--accent)}
+  .center{text-align:center; padding:56px 0}
+  footer{padding:40px 0 60px; color:var(--muted); font-size:13.5px}
+  footer .wrap{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap}
+  @media(max-width:760px){ .grid2,.phase{grid-template-columns:1fr} .nav-links{display:none} .hero{padding:54px 0 40px} }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="nav-in">
+    <div class="brand">
+      <span class="logo-badge">
+        <img src="assets/koti-logo.png" alt="KOTI" onerror="this.style.display='none';this.parentNode.textContent='KOTI';">
+      </span>
+      <span>모빌리티 빅데이터 LLM-Wiki
+        <small>한국교통연구원 교통빅데이터본부</small></span>
+    </div>
+    <nav class="nav-links">
+      <a class="ext" href="index.html">대시보드</a>
+      <a class="ext" href="llm-wiki.html">LLM-Wiki</a>
+      <a class="ext" href="weekly-report.html">주간 리포트</a>
+      <a class="cur" href="#">대시보드 안내</a>
+      <span class="nav-sep"></span>
+      <a class="ext" href="https://www.koti.re.kr" target="_blank" rel="noopener">연구원 홈페이지 ↗</a>
+    </nav>
+    <button class="toggle" id="themeBtn" title="라이트/다크 전환" aria-label="테마 전환">🌙</button>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <div class="eyebrow">모빌리티 빅데이터팀 · DASHBOARD 안내</div>
+    <h1>한눈에 보는<br><em>프로젝트 대시보드</em></h1>
+    <p>각자 주간 리포트만 쓰면, 연구책임자는 대시보드 한 곳에서 <strong>프로젝트별 전원 현황</strong>을 봅니다.
+       누가 무엇을 어디까지 했는지, 막힌 건 없는지 바로 확인합니다.</p>
+    <a class="cta" href="index.html">📊 대시보드 열기 →</a>
+    <a class="cta alt" href="#how">작동 방식 보기</a>
+  </div>
+</section>
+
+<!-- 01 -->
+<section class="block" id="how">
+  <div class="wrap">
+    <div class="sec-no">01 · 작동 방식</div>
+    <h2 class="sec-title">한 번 쓰면, <em>대시보드에 뜬다</em></h2>
+    <p class="lead">각자 익숙한 협업 도구(주간 리포트 DB)에 한 번만 작성하면, 별도 입력 없이 대시보드에 자동 반영됩니다.
+       프로젝트 현황·제출 여부·막힌 것이 한 화면에 모입니다.</p>
+    <div class="pipe">
+      <span class="step">작성<small>주간 리포트 DB</small></span>
+      <span class="arrow">→</span>
+      <span class="step">실시간 연동<small>~1분</small></span>
+      <span class="arrow">→</span>
+      <span class="step">대시보드 반영<small>프로젝트별 집계</small></span>
+      <span class="arrow">→</span>
+      <span class="step end">연구책임자<small>일괄 모니터링</small></span>
+    </div>
+    <div class="note">💡 데이터 연동은 <strong>Notion</strong>으로 예정되어 있습니다. 연결 전에는 대시보드가 구조 확인용 <strong>대기 상태</strong>로 표시됩니다.</div>
+  </div>
+</section>
+
+<!-- 02 -->
+<section class="block">
+  <div class="wrap">
+    <div class="sec-no">02 · 보여주는 것</div>
+    <h2 class="sec-title">대시보드의 <em>네 가지 파트</em></h2>
+    <div class="grid2">
+
+      <div class="feat">
+        <div class="ic">📝</div>
+        <h3>주간 리포트 제출 현황</h3>
+        <p>프로젝트별로 누가 제출·대기인지 한눈에. 이름을 클릭하면 리포트 본문과 코멘트까지 봅니다.</p>
+        <div class="preview">
+          <div class="row"><span class="av">이</span> 이종우 <span class="pill ok">제출완료</span></div>
+          <div class="row"><span class="av">전</span> 전준수 <span class="pill ok">제출완료</span></div>
+          <div class="row"><span class="av">한</span> 한효림 <span class="pill pd">대기</span></div>
+          <div style="margin-top:6px;color:var(--muted)">클릭 → 리포트·코멘트 팝업</div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="ic">🚩</div>
+        <h3>막힌 것 · 도움 필요</h3>
+        <p>주간 리포트에서 '막힘'을 체크한 항목만 맨 위에 모아, 연구책임자가 가장 먼저 봅니다.</p>
+        <div class="preview">
+          <div class="blkbox">🚩 먼저 볼 항목 · 이종우 (자율주행R&D)<br>혼재 고위험 라벨링 기준 합의 필요…</div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="ic">📂</div>
+        <h3>프로젝트 현황</h3>
+        <p>프로젝트별 참여 인원과 제출 진행률. 멤버를 클릭하면 이번 주 한 일·다음 주 계획 상세까지.</p>
+        <div class="preview">
+          <div class="barwrap"><span class="lab">국가교통조사사업</span><span class="tr"><i style="width:100%"></i></span><span class="pct">3/3</span></div>
+          <div class="barwrap"><span class="lab">자율주행R&D</span><span class="tr"><i style="width:67%"></i></span><span class="pct">2/3</span></div>
+          <div class="barwrap"><span class="lab">탄소공간지도R&D</span><span class="tr"><i style="width:100%"></i></span><span class="pct">3/3</span></div>
+        </div>
+      </div>
+
+      <div class="feat">
+        <div class="ic">📅</div>
+        <h3>프로젝트 일정</h3>
+        <p>프로젝트 마일스톤과 공통 일정을 월별 타임라인으로. 프로젝트별 색으로 구분합니다.</p>
+        <div class="preview">
+          <div class="mini-cal">
+            <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
+            <div>15</div><div class="ev">16</div><div>17</div><div class="ev">18</div><div>19</div><div>20</div><div>21</div>
+            <div>22</div><div>23</div><div>24</div><div class="ev">25</div><div class="ev">26</div><div>27</div><div>28</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- 03 -->
+<section class="block">
+  <div class="wrap">
+    <div class="sec-no">03 · 프로젝트로 보면</div>
+    <h2 class="sec-title">흩어진 일을 <em>한 맥락으로</em></h2>
+    <p class="lead">개인의 주간 활동은 흩어지기 쉽습니다. 프로젝트 단위로 모아 보면 각 과제가 어디까지 왔는지,
+       누구의 손이 필요한지 또렷해집니다.</p>
+    <div class="phase">
+      <div class="p"><div class="tag">나에게</div><h3>내 일이 맥락 속에</h3>
+        <p>주간 활동이 프로젝트 진행으로 연결돼 보이고, 내 기여가 또렷이 드러납니다.</p></div>
+      <div class="p"><div class="tag">동료끼리</div><h3>서로 진행이 보인다</h3>
+        <p>같은 프로젝트 멤버의 진행이 보여 자연스러운 협업과 자극이 됩니다.</p></div>
+      <div class="p"><div class="tag">연구책임자</div><h3>제때 돕는다</h3>
+        <p>각 과제 맥락을 알고 있어, 막힌 곳에 정확하고 빠르게 지원할 수 있습니다.</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap center">
+  <a class="cta" href="index.html">📊 대시보드 열기 →</a>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>대시보드 안내 · 한국교통연구원 교통빅데이터본부</span>
+    <span>패턴 참조: TUPA Lab Dashboard</span>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    var root=document.documentElement, btn=document.getElementById('themeBtn');
+    function set(t){root.setAttribute('data-theme',t); btn.textContent=(t==='dark'?'☀️':'🌙');
+      try{localStorage.setItem('mbd-wiki-theme',t)}catch(e){}}
+    var saved; try{saved=localStorage.getItem('mbd-wiki-theme')}catch(e){}
+    if(!saved){saved=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';}
+    set(saved);
+    btn.addEventListener('click',function(){set(root.getAttribute('data-theme')==='dark'?'light':'dark')});
+  })();
+</script>
+</body>
+</html>
