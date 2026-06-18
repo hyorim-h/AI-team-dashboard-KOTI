@@ -37,6 +37,7 @@ def build_reports_dict(reports):
         if not proj:
             continue
         key = f"{proj}::{name}"
+        print(f"  [매핑] 노션: '{r['project']}' / '{r['creator_name']}' → 키: '{key}' / status: {r['status']}")
         # 같은 사람·프로젝트가 여러 개면 제목(주차) 기준 최신 유지
         if key not in latest or r["title"] > latest[key]["title"]:
             r["_display_name"] = name
