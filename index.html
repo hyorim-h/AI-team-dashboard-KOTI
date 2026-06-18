@@ -104,20 +104,28 @@
   .gantt-proj .ghead{padding:14px 18px;border-bottom:1px solid var(--line);background:var(--surface-2);font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px}
   .gantt-proj .ghead .gcount{font-size:12px;font-weight:600;color:var(--muted)}
   .gantt-scroll{overflow-x:auto}
-  .gantt-grid{min-width:680px;padding:12px 18px 18px}
-  .gantt-months{display:flex;border-bottom:1px solid var(--line);margin-bottom:8px;position:relative;height:22px}
-  .gantt-month{font-size:11px;color:var(--muted);font-weight:700;position:absolute;top:0;border-left:1px solid var(--line);padding-left:4px}
-  .gantt-row{display:flex;align-items:center;gap:10px;margin:7px 0}
-  .gantt-label{width:170px;flex:none;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gantt-grid{min-width:720px;padding:6px 18px 18px}
+  .gantt-headrow{display:flex;align-items:flex-end;gap:10px;border-bottom:1px solid var(--line);padding-bottom:4px;margin-bottom:8px}
+  .gantt-head-label,.gantt-head-meta{font-size:11px;font-weight:800;color:var(--muted)}
+  .gantt-head-track{height:20px;background:none}
+  .gantt-month{font-size:11px;color:var(--muted);font-weight:700;position:absolute;top:0;border-left:1px solid var(--line);padding-left:4px;height:18px}
+  .gantt-months{position:relative;height:18px}
+  .gantt-label{width:160px;flex:none;font-size:13px;line-height:1.3;overflow:hidden}
   .gantt-label .gowner{color:var(--muted);font-size:11px}
-  .gantt-track{position:relative;flex:1;height:24px;background:var(--surface-2);border-radius:6px}
-  .gantt-bar{position:absolute;top:3px;height:18px;border-radius:5px;display:flex;align-items:center;padding:0 7px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;cursor:default}
-  .gantt-bar .gfill{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.28);border-radius:5px 0 0 5px}
-  .gantt-bar span{position:relative;z-index:1}
-  .gb-예정{background:#8a99a0} .gb-진행중{background:var(--accent)} .gb-완료{background:var(--ok)} .gb-지연{background:var(--warn)}
-  .gantt-today{position:absolute;top:-4px;bottom:0;width:2px;background:var(--warn);z-index:2}
-  .gantt-today::after{content:"오늘";position:absolute;top:-16px;left:-12px;font-size:10px;color:var(--warn);font-weight:800}
-  .gantt-legend{display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 16px;font-size:12px;color:var(--muted)}
+  .gantt-meta{width:54px;flex:none;text-align:center;font-size:12px}
+  .gantt-track{position:relative;flex:1}
+  .gantt-row2{display:flex;align-items:center;gap:10px;margin:9px 0}
+  .gantt-track2{height:34px;background:var(--surface-2);border-radius:6px}
+  .gbar{position:absolute;height:13px;border-radius:4px;display:flex;align-items:center;padding:0 5px}
+  .gbar-plan{top:3px;background:repeating-linear-gradient(45deg,#c3ccd1,#c3ccd1 4px,#d6dee2 4px,#d6dee2 8px);border:1px solid #b3bdc3}
+  html[data-theme="dark"] .gbar-plan{background:repeating-linear-gradient(45deg,#3a4a52,#3a4a52 4px,#2d3a41 4px,#2d3a41 8px);border-color:#46565e}
+  .gbar-actual{top:18px;color:#fff}
+  .gbar-actual .gdelay{font-size:9px;font-weight:800;color:#fff;white-space:nowrap}
+  .gantt-today{position:absolute;top:-2px;bottom:0;width:2px;background:var(--warn);z-index:3}
+  .gantt-today::after{content:"오늘";position:absolute;top:-15px;left:-11px;font-size:10px;color:var(--warn);font-weight:800}
+  .gstatus{display:inline-block;font-size:10.5px;font-weight:800;color:#fff;padding:2px 7px;border-radius:999px;white-space:nowrap}
+  .gprog{font-weight:800;color:var(--text)}
+  .gantt-legend{display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 14px;font-size:12px;color:var(--muted)}
   .gantt-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
   footer{padding:32px 0 48px;color:var(--muted);font-size:13px}
   footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
@@ -224,9 +232,10 @@
     return latest;
   }
 
-  // ===== 간트 차트 =====
-  function parseDate(s){ var d = new Date(s + "T00:00:00"); return isNaN(d) ? null : d; }
+  // ===== 간트 차트 (계획/실제 두 줄) =====
+  function parseDate(s){ if(!s) return null; var d = new Date(s + "T00:00:00"); return isNaN(d) ? null : d; }
   function dayDiff(a, b){ return Math.round((b - a) / 86400000); }
+  var STATUS_COLOR = { "예정":"#8a99a0", "진행중":"var(--accent)", "완료":"var(--ok)", "지연":"var(--warn)" };
 
   function renderGantt(wbs){
     if(!wbs.length){
@@ -234,71 +243,88 @@
         + '<div class="blocked"><p>WBS 작업이 없습니다. 노션 WBS DB에 작업을 추가하면 여기에 표시됩니다.</p></div></section>';
     }
 
-    // 전체 기간 범위 계산
+    var today = new Date(); today.setHours(0,0,0,0);
+
+    // 실제 종료점: 완료일 있으면 완료일, 없으면(진행중/지연) 오늘, 예정이면 시작 안 함
+    function actualEnd(w){
+      if(w.done) return parseDate(w.done);
+      if(w.status === "예정") return null;
+      return today;
+    }
+
+    // 전체 기간 범위
     var allStart = null, allEnd = null;
     wbs.forEach(function(w){
-      var s = parseDate(w.start), e = parseDate(w.end);
-      if(s && (!allStart || s < allStart)) allStart = s;
-      if(e && (!allEnd || e > allEnd)) allEnd = e;
+      var s = parseDate(w.start), e = parseDate(w.end), a = actualEnd(w);
+      [s, e, a].forEach(function(d){
+        if(d){ if(!allStart || d < allStart) allStart = d; if(!allEnd || d > allEnd) allEnd = d; }
+      });
     });
     if(!allStart || !allEnd) return "";
-
-    // 양 끝에 여백 3일
     allStart = new Date(allStart.getTime() - 3*86400000);
     allEnd = new Date(allEnd.getTime() + 3*86400000);
     var totalDays = dayDiff(allStart, allEnd) || 1;
+    function pct(d){ return dayDiff(allStart, d) / totalDays * 100; }
 
-    function pct(d){ return (dayDiff(allStart, d) / totalDays * 100); }
-
-    // 월 구분선
+    // 월 구분
     var months = "";
     var cur = new Date(allStart.getFullYear(), allStart.getMonth(), 1);
     while(cur <= allEnd){
       var left = pct(cur);
-      if(left >= 0 && left <= 100){
-        months += '<div class="gantt-month" style="left:'+left+'%">'+(cur.getMonth()+1)+'월</div>';
-      }
+      if(left >= 0 && left <= 100) months += '<div class="gantt-month" style="left:'+left+'%">'+(cur.getMonth()+1)+'월</div>';
       cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
     }
-
-    // 오늘 선
-    var today = new Date(); today.setHours(0,0,0,0);
     var todayLeft = pct(today);
-    var todayMark = (todayLeft >= 0 && todayLeft <= 100)
-      ? '<div class="gantt-today" style="left:'+todayLeft+'%"></div>' : "";
+    var todayMark = (todayLeft >= 0 && todayLeft <= 100) ? '<div class="gantt-today" style="left:'+todayLeft+'%"></div>' : "";
 
     var html = '<section><div class="sec-head"><h2>📅 과제별 WBS 일정</h2></div>';
     html += '<div class="gantt-legend">'
-      + '<span><i style="background:#8a99a0"></i>예정</span>'
+      + '<span><i style="background:#c3ccd1"></i>계획</span>'
       + '<span><i style="background:var(--accent)"></i>진행중</span>'
       + '<span><i style="background:var(--ok)"></i>완료</span>'
       + '<span><i style="background:var(--warn)"></i>지연</span>'
-      + '<span>· 막대 안 밝은 영역 = 진척률</span></div>';
+      + '<span>· 위=계획, 아래=실제 진행</span></div>';
 
     PROJECTS.forEach(function(p){
       var tasks = wbs.filter(function(w){ return normProj(w.project) === normProj(p.name); });
       if(!tasks.length) return;
       tasks.sort(function(a,b){ return parseDate(a.start) - parseDate(b.start); });
 
-      html += '<div class="gantt-proj"><div class="ghead">'+esc(p.name)
-        + ' <span class="gcount">· '+tasks.length+'개 작업</span></div>';
+      html += '<div class="gantt-proj"><div class="ghead">'+esc(p.name)+' <span class="gcount">· '+tasks.length+'개 작업</span></div>';
       html += '<div class="gantt-scroll"><div class="gantt-grid">';
-      html += '<div class="gantt-months">'+months+'</div>';
+      // 헤더 행
+      html += '<div class="gantt-headrow"><div class="gantt-label gantt-head-label">작업</div>'
+        + '<div class="gantt-track gantt-head-track"><div class="gantt-months">'+months+'</div></div>'
+        + '<div class="gantt-meta gantt-head-meta">상태</div>'
+        + '<div class="gantt-meta gantt-head-meta">진척</div></div>';
 
       tasks.forEach(function(w){
-        var s = parseDate(w.start), e = parseDate(w.end);
+        var s = parseDate(w.start), e = parseDate(w.end), a = actualEnd(w);
         if(!s || !e) return;
-        var left = pct(s);
-        var width = Math.max(dayDiff(s, e) / totalDays * 100, 1.5);
+        var planLeft = pct(s), planWidth = Math.max(dayDiff(s, e) / totalDays * 100, 1);
         var st = w.status || "예정";
         var prog = Math.max(0, Math.min(100, w.progress || 0));
-        var dateRange = w.start + " ~ " + w.end;
-        html += '<div class="gantt-row" style="position:relative">';
+        var color = STATUS_COLOR[st] || "#8a99a0";
+
+        // 실제 막대
+        var actualBar = "";
+        if(a){
+          var aLeft = pct(s), aWidth = Math.max(dayDiff(s, a) / totalDays * 100, 1);
+          var delay = (w.done && parseDate(w.done) > e) || (!w.done && st === "지연");
+          actualBar = '<div class="gbar gbar-actual" style="left:'+aLeft+'%;width:'+aWidth+'%;background:'+color+'">'
+            + (delay ? '<span class="gdelay">지연</span>' : '') + '</div>';
+        }
+
+        var dateInfo = w.start + " ~ " + w.end + (w.done ? (" (완료 " + w.done + ")") : "");
+
+        html += '<div class="gantt-row2" title="'+esc(dateInfo)+'">';
         html += '<div class="gantt-label">'+esc(w.task)+'<br><span class="gowner">'+esc(w.owner||"")+'</span></div>';
-        html += '<div class="gantt-track">'+todayMark
-          + '<div class="gantt-bar gb-'+esc(st)+'" style="left:'+left+'%;width:'+width+'%" title="'+esc(dateRange)+' · '+prog+'%">'
-          + '<div class="gfill" style="width:'+prog+'%"></div>'
-          + '<span>'+prog+'%</span></div></div>';
+        html += '<div class="gantt-track gantt-track2">'+todayMark
+          + '<div class="gbar gbar-plan" style="left:'+planLeft+'%;width:'+planWidth+'%"></div>'
+          + actualBar
+          + '</div>';
+        html += '<div class="gantt-meta"><span class="gstatus" style="background:'+color+'">'+esc(st)+'</span></div>';
+        html += '<div class="gantt-meta gprog">'+prog+'%</div>';
         html += '</div>';
       });
       html += '</div></div></div>';
