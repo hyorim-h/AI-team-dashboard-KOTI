@@ -11,12 +11,15 @@ PROJECTS = [
     {"name": "탄소공간지도R&D",  "members": ["정승환", "이채영", "김예원", "한효림"]},
 ]
 
-# 노션 프로젝트명 → 대시보드 표시명 매핑 (띄어쓰기 등 차이 보정)
-PROJECT_MAP = {
-    "자율주행 R&D":    "자율주행R&D",
-    "탄소공간지도 R&D": "탄소공간지도R&D",
-    "국가교통 조사사업": "국가교통조사사업",
-}
+def normalize_proj(s):
+    """모든 종류의 공백 제거 후 비교용 문자열 생성"""
+    if not s:
+        return ""
+    # 일반 공백, non-breaking space 등 모든 공백류 제거
+    return "".join(s.split()).replace("\u00a0", "").replace("\u200b", "")
+
+# 정규화된 프로젝트명 → 대시보드 표시명
+PROJECT_LOOKUP = {normalize_proj(p["name"]): p["name"] for p in PROJECTS}
 
 # 노션 생성자 이름 → 팀 내 표시 이름 매핑
 NAME_MAP = {
@@ -33,11 +36,12 @@ def build_reports_dict(reports):
     latest = {}
     for r in reports:
         name = NAME_MAP.get(r["creator_name"], r["creator_name"])
-        proj = PROJECT_MAP.get(r["project"], r["project"])
+        # 공백 정규화로 프로젝트명 매칭 (보이지 않는 유니코드 공백 회피)
+        proj = PROJECT_LOOKUP.get(normalize_proj(r["project"]), r["project"])
         if not proj:
             continue
         key = f"{proj}::{name}"
-        print(f"  [매핑] 노션: '{r['project']}' / '{r['creator_name']}' → 키: '{key}' / status: {r['status']}")
+        print(f"  [매핑] 노션 '{r['project']}'/'{r['creator_name']}' → '{key}' ({r['status']})", flush=True)
         # 같은 사람·프로젝트가 여러 개면 제목(주차) 기준 최신 유지
         if key not in latest or r["title"] > latest[key]["title"]:
             r["_display_name"] = name
