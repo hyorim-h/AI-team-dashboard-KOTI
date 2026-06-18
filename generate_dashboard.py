@@ -11,11 +11,17 @@ PROJECTS = [
     {"name": "탄소공간지도R&D",  "members": ["정승환", "이채영", "김예원", "한효림"]},
 ]
 
-# 노션 생성자 이름 → 팀 내 표시 이름 매핑 (노션 계정명이 다를 경우 여기서 조정)
+# 노션 프로젝트명 → 대시보드 표시명 매핑 (띄어쓰기 등 차이 보정)
+PROJECT_MAP = {
+    "자율주행 R&D":    "자율주행R&D",
+    "탄소공간지도 R&D": "탄소공간지도R&D",
+    "국가교통 조사사업": "국가교통조사사업",
+}
+
+# 노션 생성자 이름 → 팀 내 표시 이름 매핑
 NAME_MAP = {
-    "AI빅데이터팀": "한효림",   # 계정명 → 실명
+    "AI빅데이터팀": "한효림",
     "js_koti":      "전준수",
-    # 나머지는 그대로 사용
 }
 
 def load_data():
@@ -27,7 +33,7 @@ def build_reports_dict(reports):
     latest = {}
     for r in reports:
         name = NAME_MAP.get(r["creator_name"], r["creator_name"])
-        proj = r["project"]
+        proj = PROJECT_MAP.get(r["project"], r["project"])
         if not proj:
             continue
         key = f"{proj}::{name}"
@@ -107,7 +113,14 @@ def render_blocked_panel(reports_dict):
 def render_kpis(reports_dict):
     total = sum(len(p["members"]) for p in PROJECTS)
     submitted = sum(1 for r in reports_dict.values() if r["status"] == "submitted")
-    blocked = sum(1 for r in reports_dict.values() if r.get("blocked"))
+    # blocked는 실제 매핑된 멤버 기준으로만 카운트
+    blocked = 0
+    for p in PROJECTS:
+        for m in p["members"]:
+            key = f"{p['name']}::{m}"
+            r = reports_dict.get(key)
+            if r and r.get("blocked"):
+                blocked += 1
     pending = total - submitted
     return submitted, pending, blocked, total
 
