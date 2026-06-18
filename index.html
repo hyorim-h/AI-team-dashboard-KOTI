@@ -233,7 +233,7 @@
   // ===== 간트 차트 (계획/실제 두 줄) =====
   function parseDate(s){ if(!s) return null; var d = new Date(s + "T00:00:00"); return isNaN(d) ? null : d; }
   function dayDiff(a, b){ return Math.round((b - a) / 86400000); }
-  var STATUS_COLOR = { "예정":"#8a99a0", "진행중":"var(--accent)", "완료":"var(--ok)", "지연":"var(--warn)" };
+  var STATUS_COLOR = { "예정":"#9b6fd4", "진행중":"var(--accent)", "완료":"var(--ok)", "지연":"var(--warn)" };
 
   function renderGantt(wbs){
     if(!wbs.length){
