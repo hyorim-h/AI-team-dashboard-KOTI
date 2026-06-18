@@ -117,12 +117,10 @@
   .gantt-row2{display:flex;align-items:center;gap:10px;margin:9px 0}
   .gantt-track2{height:34px;background:var(--surface-2);border-radius:6px}
   .gbar{position:absolute;height:13px;border-radius:4px;display:flex;align-items:center;padding:0 5px}
-  .gbar-plan{top:3px;background:repeating-linear-gradient(45deg,#c3ccd1,#c3ccd1 4px,#d6dee2 4px,#d6dee2 8px);border:1px solid #b3bdc3}
-  html[data-theme="dark"] .gbar-plan{background:repeating-linear-gradient(45deg,#3a4a52,#3a4a52 4px,#2d3a41 4px,#2d3a41 8px);border-color:#46565e}
-  .gbar-actual{top:18px;color:#fff}
+  .gbar-plan{top:3px}
+  .gbar-actual{top:18px;background:#9aa7ad}
+  html[data-theme="dark"] .gbar-actual{background:#5c6b72}
   .gbar-actual .gdelay{font-size:9px;font-weight:800;color:#fff;white-space:nowrap}
-  .gantt-today{position:absolute;top:-2px;bottom:0;width:2px;background:var(--warn);z-index:3}
-  .gantt-today::after{content:"오늘";position:absolute;top:-15px;left:-11px;font-size:10px;color:var(--warn);font-weight:800}
   .gstatus{display:inline-block;font-size:10.5px;font-weight:800;color:#fff;padding:2px 7px;border-radius:999px;white-space:nowrap}
   .gprog{font-weight:800;color:var(--text)}
   .gantt-legend{display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 14px;font-size:12px;color:var(--muted)}
@@ -274,12 +272,9 @@
       if(left >= 0 && left <= 100) months += '<div class="gantt-month" style="left:'+left+'%">'+(cur.getMonth()+1)+'월</div>';
       cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
     }
-    var todayLeft = pct(today);
-    var todayMark = (todayLeft >= 0 && todayLeft <= 100) ? '<div class="gantt-today" style="left:'+todayLeft+'%"></div>' : "";
-
     var html = '<section><div class="sec-head"><h2>📅 과제별 WBS 일정</h2></div>';
     html += '<div class="gantt-legend">'
-      + '<span><i style="background:#c3ccd1"></i>계획</span>'
+      + '<span><i style="background:#8a99a0"></i>예정</span>'
       + '<span><i style="background:var(--accent)"></i>진행중</span>'
       + '<span><i style="background:var(--ok)"></i>완료</span>'
       + '<span><i style="background:var(--warn)"></i>지연</span>'
@@ -306,12 +301,15 @@
         var prog = Math.max(0, Math.min(100, w.progress || 0));
         var color = STATUS_COLOR[st] || "#8a99a0";
 
-        // 실제 막대
+        // 위: 계획(상태 색)
+        var planBar = '<div class="gbar gbar-plan" style="left:'+planLeft+'%;width:'+planWidth+'%;background:'+color+'"></div>';
+
+        // 아래: 실제(회색)
         var actualBar = "";
         if(a){
           var aLeft = pct(s), aWidth = Math.max(dayDiff(s, a) / totalDays * 100, 1);
           var delay = (w.done && parseDate(w.done) > e) || (!w.done && st === "지연");
-          actualBar = '<div class="gbar gbar-actual" style="left:'+aLeft+'%;width:'+aWidth+'%;background:'+color+'">'
+          actualBar = '<div class="gbar gbar-actual" style="left:'+aLeft+'%;width:'+aWidth+'%">'
             + (delay ? '<span class="gdelay">지연</span>' : '') + '</div>';
         }
 
@@ -319,9 +317,8 @@
 
         html += '<div class="gantt-row2" title="'+esc(dateInfo)+'">';
         html += '<div class="gantt-label">'+esc(w.task)+'<br><span class="gowner">'+esc(w.owner||"")+'</span></div>';
-        html += '<div class="gantt-track gantt-track2">'+todayMark
-          + '<div class="gbar gbar-plan" style="left:'+planLeft+'%;width:'+planWidth+'%"></div>'
-          + actualBar
+        html += '<div class="gantt-track gantt-track2">'
+          + planBar + actualBar
           + '</div>';
         html += '<div class="gantt-meta"><span class="gstatus" style="background:'+color+'">'+esc(st)+'</span></div>';
         html += '<div class="gantt-meta gprog">'+prog+'%</div>';
