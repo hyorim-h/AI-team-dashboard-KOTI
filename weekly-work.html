@@ -136,6 +136,15 @@
     <h2>🗓️ 업무계획 <span class="count-badge" id="planCount"></span></h2>
     <div id="planList"></div>
   </div>
+
+  <div class="result-sec show" id="calSec" style="margin-top:32px">
+    <h2>📅 팀 캘린더</h2>
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
+      <iframe id="calFrame"
+        src="https://calendar.google.com/calendar/embed?src=vhulqta766un5182bit092vo90%40group.calendar.google.com&ctz=Asia%2FSeoul&mode=MONTH&showTitle=0&showPrint=0&showCalendars=0&showTz=0"
+        style="border:0;width:100%;height:600px" frameborder="0" scrolling="no"></iframe>
+    </div>
+  </div>
 </div>
 
 <footer><div class="wrap">주간업무 작성 · 한국교통연구원 교통빅데이터본부</div></footer>
@@ -146,6 +155,11 @@
 
   var TEAM = ["이종우","전준수","이채영","한효림","김예원","정승환"];
   var WORKER_URL = "https://notion-proxy.ekqls0458.workers.dev";
+  // 업무계획에서 제외할 개인 일정 키워드 (제목에 포함되면 제외)
+  var PLAN_EXCLUDE = ["휴가","외출","오후반차","오전반차","반차","민방위","연차","병가","건강검진","출근","재택근무","출산휴가","연구연가","육아휴직"];
+  function isExcluded(title){
+    return PLAN_EXCLUDE.some(function(kw){ return (title||"").indexOf(kw) >= 0; });
+  }
 
   function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function showStatus(msg, kind){
@@ -258,9 +272,9 @@
       if(data.calError){ throw new Error(data.calError); }
       var cal = data.calendar || [];
 
-      // 기간 필터 (start ~ end 포함)
+      // 기간 필터 (start ~ end 포함) + 개인 일정 제외
       var plans = cal.filter(function(e){
-        return e.date >= period.start && e.date <= period.end;
+        return e.date >= period.start && e.date <= period.end && !isExcluded(e.title);
       });
       // 날짜+시간 순 정렬
       plans.sort(function(a,b){
