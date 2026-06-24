@@ -155,8 +155,7 @@
   </div>
 
   <div class="result-sec" id="saveSec" style="text-align:center;margin:24px 0">
-    <button class="btn" id="saveBtn" style="font-size:15px;padding:13px 28px">📥 노션에 저장</button>
-    <div class="status" id="saveStatus" style="margin-top:14px;text-align:left"></div>
+    <div class="status" id="saveStatus" style="text-align:left"></div>
   </div>
 
   <div class="result-sec show" id="wordSec" style="text-align:center;margin:8px 0 24px">
@@ -500,13 +499,14 @@
       document.getElementById("loadedName").textContent = file.name;
       document.getElementById("loadedBar").classList.add("show");
 
-      showStatus("분석 완료 — 업무실적 " + achievements.length + "건 추출 (저장은 아직 안 됨)", "ok");
+      showStatus("분석 완료 — 업무실적 " + achievements.length + "건 추출", "ok");
 
-      // 캘린더에서 업무계획 가져오기
-      loadPlanFromCalendar(period);
+      // 캘린더에서 업무계획 가져오기 (끝난 뒤 자동 저장)
+      await loadPlanFromCalendar(period);
 
-      // 저장 버튼 노출
+      // 자동으로 노션에 저장
       document.getElementById("saveSec").classList.add("show");
+      await doSaveToNotion();
     } catch(e){
       showStatus("분석 실패: " + e.message, "err");
     }
@@ -530,15 +530,12 @@
   });
 
   // 노션에 저장
-  document.getElementById("saveBtn").addEventListener("click", async function(){
-    var btn = this;
+  async function doSaveToNotion(){
     var st = document.getElementById("saveStatus");
     if(!STATE.week || (!STATE.achievements.length && !STATE.plans.length)){
-      st.className = "status show err"; st.textContent = "저장할 데이터가 없습니다. PDF를 먼저 올려주세요.";
       return;
     }
-    btn.disabled = true;
-    st.className = "status show info"; st.textContent = "노션에 저장 중…";
+    st.className = "status show info"; st.textContent = "노션에 자동 저장 중…";
     try {
       var res = await fetch(WORKER_URL, {
         method: "POST",
@@ -549,18 +546,16 @@
       if(!data.ok) throw new Error(data.error || "저장 실패");
       var r = data.result;
       st.className = "status show ok";
-      st.innerHTML = "저장 완료 (" + STATE.week + ")<br>"
-        + "업무실적: 새로 " + r.achieve_saved + "건" + (r.achieve_skipped ? " · 중복 " + r.achieve_skipped + "건 건너뜀" : "") + "<br>"
-        + "업무계획: 새로 " + r.plan_saved + "건" + (r.plan_skipped ? " · 중복 " + r.plan_skipped + "건 건너뜀" : "") + "<br>"
+      st.innerHTML = "노션 저장 완료 (" + STATE.week + ")<br>"
+        + "업무실적: 새로 " + r.achieve_saved + "건" + (r.achieve_skipped ? " · 기존 " + r.achieve_skipped + "건 유지" : "") + "<br>"
+        + "업무계획: 새로 " + r.plan_saved + "건" + (r.plan_skipped ? " · 기존 " + r.plan_skipped + "건 유지" : "") + "<br>"
         + "<small>아래 목록을 클릭해 수정할 수 있습니다.</small>";
       // 저장된 노션 데이터로 다시 그려 클릭(수정) 가능하게 교체
       setTimeout(function(){ loadSavedWork(); }, 800);
     } catch(e){
-      st.className = "status show err"; st.textContent = "저장 실패: " + e.message;
-    } finally {
-      btn.disabled = false;
+      st.className = "status show err"; st.textContent = "자동 저장 실패: " + e.message + " (네트워크 확인 후 PDF를 다시 올려주세요)";
     }
-  });
+  }
 
   var up = document.getElementById("uploader");
   ["dragenter","dragover"].forEach(function(ev){
