@@ -10,7 +10,7 @@
     --line:#dce4e8; --accent:#0e7c86; --accent-2:#13a3b0; --accent-soft:#e2f3f4;
     --warn:#d64545; --warn-soft:#fbe9e9; --ok:#1d9a6c; --ok-soft:#e1f4ec;
     --shadow:0 1px 2px rgba(16,40,48,.06),0 8px 24px rgba(16,40,48,.06);
-    --radius:16px; --maxw:1080px;
+    --radius:16px; --maxw:1320px;
   }
   html[data-theme="dark"]{
     --bg:#0c1417; --surface:#111d22; --surface-2:#15242a; --text:#e7eef1; --muted:#9bb0b7;
@@ -83,14 +83,11 @@
   .ev-meta b{color:var(--text);font-weight:700}
   .ev-attend{display:inline-block;font-size:11.5px;font-weight:700;color:var(--accent-2);background:var(--surface-2);padding:1px 8px;border-radius:999px;margin-right:4px}
   .empty-note{color:var(--muted);font-size:14px;padding:18px;text-align:center;background:var(--surface-2);border-radius:12px}
-  /* 2단 레이아웃: 넓으면 캘린더 | 업무영역, 좁으면 세로 1단 */
+  /* 업무계획 | 업무실적 2단 (넓으면 좌우, 좁으면 세로) */
   .work-grid{display:grid;grid-template-columns:1fr;gap:24px;align-items:start}
-  @media (min-width:1024px){
-    .work-grid{grid-template-columns:minmax(360px, 440px) 1fr}
-    .work-cal #calSec{position:sticky;top:80px}
-    .work-cal iframe{height:680px !important}
+  @media (min-width:900px){
+    .work-grid{grid-template-columns:1fr 1fr}
   }
-  .work-cal .result-sec, .work-main .result-sec{margin:0 0 20px}
   .ev-card.clickable{cursor:pointer;transition:border-color .15s}
   .ev-card.clickable:hover{border-color:var(--accent)}
   .ov{display:none;position:fixed;inset:0;background:rgba(10,20,24,.55);z-index:100;align-items:center;justify-content:center;padding:20px}
@@ -159,29 +156,26 @@
     <div class="status" id="wordStatus" style="margin-top:14px;text-align:left"></div>
   </div>
 
-  <!-- 2단 레이아웃: 왼쪽 캘린더 | 오른쪽 업무계획+업무실적 -->
+  <!-- 팀 캘린더 (상단 풀폭) -->
+  <div class="result-sec show" id="calSec" style="margin-bottom:24px">
+    <h2>📅 팀 캘린더</h2>
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
+      <iframe id="calFrame"
+        src="https://calendar.google.com/calendar/embed?src=vhulqta766un5182bit092vo90%40group.calendar.google.com&ctz=Asia%2FSeoul&mode=MONTH&showTitle=0&showPrint=0&showCalendars=0&showTz=0"
+        style="border:0;width:100%;height:560px" frameborder="0" scrolling="no"></iframe>
+    </div>
+  </div>
+
+  <!-- 업무계획 | 업무실적 2단 -->
   <div class="work-grid">
-    <div class="work-cal">
-      <div class="result-sec show" id="calSec">
-        <h2>📅 팀 캘린더</h2>
-        <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
-          <iframe id="calFrame"
-            src="https://calendar.google.com/calendar/embed?src=vhulqta766un5182bit092vo90%40group.calendar.google.com&ctz=Asia%2FSeoul&mode=MONTH&showTitle=0&showPrint=0&showCalendars=0&showTz=0"
-            style="border:0;width:100%;height:600px" frameborder="0" scrolling="no"></iframe>
-        </div>
-      </div>
+    <div class="result-sec" id="planSec">
+      <h2>🗓️ 업무계획 <span class="count-badge" id="planCount"></span></h2>
+      <div id="planList"></div>
     </div>
 
-    <div class="work-main">
-      <div class="result-sec" id="planSec">
-        <h2>🗓️ 업무계획 <span class="count-badge" id="planCount"></span></h2>
-        <div id="planList"></div>
-      </div>
-
-      <div class="result-sec" id="achieveSec">
-        <h2>✅ 업무실적 <span class="count-badge" id="achieveCount"></span></h2>
-        <div id="achieveList"></div>
-      </div>
+    <div class="result-sec" id="achieveSec">
+      <h2>✅ 업무실적 <span class="count-badge" id="achieveCount"></span></h2>
+      <div id="achieveList"></div>
     </div>
   </div>
 </div>
