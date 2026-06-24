@@ -45,8 +45,16 @@
   .uploader{background:var(--surface);border:2px dashed var(--line);border-radius:var(--radius);
     padding:34px 24px;text-align:center;margin:18px 0;transition:border-color .15s,background .15s}
   .uploader.drag{border-color:var(--accent);background:var(--accent-soft)}
+  .uploader.hide{display:none}
   .uploader h3{margin:0 0 6px;font-size:17px}
   .uploader p{margin:0 0 16px;font-size:13.5px;color:var(--muted)}
+  .loaded-bar{display:none;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;padding:13px 18px;margin:18px 0;box-shadow:var(--shadow)}
+  .loaded-bar.show{display:flex}
+  .loaded-bar .lb-ic{font-size:18px}
+  .loaded-bar .lb-txt{flex:1;font-size:14px}
+  .loaded-bar .lb-txt b{font-weight:800}
+  .loaded-bar .lb-name{color:var(--muted);font-size:13px}
   .btn{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:#fff;border:none;
     font-weight:700;font-size:14px;padding:11px 20px;border-radius:11px;cursor:pointer;box-shadow:var(--shadow)}
   .btn:disabled{opacity:.5;cursor:not-allowed}
@@ -104,6 +112,12 @@
     <p>파일을 끌어다 놓거나 버튼으로 선택하세요. 브라우저 안에서만 처리되고 어디에도 업로드되지 않습니다.</p>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <button class="btn" id="pickBtn">PDF 선택</button>
+  </div>
+
+  <div class="loaded-bar" id="loadedBar">
+    <span class="lb-ic">📄</span>
+    <div class="lb-txt"><b>주간업무 PDF 업로드 완료</b><div class="lb-name" id="loadedName">—</div></div>
+    <button class="btn ghost" id="reuploadBtn">다시 올리기</button>
   </div>
 
   <div class="status" id="status"></div>
@@ -236,6 +250,11 @@
       var achievements = extractAchievements(fullText);
       renderAchievements(achievements);
 
+      // 업로드 완료 UI 전환
+      document.getElementById("uploader").classList.add("hide");
+      document.getElementById("loadedName").textContent = file.name;
+      document.getElementById("loadedBar").classList.add("show");
+
       showStatus("분석 완료 — 업무실적 " + achievements.length + "건 추출 (저장은 아직 안 됨)", "ok");
     } catch(e){
       showStatus("분석 실패: " + e.message, "err");
@@ -246,6 +265,16 @@
   var fileInput = document.getElementById("fileInput");
   document.getElementById("pickBtn").addEventListener("click", function(){ fileInput.click(); });
   fileInput.addEventListener("change", function(e){ if(e.target.files[0]) handleFile(e.target.files[0]); });
+
+  // 다시 올리기: 초기 상태로 되돌림
+  document.getElementById("reuploadBtn").addEventListener("click", function(){
+    document.getElementById("loadedBar").classList.remove("show");
+    document.getElementById("uploader").classList.remove("hide");
+    document.getElementById("periodCard").classList.remove("show");
+    document.getElementById("achieveSec").classList.remove("show");
+    document.getElementById("status").className = "status";
+    fileInput.value = "";
+  });
 
   var up = document.getElementById("uploader");
   ["dragenter","dragover"].forEach(function(ev){
