@@ -619,8 +619,9 @@
     var st = document.getElementById("wordStatus");
     var d = window.docx;
     if(!d){ st.className="status show err"; st.textContent="워드 라이브러리 로드 실패 — 새로고침 후 다시 시도하세요."; return; }
-    if(!SAVED.achievements.length && !SAVED.plans.length){
-      st.className="status show err"; st.textContent="저장된 데이터가 없습니다. PDF를 올리고 저장한 뒤 다운로드하세요."; return;
+    var donePlanCount = SAVED.plans.filter(function(x){ return x.status === "작성완료"; }).length;
+    if(!SAVED.achievements.length && !donePlanCount){
+      st.className="status show err"; st.textContent="워드로 내보낼 내용이 없습니다. (업무실적이 없고, 작성완료된 업무계획도 없음)"; return;
     }
     st.className="status show info"; st.textContent="워드 생성 중…";
     try {
@@ -630,7 +631,9 @@
         new P({ alignment:AT.CENTER, spacing:{after:240}, children:[new T({ text:"교통빅데이터연구본부 모빌리티 빅데이터팀", size:20 })] })
       ];
       buildSection(d, "업무실적", SAVED.achievements).forEach(function(p){ children.push(p); });
-      buildSection(d, "업무계획", SAVED.plans).forEach(function(p){ children.push(p); });
+      // 업무계획은 작성완료된 것만
+      var donePlans = SAVED.plans.filter(function(x){ return x.status === "작성완료"; });
+      buildSection(d, "업무계획", donePlans).forEach(function(p){ children.push(p); });
 
       var doc = new d.Document({
         styles:{ default:{ document:{ run:{ font:"Malgun Gothic", size:20 } } } },
