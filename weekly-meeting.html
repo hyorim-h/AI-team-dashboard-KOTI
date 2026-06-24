@@ -55,6 +55,7 @@
   .cal-nav{display:flex;gap:6px}
   .cal-nav button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);
     background:var(--surface);color:var(--text);cursor:pointer;font-size:15px}
+  .cal-nav button[data-mv="today"]{width:auto;padding:0 12px;font-size:13px;font-weight:700}
   .cal-nav button:hover{background:var(--surface-2)}
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
   .cal-dow{text-align:center;font-size:12px;font-weight:800;color:var(--muted);padding:4px 0}
@@ -310,7 +311,7 @@
 
     area.innerHTML='<div class="cal">'
       +'<div class="cal-top"><div class="cal-title">'+y+'년 '+(mo+1)+'월</div>'
-      +'<div class="cal-nav"><button data-mv="-1">&lt;</button><button data-mv="today">오늘</button><button data-mv="1">&gt;</button></div></div>'
+      +'<div class="cal-nav"><button data-mv="-1">◀</button><button data-mv="today">오늘</button><button data-mv="1">▶</button></div></div>'
       +'<div class="cal-grid">'+cells+'</div></div>';
   }
 
