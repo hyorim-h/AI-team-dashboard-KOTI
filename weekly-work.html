@@ -83,6 +83,21 @@
   .ev-meta b{color:var(--text);font-weight:700}
   .ev-attend{display:inline-block;font-size:11.5px;font-weight:700;color:var(--accent-2);background:var(--surface-2);padding:1px 8px;border-radius:999px;margin-right:4px}
   .empty-note{color:var(--muted);font-size:14px;padding:18px;text-align:center;background:var(--surface-2);border-radius:12px}
+  .ev-card.clickable{cursor:pointer;transition:border-color .15s}
+  .ev-card.clickable:hover{border-color:var(--accent)}
+  .ov{display:none;position:fixed;inset:0;background:rgba(10,20,24,.55);z-index:100;align-items:center;justify-content:center;padding:20px}
+  .ov.open{display:flex}
+  .modal{background:var(--surface);border-radius:18px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow)}
+  .mhead{display:flex;align-items:center;padding:18px 22px;border-bottom:1px solid var(--line)}
+  .mtitle{font-size:16px;font-weight:800;flex:1}
+  .mhead .x{background:none;border:1px solid var(--line);color:var(--muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px}
+  .mbody{padding:18px 22px;display:flex;flex-direction:column;gap:13px}
+  .fld{display:flex;flex-direction:column;gap:5px}
+  .fld span{font-size:12.5px;font-weight:800;color:var(--muted)}
+  .fld input,.fld textarea,.fld select{border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:14px;
+    background:var(--surface);color:var(--text);font-family:inherit;resize:vertical}
+  .fld input:focus,.fld textarea:focus,.fld select:focus{outline:none;border-color:var(--accent)}
+  .medit-status{margin:0}
   footer{padding:32px 0 48px;color:var(--muted);font-size:13px}
 </style>
 </head>
@@ -156,6 +171,48 @@
 
 <footer><div class="wrap">주간업무 작성 · 한국교통연구원 교통빅데이터본부</div></footer>
 
+<!-- 수정 모달 -->
+<div class="ov" id="editOv">
+  <div class="modal">
+    <div class="mhead">
+      <div class="mtitle" id="editTitle">항목 수정</div>
+      <button class="x" id="editClose">✕</button>
+    </div>
+    <div class="mbody">
+      <label class="fld"><span>제목</span><input type="text" id="edTitle"></label>
+      <label class="fld"><span>시간</span><input type="text" id="edTime" placeholder="예: 14:00"></label>
+      <label class="fld"><span>과제</span>
+        <select id="edProject">
+          <option value="">선택 안 함</option>
+          <option value="국가교통조사사업">국가교통조사사업</option>
+          <option value="자율주행R&D">자율주행R&D</option>
+          <option value="탄소공간지도R&D">탄소공간지도R&D</option>
+          <option value="기타">기타</option>
+        </select>
+      </label>
+      <label class="fld"><span>일시·장소</span><input type="text" id="edLocation"></label>
+      <label class="fld"><span>내용</span><textarea id="edContent" rows="3"></textarea></label>
+      <label class="fld"><span>참석자</span><textarea id="edAttendees" rows="2"></textarea></label>
+      <label class="fld"><span id="edWhoLabel">작성자</span>
+        <select id="edWho">
+          <option value="">선택</option>
+          <option value="이종우">이종우</option>
+          <option value="전준수">전준수</option>
+          <option value="이채영">이채영</option>
+          <option value="한효림">한효림</option>
+          <option value="김예원">김예원</option>
+          <option value="정승환">정승환</option>
+        </select>
+      </label>
+      <div class="medit-status status" id="editStatus"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button class="btn ghost" id="editCancel">취소</button>
+        <button class="btn" id="editSave">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
   pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -199,16 +256,19 @@
     }
   }
 
+  var SAVED = { achievements:[], plans:[] };
+
   function renderSavedAchievements(items){
+    SAVED.achievements = items;
     var sec = document.getElementById("achieveSec");
     var list = document.getElementById("achieveList");
     document.getElementById("achieveCount").textContent = items.length + "건";
     sec.classList.add("show");
     if(!items.length){ list.innerHTML = '<div class="empty-note">저장된 업무실적이 없습니다.</div>'; return; }
-    list.innerHTML = items.map(function(e){
+    list.innerHTML = items.map(function(e, idx){
       var dd = (e.date||"").slice(5).replace("-",".");
       var modTag = e.modified ? '<span class="ev-attend" style="background:var(--warn-soft);color:var(--warn)">수정됨'+(e.modifier?(" · "+esc(e.modifier)):"")+'</span>' : '';
-      return '<div class="ev-card">'
+      return '<div class="ev-card clickable" data-kind="achieve" data-idx="'+idx+'">'
         + '<div class="ev-head"><span class="ev-dt">'+esc(dd)+' '+esc(e.time||"종일")+'</span>'
         + '<span class="ev-title">'+esc(e.title)+'</span>'+modTag+'</div>'
         + (e.content ? '<div class="ev-meta"><b>내용</b> · '+esc(e.content)+'</div>' : '')
@@ -219,16 +279,17 @@
   }
 
   function renderSavedPlans(items){
+    SAVED.plans = items;
     var sec = document.getElementById("planSec");
     var list = document.getElementById("planList");
     document.getElementById("planCount").textContent = items.length + "건";
     sec.classList.add("show");
     if(!items.length){ list.innerHTML = '<div class="empty-note">저장된 업무계획이 없습니다.</div>'; return; }
-    list.innerHTML = items.map(function(e){
+    list.innerHTML = items.map(function(e, idx){
       var dd = (e.date||"").slice(5).replace("-",".");
       var done = e.status === "작성완료";
       var stTag = '<span class="ev-attend" style="background:'+(done?"var(--ok-soft)":"var(--warn-soft)")+';color:'+(done?"var(--ok)":"var(--warn)")+'">'+(done?"작성완료":"작성필요")+(e.writer?(" · "+esc(e.writer)):"")+'</span>';
-      return '<div class="ev-card">'
+      return '<div class="ev-card clickable" data-kind="plan" data-idx="'+idx+'">'
         + '<div class="ev-head"><span class="ev-dt">'+esc(dd)+' '+esc(e.time||"종일")+'</span>'
         + '<span class="ev-title">'+esc(e.title)+'</span>'+stTag+'</div>'
         + (e.content ? '<div class="ev-meta"><b>내용</b> · '+esc(e.content)+'</div>' : '<div class="ev-meta" style="color:var(--muted);font-style:italic">아직 작성되지 않음 — 눌러서 작성</div>')
@@ -513,6 +574,74 @@
     set(saved);
     btn.addEventListener("click", function(){ set(root.getAttribute("data-theme")==="dark"?"light":"dark"); });
   })();
+
+  // ===== 수정 모달 =====
+  var EDIT = { kind:"", idx:-1 };
+  var editOv = document.getElementById("editOv");
+
+  function openEdit(kind, idx){
+    var item = (kind==="achieve" ? SAVED.achievements : SAVED.plans)[idx];
+    if(!item) return;
+    EDIT.kind = kind; EDIT.idx = idx;
+    var isPlan = (kind==="plan");
+    document.getElementById("editTitle").textContent = (isPlan ? "업무계획 작성/수정" : "업무실적 수정");
+    document.getElementById("edTitle").value = item.title || "";
+    document.getElementById("edTime").value = item.time || "";
+    document.getElementById("edProject").value = item.project || "";
+    document.getElementById("edLocation").value = item.location || "";
+    document.getElementById("edContent").value = item.content || "";
+    document.getElementById("edAttendees").value = item.attendees || "";
+    document.getElementById("edWhoLabel").textContent = isPlan ? "작성자" : "수정자";
+    document.getElementById("edWho").value = isPlan ? (item.writer||"") : (item.modifier||"");
+    document.getElementById("editStatus").className = "medit-status status";
+    editOv.classList.add("open");
+  }
+  function closeEdit(){ editOv.classList.remove("open"); }
+
+  // 카드 클릭 → 모달 열기 (이벤트 위임)
+  document.addEventListener("click", function(e){
+    var card = e.target.closest && e.target.closest(".ev-card.clickable");
+    if(card) openEdit(card.dataset.kind, +card.dataset.idx);
+  });
+  document.getElementById("editClose").addEventListener("click", closeEdit);
+  document.getElementById("editCancel").addEventListener("click", closeEdit);
+  editOv.addEventListener("click", function(e){ if(e.target===editOv) closeEdit(); });
+
+  // 저장
+  document.getElementById("editSave").addEventListener("click", async function(){
+    var isPlan = (EDIT.kind==="plan");
+    var orig = (isPlan ? SAVED.plans : SAVED.achievements)[EDIT.idx];
+    if(!orig) return;
+    var who = document.getElementById("edWho").value;
+    var st = document.getElementById("editStatus");
+    if(!who){ st.className="medit-status status show err"; st.textContent=(isPlan?"작성자":"수정자")+"를 선택하세요."; return; }
+
+    var item = {
+      id: orig.id,
+      title: document.getElementById("edTitle").value.trim(),
+      time: document.getElementById("edTime").value.trim(),
+      project: document.getElementById("edProject").value,
+      location: document.getElementById("edLocation").value.trim(),
+      content: document.getElementById("edContent").value.trim(),
+      attendees: document.getElementById("edAttendees").value.trim(),
+    };
+    if(isPlan) item.writer = who; else item.modifier = who;
+
+    st.className="medit-status status show info"; st.textContent="저장 중…";
+    try {
+      var res = await fetch(WORKER_URL, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ action:"update", isPlan:isPlan, item:item })
+      });
+      var data = await res.json();
+      if(!data.ok) throw new Error(data.error||"실패");
+      st.className="medit-status status show ok"; st.textContent="저장 완료 — 새로고침합니다…";
+      // 로컬 반영 후 모달 닫고 데이터 다시 로드
+      setTimeout(function(){ closeEdit(); loadSavedWork(); }, 700);
+    } catch(err){
+      st.className="medit-status status show err"; st.textContent="저장 실패: "+err.message;
+    }
+  });
 
   // 페이지 열릴 때 저장된 현재 주차 불러오기
   loadSavedWork();
