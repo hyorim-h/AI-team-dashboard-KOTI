@@ -606,26 +606,43 @@
     "기타": "(기타)"
   };
   var PROJECT_ORDER = ["국가교통조사사업","자율주행R&D","탄소공간지도R&D","기타"];
+  // 양식 폰트 (효림님 PC의 실제 KoPub 폰트명)
+  var FONT = {
+    head:   "KoPub돋움체 Bold",   // 〈업무실적〉 헤더
+    proj:   "KoPub바탕체 Medium", // 과제명
+    title:  "KoPub바탕체 Bold",   // □ 제목
+    body:   "KoPub바탕체 Light"   // 일시·장소/내용/참석자
+  };
 
   function buildItemParas(d, it){
     var P = d.Paragraph, T = d.TextRun;
+    function bodyLine(label, value){
+      return new P({
+        indent: { left: 360, hanging: 360 },
+        spacing: { after: 0 },
+        children: [ new T({ text: "- " + label + ": " + (value||""), font: FONT.body, size: 24 }) ]
+      });
+    }
     return [
-      new P({ spacing:{before:120, after:40}, children:[new T({ text:"□ "+(it.title||""), bold:true, size:22 })] }),
-      new P({ indent:{left:240}, children:[new T({ text:"- 일시·장소: "+(it.location||""), size:20 })] }),
-      new P({ indent:{left:240}, children:[new T({ text:"- 내용: "+(it.content||""), size:20 })] }),
-      new P({ indent:{left:240}, children:[new T({ text:"- 참석자: "+(it.attendees||""), size:20 })] })
+      new P({ indent:{left:360, hanging:360}, spacing:{before:120, after:0},
+        children:[new T({ text:"□ "+(it.title||""), bold:true, font:FONT.title, size:24 })] }),
+      bodyLine("일시·장소", it.location),
+      bodyLine("내용", it.content),
+      bodyLine("참석자", it.attendees)
     ];
   }
 
   function buildSection(d, label, items){
     var P = d.Paragraph, T = d.TextRun;
-    var out = [ new P({ spacing:{before:240, after:120}, children:[new T({ text:"<"+label+">", bold:true, size:24 })] }) ];
+    var out = [ new P({ spacing:{before:240, after:120},
+      children:[new T({ text:"〈"+label+"〉", bold:true, font:FONT.head, size:30 })] }) ];
     var groups = {};
     items.forEach(function(it){ var k=it.project||"기타"; (groups[k]=groups[k]||[]).push(it); });
     var n = 1;
     PROJECT_ORDER.forEach(function(pk){
       if(!groups[pk]) return;
-      out.push(new P({ spacing:{before:160, after:80}, children:[new T({ text:n+". "+(PROJECT_FULL[pk]||pk), bold:true, size:22 })] }));
+      out.push(new P({ spacing:{before:160, after:80},
+        children:[new T({ text:n+". "+(PROJECT_FULL[pk]||pk), font:FONT.proj, size:26 })] }));
       groups[pk].forEach(function(it){ buildItemParas(d, it).forEach(function(p){ out.push(p); }); });
       n++;
     });
@@ -643,11 +660,7 @@
     }
     st.className="status show info"; st.textContent="워드 생성 중…";
     try {
-      var P = d.Paragraph, T = d.TextRun, AT = d.AlignmentType;
-      var children = [
-        new P({ alignment:AT.CENTER, children:[new T({ text:"KOTI 주간 회의 자료", bold:true, size:36 })] }),
-        new P({ alignment:AT.CENTER, spacing:{after:240}, children:[new T({ text:"교통빅데이터연구본부 모빌리티 빅데이터팀", size:20 })] })
-      ];
+      var children = [];
       // 업무실적은 수정된 것만
       var modAchieve = SAVED.achievements.filter(function(x){ return x.modified; });
       buildSection(d, "업무실적", modAchieve).forEach(function(p){ children.push(p); });
@@ -656,8 +669,8 @@
       buildSection(d, "업무계획", donePlans).forEach(function(p){ children.push(p); });
 
       var doc = new d.Document({
-        styles:{ default:{ document:{ run:{ font:"Malgun Gothic", size:20 } } } },
-        sections:[{ properties:{ page:{ size:{width:12240,height:15840}, margin:{top:1440,right:1440,bottom:1440,left:1440} } }, children: children }]
+        styles:{ default:{ document:{ run:{ font:FONT.body, size:24 } } } },
+        sections:[{ properties:{ page:{ size:{width:11906,height:16838}, margin:{top:1701,right:1440,bottom:1440,left:1440} } }, children: children }]
       });
 
       var blob = await d.Packer.toBlob(doc);
