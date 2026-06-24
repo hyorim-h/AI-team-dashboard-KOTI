@@ -131,6 +131,11 @@
     <h2>✅ 업무실적 <span class="count-badge" id="achieveCount"></span></h2>
     <div id="achieveList"></div>
   </div>
+
+  <div class="result-sec" id="planSec">
+    <h2>🗓️ 업무계획 <span class="count-badge" id="planCount"></span></h2>
+    <div id="planList"></div>
+  </div>
 </div>
 
 <footer><div class="wrap">주간업무 작성 · 한국교통연구원 교통빅데이터본부</div></footer>
@@ -140,6 +145,7 @@
   pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
   var TEAM = ["이종우","전준수","이채영","한효림","김예원","정승환"];
+  var WORKER_URL = "https://notion-proxy.ekqls0458.workers.dev";
 
   function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function showStatus(msg, kind){
@@ -232,6 +238,57 @@
     }).join("");
   }
 
+  // 업무계획: 캘린더에서 PDF 기간에 해당하는 일정 가져오기
+  async function loadPlanFromCalendar(period){
+    var sec = document.getElementById("planSec");
+    var list = document.getElementById("planList");
+    sec.classList.add("show");
+    document.getElementById("planCount").textContent = "불러오는 중…";
+    list.innerHTML = '<div class="empty-note">캘린더를 불러오는 중…</div>';
+
+    if(!period.start || !period.end){
+      document.getElementById("planCount").textContent = "";
+      list.innerHTML = '<div class="empty-note">PDF에서 주차 기간을 찾지 못해 캘린더를 거를 수 없습니다.</div>';
+      return;
+    }
+
+    try {
+      var res = await fetch(WORKER_URL, {cache:"no-store"});
+      var data = await res.json();
+      if(data.calError){ throw new Error(data.calError); }
+      var cal = data.calendar || [];
+
+      // 기간 필터 (start ~ end 포함)
+      var plans = cal.filter(function(e){
+        return e.date >= period.start && e.date <= period.end;
+      });
+      // 날짜+시간 순 정렬
+      plans.sort(function(a,b){
+        if(a.date !== b.date) return a.date < b.date ? -1 : 1;
+        return (a.time||"") < (b.time||"") ? -1 : 1;
+      });
+
+      document.getElementById("planCount").textContent = plans.length + "건 (" + period.start + " ~ " + period.end + ")";
+
+      if(!plans.length){
+        list.innerHTML = '<div class="empty-note">해당 기간('+period.start+' ~ '+period.end+')에 캘린더 일정이 없습니다.</div>';
+        return;
+      }
+
+      list.innerHTML = plans.map(function(e){
+        var dd = e.date.slice(5).replace("-",".");
+        return '<div class="ev-card">'
+          + '<div class="ev-head"><span class="ev-dt">'+esc(dd)+' '+esc(e.time||"종일")+'</span>'
+          + '<span class="ev-title">'+esc(e.title)+'</span></div>'
+          + (e.desc ? '<div class="ev-meta"><b>내용</b> · '+esc(e.desc)+'</div>' : '<div class="ev-meta" style="color:var(--muted);font-style:italic">내용·참석자는 작성 단계에서 입력</div>')
+          + '</div>';
+      }).join("");
+    } catch(e){
+      document.getElementById("planCount").textContent = "";
+      list.innerHTML = '<div class="empty-note">캘린더를 불러오지 못했습니다.<br><small>'+esc(String(e))+'</small></div>';
+    }
+  }
+
   async function handleFile(file){
     if(!file || file.type !== "application/pdf"){ showStatus("PDF 파일만 올릴 수 있습니다.", "err"); return; }
     showStatus("PDF 분석 중…", "info");
@@ -256,6 +313,9 @@
       document.getElementById("loadedBar").classList.add("show");
 
       showStatus("분석 완료 — 업무실적 " + achievements.length + "건 추출 (저장은 아직 안 됨)", "ok");
+
+      // 캘린더에서 업무계획 가져오기
+      loadPlanFromCalendar(period);
     } catch(e){
       showStatus("분석 실패: " + e.message, "err");
     }
@@ -272,6 +332,7 @@
     document.getElementById("uploader").classList.remove("hide");
     document.getElementById("periodCard").classList.remove("show");
     document.getElementById("achieveSec").classList.remove("show");
+    document.getElementById("planSec").classList.remove("show");
     document.getElementById("status").className = "status";
     fileInput.value = "";
   });
