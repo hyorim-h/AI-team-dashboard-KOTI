@@ -551,7 +551,10 @@
       st.className = "status show ok";
       st.innerHTML = "저장 완료 (" + STATE.week + ")<br>"
         + "업무실적: 새로 " + r.achieve_saved + "건" + (r.achieve_skipped ? " · 중복 " + r.achieve_skipped + "건 건너뜀" : "") + "<br>"
-        + "업무계획: 새로 " + r.plan_saved + "건" + (r.plan_skipped ? " · 중복 " + r.plan_skipped + "건 건너뜀" : "");
+        + "업무계획: 새로 " + r.plan_saved + "건" + (r.plan_skipped ? " · 중복 " + r.plan_skipped + "건 건너뜀" : "") + "<br>"
+        + "<small>아래 목록을 클릭해 수정할 수 있습니다.</small>";
+      // 저장된 노션 데이터로 다시 그려 클릭(수정) 가능하게 교체
+      setTimeout(function(){ loadSavedWork(); }, 800);
     } catch(e){
       st.className = "status show err"; st.textContent = "저장 실패: " + e.message;
     } finally {
@@ -619,9 +622,10 @@
     var st = document.getElementById("wordStatus");
     var d = window.docx;
     if(!d){ st.className="status show err"; st.textContent="워드 라이브러리 로드 실패 — 새로고침 후 다시 시도하세요."; return; }
+    var modAchieveCount = SAVED.achievements.filter(function(x){ return x.modified; }).length;
     var donePlanCount = SAVED.plans.filter(function(x){ return x.status === "작성완료"; }).length;
-    if(!SAVED.achievements.length && !donePlanCount){
-      st.className="status show err"; st.textContent="워드로 내보낼 내용이 없습니다. (업무실적이 없고, 작성완료된 업무계획도 없음)"; return;
+    if(!modAchieveCount && !donePlanCount){
+      st.className="status show err"; st.textContent="워드로 내보낼 내용이 없습니다. (수정된 업무실적·작성완료된 업무계획이 없음)"; return;
     }
     st.className="status show info"; st.textContent="워드 생성 중…";
     try {
@@ -630,7 +634,9 @@
         new P({ alignment:AT.CENTER, children:[new T({ text:"KOTI 주간 회의 자료", bold:true, size:36 })] }),
         new P({ alignment:AT.CENTER, spacing:{after:240}, children:[new T({ text:"교통빅데이터연구본부 모빌리티 빅데이터팀", size:20 })] })
       ];
-      buildSection(d, "업무실적", SAVED.achievements).forEach(function(p){ children.push(p); });
+      // 업무실적은 수정된 것만
+      var modAchieve = SAVED.achievements.filter(function(x){ return x.modified; });
+      buildSection(d, "업무실적", modAchieve).forEach(function(p){ children.push(p); });
       // 업무계획은 작성완료된 것만
       var donePlans = SAVED.plans.filter(function(x){ return x.status === "작성완료"; });
       buildSection(d, "업무계획", donePlans).forEach(function(p){ children.push(p); });
