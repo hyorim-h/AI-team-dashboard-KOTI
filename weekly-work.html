@@ -366,6 +366,14 @@
     var pp = ymd.split("-");
     return (+pp[1]) + "/" + (+pp[2]);
   }
+  function fmtDateKor(ymd){ // 2026-06-23 → 06.23(화)
+    if(!ymd) return "";
+    var pp = ymd.split("-");
+    var dObj = new Date(ymd + "T00:00:00");
+    var days = ["일","월","화","수","목","금","토"];
+    function z(n){ return (n<10?"0":"")+n; }
+    return z(+pp[1]) + "." + z(+pp[2]) + "(" + days[dObj.getDay()] + ")";
+  }
 
   // 업무실적 우리팀 일정 추출
   function extractAchievements(fullText){
@@ -668,7 +676,12 @@
     document.getElementById("edTitle").value = item.title || "";
     document.getElementById("edTime").value = item.time || "";
     document.getElementById("edProject").value = item.project || "";
-    document.getElementById("edLocation").value = item.location || "";
+    // 업무계획이고 일시·장소가 비어있으면 날짜+시간으로 자동 채움 (장소는 사용자가 추가)
+    var locVal = item.location || "";
+    if(isPlan && !locVal && item.date){
+      locVal = fmtDateKor(item.date) + (item.time ? (" " + item.time) : "") + ", ";
+    }
+    document.getElementById("edLocation").value = locVal;
     document.getElementById("edContent").value = item.content || "";
     document.getElementById("edAttendees").value = item.attendees || "";
     document.getElementById("edWhoLabel").textContent = isPlan ? "작성자" : "수정자";
