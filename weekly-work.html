@@ -261,6 +261,14 @@
         else { lines.push(curLine); curLine = it.str; curY = y; }
       });
       if(curLine) lines.push(curLine);
+      // 쪽번호(- 7 -), 빈 줄 등 노이즈 제거
+      lines = lines.filter(function(ln){
+        var t = ln.trim();
+        if(t === "") return false;
+        if(/^-\s*\d+\s*-$/.test(t)) return false;   // - 7 -
+        if(/^\d+\s*\/\s*\d+$/.test(t)) return false; // 7 / 11
+        return true;
+      });
       pages.push(lines.join("\n"));
     }
     return pages;
@@ -307,8 +315,8 @@
       // 일시·장소 / 내용 / 참석자 추출
       var loc = it.match(/일\s*시[·\s]*장소\s*[:：]\s*(.+)/);
       var content = it.match(/내\s*용\s*[:：]\s*([\s\S]+?)(?=-\s*참|$)/);
-      // 참석자: 다음 줄에 과제제목(숫자. ...)이 오면 거기서 멈춤
-      var attendees = it.match(/참\s*석\s*자\s*[:：]\s*([\s\S]+?)(?=\n\s*\d+\.\s|\n\s*<|$)/);
+      // 참석자: 다음 과제제목(숫자.)·쪽번호(- N -)·꺾쇠에서 멈춤
+      var attendees = it.match(/참\s*석\s*자\s*[:：]\s*([\s\S]+?)(?=\n\s*\d+\.\s|\n\s*-\s*\d+\s*-|\n\s*<|$)/);
       events.push({
         date: "2026-"+m[1]+"-"+m[2],
         mmdd: m[1]+"."+m[2],
