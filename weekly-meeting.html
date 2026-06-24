@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>주간회의 자료 · 모빌리티 빅데이터팀</title>
+<style>
+  :root{
+    --bg:#f6f8fa; --surface:#ffffff; --surface-2:#eef3f6; --text:#13242b; --muted:#5b6b72;
+    --line:#dce4e8; --accent:#0e7c86; --accent-2:#13a3b0; --accent-soft:#e2f3f4;
+    --warn:#d64545; --warn-soft:#fbe9e9; --ok:#1d9a6c; --ok-soft:#e1f4ec;
+    --shadow:0 1px 2px rgba(16,40,48,.06),0 8px 24px rgba(16,40,48,.06);
+    --radius:16px; --maxw:1100px;
+  }
+  html[data-theme="dark"]{
+    --bg:#0c1417; --surface:#111d22; --surface-2:#15242a; --text:#e7eef1; --muted:#9bb0b7;
+    --line:#1f333a; --accent:#3fc2cd; --accent-2:#2aa7b3; --accent-soft:#10333a;
+    --warn:#ff7a7a; --warn-soft:#3a1717; --ok:#43c794; --ok-soft:#103024;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  header.nav{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .nav-in{max-width:var(--maxw);margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;text-decoration:none;color:inherit}
+  .logo-badge{height:52px;padding:0 15px;border-radius:11px;background:#fff;display:flex;align-items:center;
+    justify-content:center;color:#0a2a6b;font-weight:900;font-size:16px;box-shadow:inset 0 0 0 1px var(--line)}
+  .brand small{display:block;font-weight:600;font-size:11px;color:var(--muted)}
+  .nav-links{margin-left:auto;display:flex;gap:4px;align-items:center}
+  .nav-links a{font-size:13.5px;color:var(--muted);text-decoration:none;padding:7px 11px;border-radius:9px}
+  .nav-links a:hover{color:var(--text);background:var(--surface-2)}
+  .nav-links a.cur{color:var(--text);background:var(--surface-2);font-weight:700}
+  .toggle{border:1px solid var(--line);background:var(--surface);color:var(--text);
+    width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;display:grid;place-items:center}
+  .titlebar{padding:34px 0 14px}
+  .titlebar .eyebrow{font-size:12px;font-weight:800;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  .titlebar h1{font-size:clamp(24px,3.6vw,34px);font-weight:850;letter-spacing:-.6px;margin:8px 0 4px}
+  .titlebar .sub{color:var(--muted);font-size:14px}
+  .state{padding:40px;text-align:center;color:var(--muted)}
+
+  .filter-row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 20px}
+  .fchip{font-size:13px;font-weight:700;padding:7px 14px;border-radius:999px;border:1px solid var(--line);
+    background:var(--surface);color:var(--muted);cursor:pointer}
+  .fchip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  .meeting{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
+  .m-head{padding:18px 22px;border-bottom:1px solid var(--line);background:var(--surface-2);
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .m-proj{font-size:11.5px;font-weight:800;color:#fff;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .m-title{font-size:16px;font-weight:800;flex:1;min-width:160px}
+  .m-date{font-size:13px;color:var(--muted);font-weight:700}
+  .m-body{padding:8px 22px 18px}
+  .m-sec{padding:14px 0;border-bottom:1px dashed var(--line)}
+  .m-sec:last-child{border-bottom:none}
+  .m-sec h3{font-size:15px;font-weight:800;margin:0 0 6px;color:var(--accent)}
+  .m-sec .m-text{font-size:14px;white-space:pre-wrap;color:var(--text)}
+  .m-actions{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:#fff;border:none;
+    font-weight:700;font-size:13.5px;padding:9px 16px;border-radius:10px;cursor:pointer}
+  .btn.ghost{background:var(--surface);color:var(--text);border:1px solid var(--line)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  /* 코멘트 */
+  .cmt-wrap{padding:0 22px 18px}
+  .cmt-head{font-size:13px;font-weight:800;color:var(--muted);margin:6px 0 10px}
+  .cmt{background:var(--surface-2);border-radius:12px;padding:10px 14px;margin-bottom:8px}
+  .cmt-meta{font-size:12px;color:var(--muted);margin-bottom:2px}
+  .cmt-meta b{color:var(--accent-2);font-weight:800}
+  .cmt-text{font-size:14px;white-space:pre-wrap}
+  .cmt-form{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .cmt-form select,.cmt-form textarea{border:1px solid var(--line);border-radius:9px;padding:9px 11px;
+    font-size:14px;background:var(--surface);color:var(--text);font-family:inherit}
+  .cmt-form textarea{flex:1;min-width:200px;resize:vertical;min-height:40px}
+  .cmt-empty{font-size:13px;color:var(--muted);font-style:italic;padding:4px 0}
+
+  /* 수정 모달 */
+  .ov{display:none;position:fixed;inset:0;background:rgba(10,20,24,.55);z-index:100;align-items:center;justify-content:center;padding:20px}
+  .ov.open{display:flex}
+  .modal{background:var(--surface);border-radius:18px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow)}
+  .mhead{display:flex;align-items:center;padding:18px 22px;border-bottom:1px solid var(--line)}
+  .mtitle{font-size:16px;font-weight:800;flex:1}
+  .mhead .x{background:none;border:1px solid var(--line);color:var(--muted);width:32px;height:32px;border-radius:8px;cursor:pointer}
+  .mbody{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+  .efld{display:flex;flex-direction:column;gap:5px}
+  .efld span{font-size:12.5px;font-weight:800;color:var(--muted)}
+  .efld input,.efld textarea{border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:14px;
+    background:var(--surface);color:var(--text);font-family:inherit;resize:vertical}
+  .estatus{margin:0}
+  .status{font-size:14px;padding:10px 14px;border-radius:10px;display:none}
+  .status.show{display:block}
+  .status.info{background:var(--accent-soft);color:var(--accent)}
+  .status.err{background:var(--warn-soft);color:var(--warn)}
+  .status.ok{background:var(--ok-soft);color:var(--ok)}
+  footer{padding:32px 0 48px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="index.html">
+      <span class="logo-badge">KOTI</span>
+      <span>주간회의 자료<small>한국교통연구원 교통빅데이터본부</small></span>
+    </a>
+    <nav class="nav-links">
+      <a href="index.html">대시보드</a>
+      <a href="weekly-work.html">주간업무 작성</a>
+      <a class="cur" href="weekly-meeting.html">주간회의 자료</a>
+    </nav>
+    <button class="toggle" id="themeBtn">🌙</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="titlebar">
+    <div class="eyebrow">모빌리티 빅데이터팀 · WEEKLY MEETING</div>
+    <h1>주간회의 자료</h1>
+    <div class="sub">과제별 주간회의 요약을 보고, 요약을 수정하거나 코멘트를 남길 수 있습니다.</div>
+  </div>
+
+  <div class="filter-row" id="filterRow"></div>
+  <div id="content"><div class="state">회의자료를 불러오는 중…</div></div>
+</div>
+
+<footer><div class="wrap">주간회의 자료 · 한국교통연구원 교통빅데이터본부</div></footer>
+
+<!-- 요약 수정 모달 -->
+<div class="ov" id="editOv">
+  <div class="modal">
+    <div class="mhead">
+      <div class="mtitle">회의 요약 수정</div>
+      <button class="x" id="editClose">✕</button>
+    </div>
+    <div class="mbody" id="editBody"></div>
+    <div class="mbody" style="padding-top:0">
+      <div class="estatus status" id="editStatus"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn ghost" id="editCancel">취소</button>
+        <button class="btn" id="editSave">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  var WORKER_URL = "https://notion-proxy.ekqls0458.workers.dev";
+  var TEAM = ["이종우","전준수","이채영","한효림","김예원","정승환","이숭봉"];
+  var PROJ_COLOR = { "국가교통조사사업":"#2b7cd3", "자율주행R&D":"#1d9a6c", "탄소공간지도R&D":"#d98324", "기타":"#8a99a0" };
+
+  var MEETINGS = [];
+  var FILTER = "전체";
+  var EDIT = { idx:-1 };
+
+  function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function fmtDate(ymd){ if(!ymd) return ""; var p=ymd.split("-"); return p[0]+"."+(+p[1])+"."+(+p[2]); }
+  function fmtTime(iso){
+    if(!iso) return "";
+    var d=new Date(iso); if(isNaN(d)) return "";
+    function z(n){return(n<10?"0":"")+n;}
+    return (d.getMonth()+1)+"/"+d.getDate()+" "+z(d.getHours())+":"+z(d.getMinutes());
+  }
+
+  async function load(){
+    try {
+      var res = await fetch(WORKER_URL, {cache:"no-store"});
+      var data = await res.json();
+      MEETINGS = data.meetings || [];
+      renderFilters();
+      render();
+    } catch(e){
+      document.getElementById("content").innerHTML = '<div class="state">불러오기 실패: '+esc(String(e))+'</div>';
+    }
+  }
+
+  function renderFilters(){
+    var projs = ["전체"];
+    MEETINGS.forEach(function(m){ if(m.project && projs.indexOf(m.project)<0) projs.push(m.project); });
+    document.getElementById("filterRow").innerHTML = projs.map(function(p){
+      return '<button class="fchip'+(p===FILTER?" on":"")+'" data-proj="'+esc(p)+'">'+esc(p)+'</button>';
+    }).join("");
+  }
+
+  function render(){
+    var list = MEETINGS.filter(function(m){ return FILTER==="전체" || m.project===FILTER; });
+    var box = document.getElementById("content");
+    if(!list.length){ box.innerHTML = '<div class="state">표시할 회의자료가 없습니다.</div>'; return; }
+
+    box.innerHTML = list.map(function(m){
+      var gIdx = MEETINGS.indexOf(m);
+      var color = PROJ_COLOR[m.project] || "#8a99a0";
+      var secs = (m.sections||[]).map(function(s){
+        return '<div class="m-sec"><h3>'+esc(s.heading)+'</h3><div class="m-text">'+esc(s.body)+'</div></div>';
+      }).join("") || '<div class="cmt-empty" style="padding:14px 0">요약 내용이 없습니다.</div>';
+
+      var comments = (m.comments||[]);
+      var cmtHtml = comments.length ? comments.map(function(c){
+        return '<div class="cmt"><div class="cmt-meta"><b>'+esc(c.author||"익명")+'</b> · '+esc(fmtTime(c.time))+'</div>'
+          + '<div class="cmt-text">'+esc(c.text)+'</div></div>';
+      }).join("") : '<div class="cmt-empty">아직 코멘트가 없습니다. 첫 코멘트를 남겨보세요.</div>';
+
+      var whoOpts = TEAM.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join("");
+
+      return '<div class="meeting">'
+        + '<div class="m-head">'
+        +   '<span class="m-proj" style="background:'+color+'">'+esc(m.project||"기타")+'</span>'
+        +   '<span class="m-title">'+esc(m.title)+'</span>'
+        +   '<span class="m-date">'+esc(fmtDate(m.date))+(m.week?(" · "+esc(m.week)):"")+'</span>'
+        + '</div>'
+        + '<div class="m-body">'+secs+'</div>'
+        + '<div class="m-actions">'
+        +   '<button class="btn ghost" data-edit="'+gIdx+'">✏️ 요약 수정</button>'
+        +   '<span style="font-size:12.5px;color:var(--muted)">작성: '+esc(m.writer||"-")+'</span>'
+        + '</div>'
+        + '<div class="cmt-wrap">'
+        +   '<div class="cmt-head">💬 코멘트 '+comments.length+'</div>'
+        +   cmtHtml
+        +   '<div class="cmt-form">'
+        +     '<select data-who="'+gIdx+'"><option value="">작성자</option>'+whoOpts+'</select>'
+        +     '<textarea data-cmt="'+gIdx+'" placeholder="코멘트를 입력하세요"></textarea>'
+        +     '<button class="btn" data-send="'+gIdx+'">등록</button>'
+        +   '</div>'
+        +   '<div class="status" data-cstatus="'+gIdx+'" style="margin-top:8px"></div>'
+        + '</div>'
+        + '</div>';
+    }).join("");
+  }
+
+  // 필터 클릭
+  document.getElementById("filterRow").addEventListener("click", function(e){
+    var b = e.target.closest(".fchip"); if(!b) return;
+    FILTER = b.dataset.proj; renderFilters(); render();
+  });
+
+  // 코멘트 등록 / 요약 수정 (이벤트 위임)
+  document.getElementById("content").addEventListener("click", async function(e){
+    var sendBtn = e.target.closest("[data-send]");
+    var editBtn = e.target.closest("[data-edit]");
+    if(sendBtn){
+      var idx = +sendBtn.dataset.send;
+      var m = MEETINGS[idx];
+      var who = document.querySelector('[data-who="'+idx+'"]').value;
+      var ta = document.querySelector('[data-cmt="'+idx+'"]');
+      var st = document.querySelector('[data-cstatus="'+idx+'"]');
+      var text = ta.value.trim();
+      if(!who){ st.className="status show err"; st.textContent="작성자를 선택하세요."; return; }
+      if(!text){ st.className="status show err"; st.textContent="코멘트를 입력하세요."; return; }
+      sendBtn.disabled = true;
+      st.className="status show info"; st.textContent="등록 중…";
+      try {
+        var res = await fetch(WORKER_URL, { method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ action:"comment", meetingId:m.id, text:text, author:who }) });
+        var data = await res.json();
+        if(!data.ok) throw new Error(data.error||"실패");
+        st.className="status show ok"; st.textContent="등록 완료";
+        ta.value="";
+        setTimeout(load, 600);
+      } catch(err){
+        st.className="status show err"; st.textContent="등록 실패: "+err.message;
+        sendBtn.disabled = false;
+      }
+    } else if(editBtn){
+      openEdit(+editBtn.dataset.edit);
+    }
+  });
+
+  // ===== 요약 수정 모달 =====
+  var editOv = document.getElementById("editOv");
+  function openEdit(idx){
+    var m = MEETINGS[idx]; if(!m) return;
+    EDIT.idx = idx;
+    var body = document.getElementById("editBody");
+    body.innerHTML = (m.sections||[]).map(function(s, i){
+      return '<div class="efld"><span>꼭지 제목</span><input type="text" data-h="'+i+'" value="'+esc(s.heading)+'"></div>'
+        + '<div class="efld"><span>내용</span><textarea data-b="'+i+'" rows="4">'+esc(s.body)+'</textarea></div>';
+    }).join("");
+    document.getElementById("editStatus").className = "estatus status";
+    editOv.classList.add("open");
+  }
+  function closeEdit(){ editOv.classList.remove("open"); }
+  document.getElementById("editClose").addEventListener("click", closeEdit);
+  document.getElementById("editCancel").addEventListener("click", closeEdit);
+  editOv.addEventListener("click", function(e){ if(e.target===editOv) closeEdit(); });
+
+  document.getElementById("editSave").addEventListener("click", async function(){
+    var m = MEETINGS[EDIT.idx]; if(!m) return;
+    var st = document.getElementById("editStatus");
+    var sections = (m.sections||[]).map(function(s, i){
+      return {
+        heading: document.querySelector('[data-h="'+i+'"]').value.trim(),
+        body: document.querySelector('[data-b="'+i+'"]').value.trim()
+      };
+    });
+    st.className="estatus status show info"; st.textContent="저장 중…";
+    try {
+      var res = await fetch(WORKER_URL, { method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ action:"updateMeeting", meetingId:m.id, sections:sections }) });
+      var data = await res.json();
+      if(!data.ok) throw new Error(data.error||"실패");
+      st.className="estatus status show ok"; st.textContent="저장 완료 — 새로고침합니다…";
+      setTimeout(function(){ closeEdit(); load(); }, 700);
+    } catch(err){
+      st.className="estatus status show err"; st.textContent="저장 실패: "+err.message;
+    }
+  });
+
+  // 테마
+  (function(){
+    var root=document.documentElement, btn=document.getElementById("themeBtn");
+    function set(t){ root.setAttribute("data-theme",t); btn.textContent=(t==="dark"?"☀️":"🌙");
+      try{localStorage.setItem("mbd-theme",t)}catch(e){} }
+    var saved; try{saved=localStorage.getItem("mbd-theme")}catch(e){}
+    if(!saved){ saved=matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"; }
+    set(saved);
+    btn.addEventListener("click", function(){ set(root.getAttribute("data-theme")==="dark"?"light":"dark"); });
+  })();
+
+  load();
+</script>
+</body>
+</html>
