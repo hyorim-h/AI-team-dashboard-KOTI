@@ -294,7 +294,7 @@
         return '<div class="ev-card">'
           + '<div class="ev-head"><span class="ev-dt">'+esc(dd)+' '+esc(e.time||"종일")+'</span>'
           + '<span class="ev-title">'+esc(e.title)+'</span></div>'
-          + (e.desc ? '<div class="ev-meta"><b>내용</b> · '+esc(e.desc)+'</div>' : '<div class="ev-meta" style="color:var(--muted);font-style:italic">내용·참석자는 작성 단계에서 입력</div>')
+          + '<div class="ev-meta" style="color:var(--muted);font-style:italic">내용·참석자는 작성 단계에서 입력</div>'
           + '</div>';
       }).join("");
     } catch(e){
