@@ -47,6 +47,30 @@
     background:var(--surface);color:var(--muted);cursor:pointer}
   .fchip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 
+  /* 달력 */
+  .cal{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px 20px;margin-bottom:24px}
+  .cal-top{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+  .cal-title{font-size:17px;font-weight:850;flex:1}
+  .cal-nav{display:flex;gap:6px}
+  .cal-nav button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);
+    background:var(--surface);color:var(--text);cursor:pointer;font-size:15px}
+  .cal-nav button:hover{background:var(--surface-2)}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cal-dow{text-align:center;font-size:12px;font-weight:800;color:var(--muted);padding:4px 0}
+  .cal-dow.sun{color:#d64545}.cal-dow.sat{color:#2b7cd3}
+  .cal-cell{min-height:74px;border:1px solid var(--line);border-radius:10px;padding:5px 6px;
+    background:var(--surface);display:flex;flex-direction:column;gap:3px}
+  .cal-cell.empty{background:transparent;border:none}
+  .cal-cell.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .cal-cell.has{cursor:default}
+  .cal-daynum{font-size:12px;font-weight:700;color:var(--muted)}
+  .cal-cell.sel{background:var(--accent-soft);border-color:var(--accent)}
+  .cal-ev{font-size:11px;font-weight:700;color:#fff;padding:2px 6px;border-radius:6px;cursor:pointer;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+  .cal-ev:hover{filter:brightness(1.08)}
+  .sel-head{font-size:14px;font-weight:800;color:var(--muted);margin:0 0 12px}
+
   .meeting{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
     box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
   .m-head{padding:18px 22px;border-bottom:1px solid var(--line);background:var(--surface-2);
@@ -126,6 +150,7 @@
   </div>
 
   <div class="filter-row" id="filterRow"></div>
+  <div id="calArea"></div>
   <div id="content"><div class="state">회의자료를 불러오는 중…</div></div>
 </div>
 
@@ -157,6 +182,8 @@
   var MEETINGS = [];
   var FILTER = "전체";
   var EDIT = { idx:-1 };
+  var VIEW = { y:0, mo:0 };   // 현재 표시 중인 달 (mo: 0-11)
+  var SEL_DATE = "";          // 선택된 날짜 (YYYY-MM-DD)
 
   function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function fmtDate(ymd){ if(!ymd) return ""; var p=ymd.split("-"); return p[0]+"."+(+p[1])+"."+(+p[2]); }
@@ -172,6 +199,14 @@
       var res = await fetch(WORKER_URL, {cache:"no-store"});
       var data = await res.json();
       MEETINGS = data.meetings || [];
+      // 초기 표시월/선택날짜: 가장 최근 회의 기준 (없으면 오늘)
+      if(!SEL_DATE){
+        var dates = MEETINGS.map(function(m){return m.date;}).filter(Boolean).sort();
+        var base = dates.length ? dates[dates.length-1] : null;
+        var bd = base ? new Date(base+"T00:00:00") : new Date();
+        VIEW.y = bd.getFullYear(); VIEW.mo = bd.getMonth();
+        SEL_DATE = base || "";
+      }
       renderFilters();
       render();
     } catch(e){
@@ -187,56 +222,126 @@
     }).join("");
   }
 
+  // 회의 1건 카드 HTML
+  function meetingCard(m){
+    var gIdx = MEETINGS.indexOf(m);
+    var color = PROJ_COLOR[m.project] || "#8a99a0";
+    var secs = (m.sections||[]).map(function(s){
+      return '<div class="m-sec"><h3>'+esc(s.heading)+'</h3><div class="m-text">'+esc(s.body)+'</div></div>';
+    }).join("") || '<div class="cmt-empty" style="padding:14px 0">요약 내용이 없습니다.</div>';
+
+    var comments = (m.comments||[]);
+    var cmtHtml = comments.length ? comments.map(function(c){
+      return '<div class="cmt"><div class="cmt-meta"><b>'+esc(c.author||"익명")+'</b> · '+esc(fmtTime(c.time))
+        + '<button class="cmt-del" data-del="'+esc(c.id)+'" data-mid="'+esc(m.id)+'" title="삭제">삭제</button></div>'
+        + '<div class="cmt-text">'+esc(c.text)+'</div></div>';
+    }).join("") : '<div class="cmt-empty">아직 코멘트가 없습니다. 첫 코멘트를 남겨보세요.</div>';
+
+    var whoOpts = TEAM.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join("");
+
+    return '<div class="meeting">'
+      + '<div class="m-head">'
+      +   '<span class="m-proj" style="background:'+color+'">'+esc(m.project||"기타")+'</span>'
+      +   '<span class="m-title">'+esc(m.title)+'</span>'
+      +   '<span class="m-date">'+esc(fmtDate(m.date))+(m.week?(" · "+esc(m.week)):"")+'</span>'
+      + '</div>'
+      + '<div class="m-body">'+secs+'</div>'
+      + '<div class="m-actions">'
+      +   '<button class="btn ghost" data-edit="'+gIdx+'">✏️ 요약 수정</button>'
+      +   '<span style="font-size:12.5px;color:var(--muted)">작성: '+esc(m.writer||"-")+'</span>'
+      + '</div>'
+      + '<div class="cmt-wrap">'
+      +   '<div class="cmt-head">💬 코멘트 '+comments.length+'</div>'
+      +   cmtHtml
+      +   '<div class="cmt-form">'
+      +     '<select data-who="'+gIdx+'"><option value="">작성자</option>'+whoOpts+'</select>'
+      +     '<textarea data-cmt="'+gIdx+'" placeholder="코멘트를 입력하세요"></textarea>'
+      +     '<button class="btn" data-send="'+gIdx+'">등록</button>'
+      +   '</div>'
+      +   '<div class="status" data-cstatus="'+gIdx+'" style="margin-top:8px"></div>'
+      + '</div>'
+      + '</div>';
+  }
+
+  // 달력 + 선택된 날짜의 회의들
   function render(){
-    var list = MEETINGS.filter(function(m){ return FILTER==="전체" || m.project===FILTER; });
-    var box = document.getElementById("content");
-    if(!list.length){ box.innerHTML = '<div class="state">표시할 회의자료가 없습니다.</div>'; return; }
+    renderCalendar();
+    renderSelected();
+  }
 
-    box.innerHTML = list.map(function(m){
-      var gIdx = MEETINGS.indexOf(m);
-      var color = PROJ_COLOR[m.project] || "#8a99a0";
-      var secs = (m.sections||[]).map(function(s){
-        return '<div class="m-sec"><h3>'+esc(s.heading)+'</h3><div class="m-text">'+esc(s.body)+'</div></div>';
-      }).join("") || '<div class="cmt-empty" style="padding:14px 0">요약 내용이 없습니다.</div>';
+  function todayStr(){
+    var d=new Date(); function z(n){return(n<10?"0":"")+n;}
+    return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate());
+  }
 
-      var comments = (m.comments||[]);
-      var cmtHtml = comments.length ? comments.map(function(c){
-        return '<div class="cmt"><div class="cmt-meta"><b>'+esc(c.author||"익명")+'</b> · '+esc(fmtTime(c.time))
-          + '<button class="cmt-del" data-del="'+esc(c.id)+'" data-mid="'+esc(m.id)+'" title="삭제">삭제</button></div>'
-          + '<div class="cmt-text">'+esc(c.text)+'</div></div>';
-      }).join("") : '<div class="cmt-empty">아직 코멘트가 없습니다. 첫 코멘트를 남겨보세요.</div>';
+  function renderCalendar(){
+    var area = document.getElementById("calArea");
+    var y=VIEW.y, mo=VIEW.mo;
+    // 이 달에 회의 있는 날짜 → 회의 목록 매핑 (필터 적용)
+    var byDate = {};
+    MEETINGS.forEach(function(m){
+      if(FILTER!=="전체" && m.project!==FILTER) return;
+      if(!m.date) return;
+      var d=new Date(m.date+"T00:00:00");
+      if(d.getFullYear()===y && d.getMonth()===mo){
+        (byDate[m.date]=byDate[m.date]||[]).push(m);
+      }
+    });
 
-      var whoOpts = TEAM.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join("");
+    var first=new Date(y,mo,1), startDow=first.getDay();
+    var daysInMonth=new Date(y,mo+1,0).getDate();
+    var dows=["일","월","화","수","목","금","토"];
+    var cells="";
+    dows.forEach(function(d,i){ cells+='<div class="cal-dow'+(i===0?" sun":i===6?" sat":"")+'">'+d+'</div>'; });
+    for(var i=0;i<startDow;i++){ cells+='<div class="cal-cell empty"></div>'; }
+    function z(n){return(n<10?"0":"")+n;}
+    for(var day=1;day<=daysInMonth;day++){
+      var ds=y+"-"+z(mo+1)+"-"+z(day);
+      var evs=byDate[ds]||[];
+      var cls="cal-cell"+(ds===todayStr()?" today":"")+(ds===SEL_DATE?" sel":"")+(evs.length?" has":"");
+      var evHtml=evs.map(function(m){
+        var color=PROJ_COLOR[m.project]||"#8a99a0";
+        return '<div class="cal-ev" style="background:'+color+'" data-day="'+ds+'" title="'+esc(m.title)+'">'+esc(m.project||m.title)+'</div>';
+      }).join("");
+      cells+='<div class="'+cls+'" data-day="'+ds+'"><span class="cal-daynum">'+day+'</span>'+evHtml+'</div>';
+    }
 
-      return '<div class="meeting">'
-        + '<div class="m-head">'
-        +   '<span class="m-proj" style="background:'+color+'">'+esc(m.project||"기타")+'</span>'
-        +   '<span class="m-title">'+esc(m.title)+'</span>'
-        +   '<span class="m-date">'+esc(fmtDate(m.date))+(m.week?(" · "+esc(m.week)):"")+'</span>'
-        + '</div>'
-        + '<div class="m-body">'+secs+'</div>'
-        + '<div class="m-actions">'
-        +   '<button class="btn ghost" data-edit="'+gIdx+'">✏️ 요약 수정</button>'
-        +   '<span style="font-size:12.5px;color:var(--muted)">작성: '+esc(m.writer||"-")+'</span>'
-        + '</div>'
-        + '<div class="cmt-wrap">'
-        +   '<div class="cmt-head">💬 코멘트 '+comments.length+'</div>'
-        +   cmtHtml
-        +   '<div class="cmt-form">'
-        +     '<select data-who="'+gIdx+'"><option value="">작성자</option>'+whoOpts+'</select>'
-        +     '<textarea data-cmt="'+gIdx+'" placeholder="코멘트를 입력하세요"></textarea>'
-        +     '<button class="btn" data-send="'+gIdx+'">등록</button>'
-        +   '</div>'
-        +   '<div class="status" data-cstatus="'+gIdx+'" style="margin-top:8px"></div>'
-        + '</div>'
-        + '</div>';
-    }).join("");
+    area.innerHTML='<div class="cal">'
+      +'<div class="cal-top"><div class="cal-title">'+y+'년 '+(mo+1)+'월</div>'
+      +'<div class="cal-nav"><button data-mv="-1">‹</button><button data-mv="today">오늘</button><button data-mv="1">›</button></div></div>'
+      +'<div class="cal-grid">'+cells+'</div></div>';
+  }
+
+  function renderSelected(){
+    var box=document.getElementById("content");
+    if(!SEL_DATE){ box.innerHTML='<div class="state">날짜를 선택하면 회의 요약이 표시됩니다.</div>'; return; }
+    var list=MEETINGS.filter(function(m){
+      if(FILTER!=="전체" && m.project!==FILTER) return false;
+      return m.date===SEL_DATE;
+    });
+    if(!list.length){ box.innerHTML='<div class="state">'+esc(fmtDate(SEL_DATE))+'에 회의자료가 없습니다.</div>'; return; }
+    box.innerHTML='<div class="sel-head">📌 '+esc(fmtDate(SEL_DATE))+' 회의 '+list.length+'건</div>'
+      + list.map(meetingCard).join("");
   }
 
   // 필터 클릭
   document.getElementById("filterRow").addEventListener("click", function(e){
     var b = e.target.closest(".fchip"); if(!b) return;
     FILTER = b.dataset.proj; renderFilters(); render();
+  });
+
+  // 달력: 날짜 클릭 / 월 이동
+  document.getElementById("calArea").addEventListener("click", function(e){
+    var mv = e.target.closest("[data-mv]");
+    if(mv){
+      var v = mv.dataset.mv;
+      if(v==="today"){ var d=new Date(); VIEW.y=d.getFullYear(); VIEW.mo=d.getMonth(); }
+      else { VIEW.mo += parseInt(v,10); if(VIEW.mo<0){VIEW.mo=11;VIEW.y--;} else if(VIEW.mo>11){VIEW.mo=0;VIEW.y++;} }
+      renderCalendar();
+      return;
+    }
+    var cell = e.target.closest("[data-day]");
+    if(cell){ SEL_DATE = cell.dataset.day; renderCalendar(); renderSelected(); }
   });
 
   // 코멘트 등록 / 요약 수정 (이벤트 위임)
