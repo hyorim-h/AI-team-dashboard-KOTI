@@ -307,7 +307,8 @@
       // 일시·장소 / 내용 / 참석자 추출
       var loc = it.match(/일\s*시[·\s]*장소\s*[:：]\s*(.+)/);
       var content = it.match(/내\s*용\s*[:：]\s*([\s\S]+?)(?=-\s*참|$)/);
-      var attendees = it.match(/참\s*석\s*자\s*[:：]\s*([\s\S]+?)$/);
+      // 참석자: 다음 줄에 과제제목(숫자. ...)이 오면 거기서 멈춤
+      var attendees = it.match(/참\s*석\s*자\s*[:：]\s*([\s\S]+?)(?=\n\s*\d+\.\s|\n\s*<|$)/);
       events.push({
         date: "2026-"+m[1]+"-"+m[2],
         mmdd: m[1]+"."+m[2],
