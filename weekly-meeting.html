@@ -104,6 +104,8 @@
     font-size:14px;background:var(--surface);color:var(--text);font-family:inherit}
   .cmt-form textarea{flex:1;min-width:200px;resize:vertical;min-height:40px}
   .cmt-empty{font-size:13px;color:var(--muted);font-style:italic;padding:4px 0}
+  .refresh-btn{margin-left:10px;border:1px solid var(--line);background:var(--surface);color:var(--accent);
+    font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;vertical-align:middle}
 
   /* 수정 모달 */
   .ov{display:none;position:fixed;inset:0;background:rgba(10,20,24,.55);z-index:100;align-items:center;justify-content:center;padding:20px}
@@ -145,7 +147,7 @@
 <div class="wrap">
   <div class="titlebar">
     <div class="eyebrow">모빌리티 빅데이터팀 · WEEKLY MEETING</div>
-    <h1>주간회의 자료</h1>
+    <h1>주간회의 자료 <button class="refresh-btn" id="refreshBtn">↻ 새로고침</button></h1>
     <div class="sub">과제별 주간회의 요약을 보고, 요약을 수정하거나 코멘트를 남길 수 있습니다.</div>
   </div>
 
@@ -308,7 +310,7 @@
 
     area.innerHTML='<div class="cal">'
       +'<div class="cal-top"><div class="cal-title">'+y+'년 '+(mo+1)+'월</div>'
-      +'<div class="cal-nav"><button data-mv="-1">‹</button><button data-mv="today">오늘</button><button data-mv="1">›</button></div></div>'
+      +'<div class="cal-nav"><button data-mv="-1">&lt;</button><button data-mv="today">오늘</button><button data-mv="1">&gt;</button></div></div>'
       +'<div class="cal-grid">'+cells+'</div></div>';
   }
 
@@ -442,6 +444,8 @@
     set(saved);
     btn.addEventListener("click", function(){ set(root.getAttribute("data-theme")==="dark"?"light":"dark"); });
   })();
+
+  document.getElementById("refreshBtn").addEventListener("click", function(){ SEL_DATE=""; load(); });
 
   load();
 </script>
