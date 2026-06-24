@@ -171,6 +171,72 @@
   // 저장용 전역 상태
   var STATE = { week:"", achievements:[], plans:[] };
 
+  // 페이지 열릴 때: 노션에 저장된 현재 주차 데이터 불러오기
+  async function loadSavedWork(){
+    try {
+      var res = await fetch(WORKER_URL, {cache:"no-store"});
+      var data = await res.json();
+      var work = data.work || {};
+      if(!work.week || ((work.achievements||[]).length===0 && (work.plans||[]).length===0)){
+        return; // 저장된 데이터 없음 → PDF 업로드 첫 화면 유지
+      }
+      // 주차 카드
+      document.getElementById("pcWeek").textContent = work.week + " (저장됨)";
+      var aDates = (work.achievements||[]).map(function(x){return x.date;}).filter(Boolean).sort();
+      var pDates = (work.plans||[]).map(function(x){return x.date;}).filter(Boolean).sort();
+      document.getElementById("pcAchieve").textContent = aDates.length ? (fmtMD(aDates[0])+" ~ "+fmtMD(aDates[aDates.length-1])) : "—";
+      document.getElementById("pcPlan").textContent = pDates.length ? (fmtMD(pDates[0])+" ~ "+fmtMD(pDates[pDates.length-1])) : "—";
+      document.getElementById("periodCard").classList.add("show");
+
+      // 업무실적 카드 (저장본)
+      renderSavedAchievements(work.achievements||[]);
+      renderSavedPlans(work.plans||[]);
+
+      // 업로드 박스는 "새 주차 올리기"로 축소 안내
+      showStatus("현재 저장된 주차: " + work.week + " — 항목을 눌러 수정할 수 있습니다. (새 주차는 PDF를 올리세요)", "info");
+    } catch(e){
+      // 불러오기 실패는 조용히 무시 (PDF 업로드는 그대로 가능)
+    }
+  }
+
+  function renderSavedAchievements(items){
+    var sec = document.getElementById("achieveSec");
+    var list = document.getElementById("achieveList");
+    document.getElementById("achieveCount").textContent = items.length + "건";
+    sec.classList.add("show");
+    if(!items.length){ list.innerHTML = '<div class="empty-note">저장된 업무실적이 없습니다.</div>'; return; }
+    list.innerHTML = items.map(function(e){
+      var dd = (e.date||"").slice(5).replace("-",".");
+      var modTag = e.modified ? '<span class="ev-attend" style="background:var(--warn-soft);color:var(--warn)">수정됨'+(e.modifier?(" · "+esc(e.modifier)):"")+'</span>' : '';
+      return '<div class="ev-card">'
+        + '<div class="ev-head"><span class="ev-dt">'+esc(dd)+' '+esc(e.time||"종일")+'</span>'
+        + '<span class="ev-title">'+esc(e.title)+'</span>'+modTag+'</div>'
+        + (e.content ? '<div class="ev-meta"><b>내용</b> · '+esc(e.content)+'</div>' : '')
+        + (e.location ? '<div class="ev-meta"><b>일시·장소</b> · '+esc(e.location)+'</div>' : '')
+        + (e.attendees ? '<div class="ev-meta"><b>참석자</b> · '+esc(e.attendees)+'</div>' : '')
+        + '</div>';
+    }).join("");
+  }
+
+  function renderSavedPlans(items){
+    var sec = document.getElementById("planSec");
+    var list = document.getElementById("planList");
+    document.getElementById("planCount").textContent = items.length + "건";
+    sec.classList.add("show");
+    if(!items.length){ list.innerHTML = '<div class="empty-note">저장된 업무계획이 없습니다.</div>'; return; }
+    list.innerHTML = items.map(function(e){
+      var dd = (e.date||"").slice(5).replace("-",".");
+      var done = e.status === "작성완료";
+      var stTag = '<span class="ev-attend" style="background:'+(done?"var(--ok-soft)":"var(--warn-soft)")+';color:'+(done?"var(--ok)":"var(--warn)")+'">'+(done?"작성완료":"작성필요")+(e.writer?(" · "+esc(e.writer)):"")+'</span>';
+      return '<div class="ev-card">'
+        + '<div class="ev-head"><span class="ev-dt">'+esc(dd)+' '+esc(e.time||"종일")+'</span>'
+        + '<span class="ev-title">'+esc(e.title)+'</span>'+stTag+'</div>'
+        + (e.content ? '<div class="ev-meta"><b>내용</b> · '+esc(e.content)+'</div>' : '<div class="ev-meta" style="color:var(--muted);font-style:italic">아직 작성되지 않음 — 눌러서 작성</div>')
+        + (e.location ? '<div class="ev-meta"><b>일시·장소</b> · '+esc(e.location)+'</div>' : '')
+        + '</div>';
+    }).join("");
+  }
+
   function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function showStatus(msg, kind){
     var el = document.getElementById("status");
@@ -438,6 +504,9 @@
     set(saved);
     btn.addEventListener("click", function(){ set(root.getAttribute("data-theme")==="dark"?"light":"dark"); });
   })();
+
+  // 페이지 열릴 때 저장된 현재 주차 불러오기
+  loadSavedWork();
 </script>
 </body>
 </html>
