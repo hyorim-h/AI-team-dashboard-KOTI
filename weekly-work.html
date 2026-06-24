@@ -68,7 +68,8 @@
   .period-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 20px;margin:16px 0;box-shadow:var(--shadow);display:none}
   .period-card.show{display:block}
   .period-card .pc-week{font-size:13px;color:var(--accent);font-weight:800}
-  .period-card .pc-range{font-size:20px;font-weight:850;margin-top:3px}
+  .period-card .pc-line{font-size:15px;font-weight:700;margin-top:6px}
+  .period-card .pc-lab{display:inline-block;width:72px;font-size:12.5px;font-weight:800;color:var(--muted)}
 
   .result-sec{margin:24px 0;display:none}
   .result-sec.show{display:block}
@@ -124,7 +125,8 @@
 
   <div class="period-card" id="periodCard">
     <div class="pc-week" id="pcWeek">—</div>
-    <div class="pc-range" id="pcRange">—</div>
+    <div class="pc-line"><span class="pc-lab">업무실적</span> <span id="pcAchieve">—</span></div>
+    <div class="pc-line"><span class="pc-lab">업무계획</span> <span id="pcPlan">—</span></div>
   </div>
 
   <div class="result-sec" id="achieveSec">
@@ -135,6 +137,11 @@
   <div class="result-sec" id="planSec">
     <h2>🗓️ 업무계획 <span class="count-badge" id="planCount"></span></h2>
     <div id="planList"></div>
+  </div>
+
+  <div class="result-sec" id="saveSec" style="text-align:center;margin:24px 0">
+    <button class="btn" id="saveBtn" style="font-size:15px;padding:13px 28px">📥 노션에 저장</button>
+    <div class="status" id="saveStatus" style="margin-top:14px;text-align:left"></div>
   </div>
 
   <div class="result-sec show" id="calSec" style="margin-top:32px">
@@ -160,6 +167,9 @@
   function isExcluded(title){
     return PLAN_EXCLUDE.some(function(kw){ return (title||"").indexOf(kw) >= 0; });
   }
+
+  // 저장용 전역 상태
+  var STATE = { week:"", achievements:[], plans:[] };
 
   function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function showStatus(msg, kind){
@@ -194,12 +204,27 @@
   function extractPeriod(firstPage){
     var p = firstPage.match(/(\d{4})\.(\d{2})\.(\d{2})\.?\s*[~∼\-]\s*(\d{4})\.(\d{2})\.(\d{2})/);
     var wk = firstPage.match(/\((\d+)주차\)/);
-    var res = { week: wk ? wk[1] : "", start:"", end:"" };
+    var res = { week: wk ? wk[1] : "", start:"", end:"", achieveStart:"", achieveEnd:"" };
     if(p){
-      res.start = p[1]+"-"+p[2]+"-"+p[3];
-      res.end = p[4]+"-"+p[5]+"-"+p[6];
+      res.start = p[1]+"-"+p[2]+"-"+p[3];   // 업무계획 시작
+      res.end = p[4]+"-"+p[5]+"-"+p[6];     // 업무계획 종료
+      // 업무실적 기간 = 업무계획 기간 -7일
+      res.achieveStart = minus7(res.start);
+      res.achieveEnd = minus7(res.end);
     }
     return res;
+  }
+
+  function minus7(ymd){
+    var d = new Date(ymd + "T00:00:00");
+    d.setDate(d.getDate() - 7);
+    function z(n){ return (n<10?"0":"")+n; }
+    return d.getFullYear() + "-" + z(d.getMonth()+1) + "-" + z(d.getDate());
+  }
+  function fmtMD(ymd){ // 2026-06-15 → 6/15
+    if(!ymd) return "—";
+    var pp = ymd.split("-");
+    return (+pp[1]) + "/" + (+pp[2]);
   }
 
   // 업무실적 우리팀 일정 추출
@@ -283,6 +308,7 @@
       });
 
       document.getElementById("planCount").textContent = plans.length + "건 (" + period.start + " ~ " + period.end + ")";
+      STATE.plans = plans;
 
       if(!plans.length){
         list.innerHTML = '<div class="empty-note">해당 기간('+period.start+' ~ '+period.end+')에 캘린더 일정이 없습니다.</div>';
@@ -314,12 +340,18 @@
       var period = extractPeriod(firstPage);
       var pc = document.getElementById("periodCard");
       document.getElementById("pcWeek").textContent = period.week ? (period.week + "주차") : "주차 정보 없음";
-      document.getElementById("pcRange").textContent = (period.start && period.end)
-        ? (period.start + " ~ " + period.end) : "기간을 찾지 못함";
+      document.getElementById("pcAchieve").textContent = (period.achieveStart && period.achieveEnd)
+        ? (fmtMD(period.achieveStart) + " ~ " + fmtMD(period.achieveEnd)) : "—";
+      document.getElementById("pcPlan").textContent = (period.start && period.end)
+        ? (fmtMD(period.start) + " ~ " + fmtMD(period.end)) : "—";
       pc.classList.add("show");
 
       var achievements = extractAchievements(fullText);
       renderAchievements(achievements);
+
+      // 주차 문자열 (예: 2026-24) + 업무실적 전역 저장
+      STATE.week = (period.start ? period.start.slice(0,4) : "2026") + "-" + (period.week || "");
+      STATE.achievements = achievements;
 
       // 업로드 완료 UI 전환
       document.getElementById("uploader").classList.add("hide");
@@ -330,6 +362,9 @@
 
       // 캘린더에서 업무계획 가져오기
       loadPlanFromCalendar(period);
+
+      // 저장 버튼 노출
+      document.getElementById("saveSec").classList.add("show");
     } catch(e){
       showStatus("분석 실패: " + e.message, "err");
     }
@@ -347,8 +382,39 @@
     document.getElementById("periodCard").classList.remove("show");
     document.getElementById("achieveSec").classList.remove("show");
     document.getElementById("planSec").classList.remove("show");
+    document.getElementById("saveSec").classList.remove("show");
     document.getElementById("status").className = "status";
     fileInput.value = "";
+  });
+
+  // 노션에 저장
+  document.getElementById("saveBtn").addEventListener("click", async function(){
+    var btn = this;
+    var st = document.getElementById("saveStatus");
+    if(!STATE.week || (!STATE.achievements.length && !STATE.plans.length)){
+      st.className = "status show err"; st.textContent = "저장할 데이터가 없습니다. PDF를 먼저 올려주세요.";
+      return;
+    }
+    btn.disabled = true;
+    st.className = "status show info"; st.textContent = "노션에 저장 중…";
+    try {
+      var res = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ week: STATE.week, achievements: STATE.achievements, plans: STATE.plans })
+      });
+      var data = await res.json();
+      if(!data.ok) throw new Error(data.error || "저장 실패");
+      var r = data.result;
+      st.className = "status show ok";
+      st.innerHTML = "저장 완료 (" + STATE.week + ")<br>"
+        + "업무실적: 새로 " + r.achieve_saved + "건" + (r.achieve_skipped ? " · 중복 " + r.achieve_skipped + "건 건너뜀" : "") + "<br>"
+        + "업무계획: 새로 " + r.plan_saved + "건" + (r.plan_skipped ? " · 중복 " + r.plan_skipped + "건 건너뜀" : "");
+    } catch(e){
+      st.className = "status show err"; st.textContent = "저장 실패: " + e.message;
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   var up = document.getElementById("uploader");
