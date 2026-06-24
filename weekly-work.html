@@ -159,6 +159,11 @@
     <div class="status" id="saveStatus" style="margin-top:14px;text-align:left"></div>
   </div>
 
+  <div class="result-sec show" id="wordSec" style="text-align:center;margin:8px 0 24px">
+    <button class="btn ghost" id="wordBtn" style="font-size:15px;padding:13px 28px">📄 주간업무 워드 다운로드</button>
+    <div class="status" id="wordStatus" style="margin-top:14px;text-align:left"></div>
+  </div>
+
   <div class="result-sec show" id="calSec" style="margin-top:32px">
     <h2>📅 팀 캘린더</h2>
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
@@ -214,6 +219,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
 <script>
   pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
@@ -574,6 +580,76 @@
     set(saved);
     btn.addEventListener("click", function(){ set(root.getAttribute("data-theme")==="dark"?"light":"dark"); });
   })();
+
+  // ===== 워드(.docx) 생성 =====
+  var PROJECT_FULL = {
+    "자율주행R&D": "(R&D) 「자율주행시대 고위험 사고인자·위험상황 예측 및 단속 기술 개발」",
+    "탄소공간지도R&D": "(R&D) 「탄소공간지도 기반 계획지원 기술개발」",
+    "국가교통조사사업": "(DB사업) 「2026 국가교통조사 및 DB시스템」",
+    "기타": "(기타)"
+  };
+  var PROJECT_ORDER = ["국가교통조사사업","자율주행R&D","탄소공간지도R&D","기타"];
+
+  function buildItemParas(d, it){
+    var P = d.Paragraph, T = d.TextRun;
+    return [
+      new P({ spacing:{before:120, after:40}, children:[new T({ text:"□ "+(it.title||""), bold:true, size:22 })] }),
+      new P({ indent:{left:240}, children:[new T({ text:"- 일시·장소: "+(it.location||""), size:20 })] }),
+      new P({ indent:{left:240}, children:[new T({ text:"- 내용: "+(it.content||""), size:20 })] }),
+      new P({ indent:{left:240}, children:[new T({ text:"- 참석자: "+(it.attendees||""), size:20 })] })
+    ];
+  }
+
+  function buildSection(d, label, items){
+    var P = d.Paragraph, T = d.TextRun;
+    var out = [ new P({ spacing:{before:240, after:120}, children:[new T({ text:"<"+label+">", bold:true, size:24 })] }) ];
+    var groups = {};
+    items.forEach(function(it){ var k=it.project||"기타"; (groups[k]=groups[k]||[]).push(it); });
+    var n = 1;
+    PROJECT_ORDER.forEach(function(pk){
+      if(!groups[pk]) return;
+      out.push(new P({ spacing:{before:160, after:80}, children:[new T({ text:n+". "+(PROJECT_FULL[pk]||pk), bold:true, size:22 })] }));
+      groups[pk].forEach(function(it){ buildItemParas(d, it).forEach(function(p){ out.push(p); }); });
+      n++;
+    });
+    return out;
+  }
+
+  async function downloadWord(){
+    var st = document.getElementById("wordStatus");
+    var d = window.docx;
+    if(!d){ st.className="status show err"; st.textContent="워드 라이브러리 로드 실패 — 새로고침 후 다시 시도하세요."; return; }
+    if(!SAVED.achievements.length && !SAVED.plans.length){
+      st.className="status show err"; st.textContent="저장된 데이터가 없습니다. PDF를 올리고 저장한 뒤 다운로드하세요."; return;
+    }
+    st.className="status show info"; st.textContent="워드 생성 중…";
+    try {
+      var P = d.Paragraph, T = d.TextRun, AT = d.AlignmentType;
+      var children = [
+        new P({ alignment:AT.CENTER, children:[new T({ text:"KOTI 주간 회의 자료", bold:true, size:36 })] }),
+        new P({ alignment:AT.CENTER, spacing:{after:240}, children:[new T({ text:"교통빅데이터연구본부 모빌리티 빅데이터팀", size:20 })] })
+      ];
+      buildSection(d, "업무실적", SAVED.achievements).forEach(function(p){ children.push(p); });
+      buildSection(d, "업무계획", SAVED.plans).forEach(function(p){ children.push(p); });
+
+      var doc = new d.Document({
+        styles:{ default:{ document:{ run:{ font:"Malgun Gothic", size:20 } } } },
+        sections:[{ properties:{ page:{ size:{width:12240,height:15840}, margin:{top:1440,right:1440,bottom:1440,left:1440} } }, children: children }]
+      });
+
+      var blob = await d.Packer.toBlob(doc);
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      var wk = (SAVED.achievements[0] && SAVED.achievements[0].week) || (SAVED.plans[0] && SAVED.plans[0].week) || "주간업무";
+      a.href = url; a.download = "주간업무_" + wk + ".docx";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      st.className="status show ok"; st.textContent="워드 다운로드 완료";
+    } catch(e){
+      st.className="status show err"; st.textContent="워드 생성 실패: "+e.message;
+    }
+  }
+  document.getElementById("wordBtn").addEventListener("click", downloadWord);
 
   // ===== 수정 모달 =====
   var EDIT = { kind:"", idx:-1 };
