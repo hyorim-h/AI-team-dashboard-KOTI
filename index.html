@@ -11,7 +11,7 @@
     --warn:#d64545; --warn-soft:#fbe9e9; --ok:#1d9a6c; --ok-soft:#e1f4ec;
     --pend:#7b8a91; --pend-soft:#eef3f6;
     --shadow:0 1px 2px rgba(16,40,48,.06),0 8px 24px rgba(16,40,48,.06);
-    --radius:16px; --maxw:1180px;
+    --radius:16px; --maxw:1320px;
   }
   html[data-theme="dark"]{
     --bg:#0c1417; --surface:#111d22; --surface-2:#15242a; --text:#e7eef1; --muted:#9bb0b7;
@@ -161,8 +161,6 @@
       <a class="cur" href="index.html">대시보드</a>
       <a href="weekly-work.html">주간업무 작성</a>
       <a href="weekly-meeting.html">주간회의 자료</a>
-      <a href="llm-wiki.html">LLM-Wiki</a>
-      <a href="weekly-report.html">주간 리포트</a>
       <span class="nav-sep"></span>
       <a class="ext" href="https://www.koti.re.kr" target="_blank" rel="noopener">연구원 홈페이지 ↗</a>
     </nav>
@@ -178,21 +176,6 @@
       <span id="updated">불러오는 중…</span>
       <button class="refresh-btn" id="refreshBtn">↻ 새로고침</button>
     </div>
-  </div>
-
-  <div style="display:flex;gap:12px;margin:20px 0 4px;flex-wrap:wrap">
-    <a href="weekly-work.html" style="display:flex;align-items:center;gap:8px;padding:12px 20px;
-      background:var(--surface);border:1px solid var(--line);border-radius:12px;
-      text-decoration:none;color:var(--text);font-weight:700;font-size:14px;
-      box-shadow:var(--shadow);transition:background .15s">
-      📝 주간업무 작성
-    </a>
-    <a href="weekly-meeting.html" style="display:flex;align-items:center;gap:8px;padding:12px 20px;
-      background:var(--surface);border:1px solid var(--line);border-radius:12px;
-      text-decoration:none;color:var(--text);font-weight:700;font-size:14px;
-      box-shadow:var(--shadow);transition:background .15s">
-      📋 주간회의 자료
-    </a>
   </div>
 
   <div id="content">
