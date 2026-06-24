@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>주간업무 작성 · 모빌리티 빅데이터팀</title>
+<style>
+  :root{
+    --bg:#f6f8fa; --surface:#ffffff; --surface-2:#eef3f6; --text:#13242b; --muted:#5b6b72;
+    --line:#dce4e8; --accent:#0e7c86; --accent-2:#13a3b0; --accent-soft:#e2f3f4;
+    --warn:#d64545; --warn-soft:#fbe9e9; --ok:#1d9a6c; --ok-soft:#e1f4ec;
+    --shadow:0 1px 2px rgba(16,40,48,.06),0 8px 24px rgba(16,40,48,.06);
+    --radius:16px; --maxw:1080px;
+  }
+  html[data-theme="dark"]{
+    --bg:#0c1417; --surface:#111d22; --surface-2:#15242a; --text:#e7eef1; --muted:#9bb0b7;
+    --line:#1f333a; --accent:#3fc2cd; --accent-2:#2aa7b3; --accent-soft:#10333a;
+    --warn:#ff7a7a; --warn-soft:#3a1717; --ok:#43c794; --ok-soft:#103024;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box} html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  header.nav{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .nav-in{max-width:var(--maxw);margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;text-decoration:none;color:inherit}
+  .logo-badge{height:52px;padding:0 15px;border-radius:11px;background:#fff;display:flex;align-items:center;
+    justify-content:center;color:#0a2a6b;font-weight:900;font-size:16px;box-shadow:inset 0 0 0 1px var(--line)}
+  .brand small{display:block;font-weight:600;font-size:11px;color:var(--muted)}
+  .nav-links{margin-left:auto;display:flex;gap:4px;align-items:center}
+  .nav-links a{font-size:13.5px;color:var(--muted);text-decoration:none;padding:7px 11px;border-radius:9px}
+  .nav-links a:hover{color:var(--text);background:var(--surface-2)}
+  .nav-links a.cur{color:var(--text);background:var(--surface-2);font-weight:700}
+  .toggle{border:1px solid var(--line);background:var(--surface);color:var(--text);
+    width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:16px;display:grid;place-items:center}
+  .titlebar{padding:34px 0 14px}
+  .titlebar .eyebrow{font-size:12px;font-weight:800;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  .titlebar h1{font-size:clamp(24px,3.6vw,34px);font-weight:850;letter-spacing:-.6px;margin:8px 0 4px}
+  .titlebar .sub{color:var(--muted);font-size:14px}
+
+  .uploader{background:var(--surface);border:2px dashed var(--line);border-radius:var(--radius);
+    padding:34px 24px;text-align:center;margin:18px 0;transition:border-color .15s,background .15s}
+  .uploader.drag{border-color:var(--accent);background:var(--accent-soft)}
+  .uploader h3{margin:0 0 6px;font-size:17px}
+  .uploader p{margin:0 0 16px;font-size:13.5px;color:var(--muted)}
+  .btn{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:#fff;border:none;
+    font-weight:700;font-size:14px;padding:11px 20px;border-radius:11px;cursor:pointer;box-shadow:var(--shadow)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:var(--surface);color:var(--text);border:1px solid var(--line)}
+  .status{margin:14px 0;font-size:14px;padding:12px 16px;border-radius:12px;display:none}
+  .status.show{display:block}
+  .status.info{background:var(--accent-soft);color:var(--accent)}
+  .status.err{background:var(--warn-soft);color:var(--warn)}
+  .status.ok{background:var(--ok-soft);color:var(--ok)}
+
+  .period-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 20px;margin:16px 0;box-shadow:var(--shadow);display:none}
+  .period-card.show{display:block}
+  .period-card .pc-week{font-size:13px;color:var(--accent);font-weight:800}
+  .period-card .pc-range{font-size:20px;font-weight:850;margin-top:3px}
+
+  .result-sec{margin:24px 0;display:none}
+  .result-sec.show{display:block}
+  .result-sec h2{font-size:18px;font-weight:800;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .count-badge{font-size:12.5px;font-weight:700;color:var(--muted)}
+  .ev-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow)}
+  .ev-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+  .ev-dt{font-size:12.5px;font-weight:800;color:var(--accent);background:var(--accent-soft);padding:2px 9px;border-radius:999px;white-space:nowrap}
+  .ev-title{font-weight:800;font-size:15px}
+  .ev-meta{font-size:13px;color:var(--muted);margin-top:3px}
+  .ev-meta b{color:var(--text);font-weight:700}
+  .ev-attend{display:inline-block;font-size:11.5px;font-weight:700;color:var(--accent-2);background:var(--surface-2);padding:1px 8px;border-radius:999px;margin-right:4px}
+  .empty-note{color:var(--muted);font-size:14px;padding:18px;text-align:center;background:var(--surface-2);border-radius:12px}
+  footer{padding:32px 0 48px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="index.html">
+      <span class="logo-badge">KOTI</span>
+      <span>주간업무 작성<small>한국교통연구원 교통빅데이터본부</small></span>
+    </a>
+    <nav class="nav-links">
+      <a href="index.html">대시보드</a>
+      <a class="cur" href="weekly-work.html">주간업무 작성</a>
+    </nav>
+    <button class="toggle" id="themeBtn">🌙</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="titlebar">
+    <div class="eyebrow">모빌리티 빅데이터팀 · WEEKLY WORK</div>
+    <h1>주간업무 작성 도우미</h1>
+    <div class="sub">주간업무 PDF를 올리면 우리 팀 일정을 자동으로 추출합니다. <strong>(1단계: 추출 미리보기 — 아직 저장 안 함)</strong></div>
+  </div>
+
+  <div class="uploader" id="uploader">
+    <h3>📄 주간업무 PDF 올리기</h3>
+    <p>파일을 끌어다 놓거나 버튼으로 선택하세요. 브라우저 안에서만 처리되고 어디에도 업로드되지 않습니다.</p>
+    <input type="file" id="fileInput" accept="application/pdf" style="display:none">
+    <button class="btn" id="pickBtn">PDF 선택</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="period-card" id="periodCard">
+    <div class="pc-week" id="pcWeek">—</div>
+    <div class="pc-range" id="pcRange">—</div>
+  </div>
+
+  <div class="result-sec" id="achieveSec">
+    <h2>✅ 업무실적 <span class="count-badge" id="achieveCount"></span></h2>
+    <div id="achieveList"></div>
+  </div>
+</div>
+
+<footer><div class="wrap">주간업무 작성 · 한국교통연구원 교통빅데이터본부</div></footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+  var TEAM = ["이종우","전준수","이채영","한효림","김예원","정승환"];
+
+  function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function showStatus(msg, kind){
+    var el = document.getElementById("status");
+    el.textContent = msg; el.className = "status show " + (kind||"info");
+  }
+
+  // PDF → 텍스트 (페이지별)
+  async function pdfToText(file){
+    var buf = await file.arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({data: buf}).promise;
+    var pages = [];
+    for(var i=1;i<=pdf.numPages;i++){
+      var page = await pdf.getPage(i);
+      var content = await page.getTextContent();
+      // y좌표로 줄 구분: 같은 줄(y 비슷)은 이어붙이고 줄바뀜은 \n
+      var items = content.items;
+      var lines = [], curY = null, curLine = "";
+      items.forEach(function(it){
+        var y = Math.round(it.transform[5]);
+        if(curY === null){ curY = y; curLine = it.str; }
+        else if(Math.abs(y - curY) <= 3){ curLine += it.str; }
+        else { lines.push(curLine); curLine = it.str; curY = y; }
+      });
+      if(curLine) lines.push(curLine);
+      pages.push(lines.join("\n"));
+    }
+    return pages;
+  }
+
+  // 주차 기간 추출 (첫 페이지)
+  function extractPeriod(firstPage){
+    var p = firstPage.match(/(\d{4})\.(\d{2})\.(\d{2})\.?\s*[~∼\-]\s*(\d{4})\.(\d{2})\.(\d{2})/);
+    var wk = firstPage.match(/\((\d+)주차\)/);
+    var res = { week: wk ? wk[1] : "", start:"", end:"" };
+    if(p){
+      res.start = p[1]+"-"+p[2]+"-"+p[3];
+      res.end = p[4]+"-"+p[5]+"-"+p[6];
+    }
+    return res;
+  }
+
+  // 업무실적 우리팀 일정 추출
+  function extractAchievements(fullText){
+    var 실적 = fullText.split("업무계획")[0];
+    var items = 실적.split("□");
+    var events = [];
+    items.forEach(function(it){
+      var m = it.match(/(\d{2})\.(\d{2})\([월화수목금토일]\)\s*(\d{1,2}:\d{2})?/);
+      if(!m) return;
+      var hit = TEAM.filter(function(n){ return it.indexOf(n) >= 0; });
+      if(!hit.length) return;
+      var title = it.trim().split("\n")[0].trim();
+      // 일시·장소 / 내용 / 참석자 추출
+      var loc = it.match(/일\s*시[·\s]*장소\s*[:：]\s*(.+)/);
+      var content = it.match(/내\s*용\s*[:：]\s*([\s\S]+?)(?=-\s*참|$)/);
+      var attendees = it.match(/참\s*석\s*자\s*[:：]\s*([\s\S]+?)$/);
+      events.push({
+        date: "2026-"+m[1]+"-"+m[2],
+        mmdd: m[1]+"."+m[2],
+        time: m[3] || "",
+        title: title,
+        location: loc ? loc[1].trim() : "",
+        content: content ? content[1].replace(/\s+/g," ").trim() : "",
+        attendees: attendees ? attendees[1].replace(/\s+/g," ").trim() : "",
+        team: hit
+      });
+    });
+    return events;
+  }
+
+  function renderAchievements(events){
+    var sec = document.getElementById("achieveSec");
+    var list = document.getElementById("achieveList");
+    document.getElementById("achieveCount").textContent = "우리 팀 " + events.length + "건";
+    sec.classList.add("show");
+    if(!events.length){
+      list.innerHTML = '<div class="empty-note">PDF 업무실적에서 우리 팀 참석 일정을 찾지 못했습니다.</div>';
+      return;
+    }
+    list.innerHTML = events.map(function(e){
+      var att = e.team.map(function(t){ return '<span class="ev-attend">'+esc(t)+'</span>'; }).join("");
+      return '<div class="ev-card">'
+        + '<div class="ev-head"><span class="ev-dt">'+esc(e.mmdd)+' '+esc(e.time||"종일")+'</span>'
+        + '<span class="ev-title">'+esc(e.title)+'</span></div>'
+        + (e.content ? '<div class="ev-meta"><b>내용</b> · '+esc(e.content)+'</div>' : '')
+        + (e.location ? '<div class="ev-meta"><b>일시·장소</b> · '+esc(e.location)+'</div>' : '')
+        + '<div class="ev-meta" style="margin-top:6px">'+att+'</div>'
+        + '</div>';
+    }).join("");
+  }
+
+  async function handleFile(file){
+    if(!file || file.type !== "application/pdf"){ showStatus("PDF 파일만 올릴 수 있습니다.", "err"); return; }
+    showStatus("PDF 분석 중…", "info");
+    try {
+      var pages = await pdfToText(file);
+      var firstPage = pages[0] || "";
+      var fullText = pages.join("\n");
+
+      var period = extractPeriod(firstPage);
+      var pc = document.getElementById("periodCard");
+      document.getElementById("pcWeek").textContent = period.week ? (period.week + "주차") : "주차 정보 없음";
+      document.getElementById("pcRange").textContent = (period.start && period.end)
+        ? (period.start + " ~ " + period.end) : "기간을 찾지 못함";
+      pc.classList.add("show");
+
+      var achievements = extractAchievements(fullText);
+      renderAchievements(achievements);
+
+      showStatus("분석 완료 — 업무실적 " + achievements.length + "건 추출 (저장은 아직 안 됨)", "ok");
+    } catch(e){
+      showStatus("분석 실패: " + e.message, "err");
+    }
+  }
+
+  // 이벤트 바인딩
+  var fileInput = document.getElementById("fileInput");
+  document.getElementById("pickBtn").addEventListener("click", function(){ fileInput.click(); });
+  fileInput.addEventListener("change", function(e){ if(e.target.files[0]) handleFile(e.target.files[0]); });
+
+  var up = document.getElementById("uploader");
+  ["dragenter","dragover"].forEach(function(ev){
+    up.addEventListener(ev, function(e){ e.preventDefault(); up.classList.add("drag"); });
+  });
+  ["dragleave","drop"].forEach(function(ev){
+    up.addEventListener(ev, function(e){ e.preventDefault(); up.classList.remove("drag"); });
+  });
+  up.addEventListener("drop", function(e){
+    var f = e.dataTransfer.files[0]; if(f) handleFile(f);
+  });
+
+  // 테마
+  (function(){
+    var root=document.documentElement, btn=document.getElementById("themeBtn");
+    function set(t){ root.setAttribute("data-theme",t); btn.textContent=(t==="dark"?"☀️":"🌙");
+      try{localStorage.setItem("mbd-theme",t)}catch(e){} }
+    var saved; try{saved=localStorage.getItem("mbd-theme")}catch(e){}
+    if(!saved){ saved=matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"; }
+    set(saved);
+    btn.addEventListener("click", function(){ set(root.getAttribute("data-theme")==="dark"?"light":"dark"); });
+  })();
+</script>
+</body>
+</html>
