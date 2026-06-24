@@ -375,6 +375,17 @@
     return z(+pp[1]) + "." + z(+pp[2]) + "(" + days[dObj.getDay()] + ")";
   }
 
+  // 업무계획 제목에 특정 키워드가 있으면 자동 채울 기본 참석자
+  var DEFAULT_ATTENDEES = [
+    { keyword:"자율주행", names:"차세대융합기술연구원 김형주 박사, 임동현, 박수연 연구원, 한국도로교통공단 이재명 책임, 송원우, 황지현 연구원, ㈜포럼에이트 김도훈 대표, 김주빈 과장, ㈜큐빅웨어 김성민 소장, 유티정보 이충민 부장, 본원 이숭봉·이종우 부연구위원, 전준수 전문연구원, 한효림 연구원" }
+  ];
+  function defaultAttendeesFor(title){
+    for(var i=0;i<DEFAULT_ATTENDEES.length;i++){
+      if((title||"").indexOf(DEFAULT_ATTENDEES[i].keyword) >= 0) return DEFAULT_ATTENDEES[i].names;
+    }
+    return "";
+  }
+
   // 업무실적 우리팀 일정 추출
   function extractAchievements(fullText){
     var 실적 = fullText.split("업무계획")[0];
@@ -683,7 +694,10 @@
     }
     document.getElementById("edLocation").value = locVal;
     document.getElementById("edContent").value = item.content || "";
-    document.getElementById("edAttendees").value = item.attendees || "";
+    // 업무계획이고 참석자 비어있으면 제목 키워드로 기본 참석자 자동 채움
+    var attVal = item.attendees || "";
+    if(isPlan && !attVal){ attVal = defaultAttendeesFor(item.title); }
+    document.getElementById("edAttendees").value = attVal;
     document.getElementById("edWhoLabel").textContent = isPlan ? "작성자" : "수정자";
     document.getElementById("edWho").value = isPlan ? (item.writer||"") : (item.modifier||"");
     document.getElementById("editStatus").className = "medit-status status";
