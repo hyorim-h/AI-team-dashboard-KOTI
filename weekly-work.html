@@ -112,12 +112,12 @@
   .popover .pv-ev .pv-tag{font-size:10px;font-weight:800;padding:1px 6px;border-radius:3px;white-space:nowrap}
 
   .tbl{width:100%;border-collapse:collapse;font-size:13.5px}
-  .tbl th{text-align:left;font-size:12px;font-weight:800;color:var(--text-2);padding:11px 14px;border-bottom:2px solid var(--line);white-space:nowrap}
-  .tbl td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .tbl th{text-align:center;font-size:12px;font-weight:800;color:var(--text-2);padding:11px 14px;border-bottom:2px solid var(--line);white-space:nowrap}
+  .tbl td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:middle;text-align:center}
   .tbl tbody tr{cursor:pointer;transition:background .12s}
   .tbl tbody tr:hover{background:var(--blue-soft)}
   .tbl .col-no{width:44px;color:var(--muted);font-weight:700}
-  .tbl .t-title{font-weight:700;color:var(--navy)}
+  .tbl .t-title{font-weight:700;color:var(--navy);text-align:center}
   .tbl .t-title.dim{color:var(--muted);text-decoration:line-through}
   .tbl .t-sub{color:var(--text-2)}
   .ptag{display:inline-block;font-size:11px;font-weight:800;padding:3px 9px;border-radius:4px;white-space:nowrap}
@@ -429,8 +429,8 @@
   function achieveCard(){
     var rows = applyFilter(DATA.achievements, false);
     var body = rows.length ? rows.map(function(r,i){
-      var stt = r.modified ? '<span class="badge" style="color:var(--orange);background:var(--orange-soft)">수정됨'+(r.modifier?" · "+esc(r.modifier):"")+'</span>'
-              : (r.status==="삭제필요" ? '<span class="badge" style="color:var(--red);background:var(--red-soft)">삭제필요</span>' : '-');
+      var stt = r.status==="삭제필요" ? '<span class="badge" style="color:var(--red);background:var(--red-soft)">삭제필요</span>'
+              : (r.modified ? '<span class="badge" style="color:var(--orange);background:var(--orange-soft)">수정됨</span>' : '-');
       var titleCls = r.status==="삭제필요" ? "t-title dim" : "t-title";
       return '<tr data-kind="achieve" data-idx="'+DATA.achievements.indexOf(r)+'">'
         + '<td class="col-no">'+(i+1)+'</td>'
@@ -455,9 +455,8 @@
   function planCard(){
     var rows = applyFilter(DATA.plans, true);
     var body = rows.length ? rows.map(function(r,i){
-      var done = r.status==="완료" || r.status==="작성완료";
-      var stt = r.modified ? '<span class="badge" style="color:var(--orange);background:var(--orange-soft)">수정됨</span>'
-              : done ? '<span class="badge" style="color:var(--green);background:var(--green-soft)">완료</span>'
+      var stt = (r.status==="수정됨") ? '<span class="badge" style="color:var(--orange);background:var(--orange-soft)">수정됨</span>'
+              : (r.status==="완료"||r.status==="작성완료") ? '<span class="badge" style="color:var(--green);background:var(--green-soft)">완료</span>'
               : '<span class="badge" style="color:var(--blue);background:var(--blue-soft)">예정</span>';
       return '<tr data-kind="plan" data-idx="'+DATA.plans.indexOf(r)+'">'
         + '<td class="col-no">'+(i+1)+'</td>'
@@ -597,7 +596,9 @@
     document.getElementById("edTime").value = r.time||"";
     // 상태 옵션
     var stOpts = isPlan ? ["예정","완료","수정됨"] : ["","삭제필요"];
-    fillSelect(document.getElementById("edStatus"), stOpts, curStatusForEdit(r,isPlan));
+    var initStatus = curStatusForEdit(r,isPlan);
+    fillSelect(document.getElementById("edStatus"), stOpts, initStatus);
+    EDIT.initStatus = initStatus;
     document.getElementById("edLocation").value = r.location||"";
     document.getElementById("edContent").value = r.content||"";
     document.getElementById("edAttendees").value = r.attendees||"";
@@ -642,22 +643,25 @@
     st.className="estatus status show info"; st.textContent="저장 중…";
     try {
       var body;
+      var statusChanged = (selStatus !== (EDIT.initStatus||""));
       if(isNew){
-        // 추가: 실적이면 삭제필요 여부, 계획이면 예정 기본
-        if(isPlan) item.status = selStatus||"예정"; else item.status = selStatus||"";
+        // 추가: 계획이면 완료 자동, 실적이면 수정됨 자동 (Worker에서 처리). 수정일시 기록.
+        item.now = nowStr();
+        item.status = selStatus||"";
         body={ action:"create", isPlan:isPlan, item:item };
       } else {
         var prev=(isPlan?DATA.plans:DATA.achievements)[EDIT.idx];
-        // 상태 처리: 모달에서 고른 값 반영
-        if(isPlan){
-          // 사용자가 상태를 직접 골랐으면 그 값, 아니면 로직(완료→수정됨) 자동
-          item.status = selStatus;  // 예정/완료/수정됨 중 선택값
-        } else {
-          item.status = selStatus;  // "" or 삭제필요
-          item.prevStatus = prev?prev.status:"";
-        }
         item.now = nowStr();
-        body={ action:"update", isPlan:isPlan, item:item, now:nowStr() };
+        if(isPlan){
+          // 사용자가 상태를 직접 바꿨으면 그 값, 아니면 서버에서 자동(완료/수정됨)
+          item.statusChanged = statusChanged;
+          item.status = selStatus;
+          item.prevStatus = prev ? curStatusForEdit(prev, true) : "";
+        } else {
+          // 실적: 삭제필요 여부만 넘김. 수정됨은 서버가 자동 처리
+          item.status = selStatus;  // "" or 삭제필요
+        }
+        body={ action:"update", isPlan:isPlan, item:item, now:item.now };
       }
       var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
       var data=await res.json();
