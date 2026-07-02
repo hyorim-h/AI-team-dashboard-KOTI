@@ -24,7 +24,7 @@
     --text:#e7eef7; --text-2:#a8b6d4; --muted:#6b7ba0;
     --shadow:0 1px 3px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35);
   }
-  html[data-theme="dark"] .cal-cell.out{background:#0c1428}
+  html[data-theme="dark"] .cal-cell.out{background:#0c1428;border-color:transparent}
   html[data-theme="dark"] .cal-cell.wk-a{background:#14203a}
   html[data-theme="dark"] .cal-cell.wk-p{background:#152740}
   *{box-sizing:border-box}
@@ -86,18 +86,22 @@
   .cal-legend .lg{display:inline-flex;align-items:center;gap:4px}
   .cal-legend .dot{width:9px;height:9px;border-radius:3px;display:inline-block}
   .cal-legend .wk{width:15px;height:10px;border-radius:3px;display:inline-block;border:1px solid var(--line-2)}
-  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);padding:14px 18px}
-  .cal-dow{text-align:center;font-size:12px;font-weight:800;padding:6px 0;color:var(--text-2)}
+  .cal-wrap{padding:16px 20px}
+  .cal-dowrow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:8px;text-align:center}
+  .cal-dow{font-size:11.5px;font-weight:700;color:var(--text-2)}
   .cal-dow.sun{color:var(--red)} .cal-dow.sat{color:var(--blue)}
-  .cal-cell{height:92px;border:1px solid var(--line);margin:-0.5px;padding:5px 7px;background:var(--surface);
-    display:flex;flex-direction:column;gap:2px;overflow:hidden;position:relative}
-  .cal-cell.out{background:#f4f6fa}
-  .cal-cell.wk-a{background:#f5f6f8}
-  .cal-cell.wk-p{background:#eef4fc}
-  .cal-daynum{font-size:12px;font-weight:700;color:var(--text-2)}
+  .cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
+  .cal-cell{height:96px;border:1px solid var(--line);border-radius:7px;padding:8px 9px;background:var(--surface);
+    display:flex;flex-direction:column;gap:3px;overflow:hidden}
+  .cal-cell.out{background:#f6f8fc;border-color:transparent}
+  .cal-cell.wk-a{background:#f6f7fa}
+  .cal-cell.wk-p{background:#eef3fd}
+  .cal-daynum{font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:1px}
+  .cal-cell.out .cal-daynum{color:var(--muted)}
   .cal-cell.sun .cal-daynum{color:var(--red)} .cal-cell.sat .cal-daynum{color:var(--blue)}
-  .cal-ev{font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;cursor:pointer}
-  .cal-more{font-size:10px;font-weight:700;color:var(--text-2);cursor:pointer;padding:0 5px}
+  .cal-ev{font-size:10.5px;font-weight:600;padding:2px 6px;border-radius:4px;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;line-height:1.45;cursor:pointer}
+  .cal-more{font-size:10px;font-weight:700;color:var(--muted);cursor:pointer;padding:1px 6px}
   .cal-more:hover{color:var(--blue);text-decoration:underline}
   /* 팝오버 */
   .popover{position:fixed;z-index:200;background:var(--surface);border:1px solid var(--line-2);border-radius:8px;
@@ -294,36 +298,56 @@
     var first=new Date(y,mo,1), startDow=first.getDay();
     var gridStart=new Date(y,mo,1); gridStart.setDate(1-startDow);
     var dows=["일","월","화","수","목","금","토"];
-    var cells="";
-    dows.forEach(function(d,i){ cells+='<div class="cal-dow'+(i===0?" sun":i===6?" sat":"")+'">'+d+'</div>'; });
-    for(var i=0;i<42;i++){
-      var cur=new Date(gridStart); cur.setDate(gridStart.getDate()+i);
-      var ds=ymd(cur), inMonth=(cur.getMonth()===mo);
-      var dow=cur.getDay();
-      var evs=byDate[ds]||[];
-      var wkCls="";
-      if(PERIOD.aStart && ds>=PERIOD.aStart && ds<=PERIOD.aEnd) wkCls=" wk-a";
-      else if(PERIOD.pStart && ds>=PERIOD.pStart && ds<=PERIOD.pEnd) wkCls=" wk-p";
-      var cls="cal-cell"+(inMonth?"":" out")+wkCls+(dow===0?" sun":dow===6?" sat":"");
-      var evHtml=evs.slice(0,3).map(function(e){
-        var st=PROJ_STYLE[e.r.project]||PROJ_STYLE["기타"];
-        var pre=e.plan?"계획 · ":"";
-        return '<div class="cal-ev" style="color:'+st.c+';background:'+st.bg+'" data-evday="'+ds+'">'+esc(pre+(e.r.title||""))+'</div>';
-      }).join("");
-      if(evs.length>3) evHtml+='<div class="cal-more" data-more="'+ds+'">+'+(evs.length-3)+'건 더보기</div>';
-      cells+='<div class="'+cls+'"><span class="cal-daynum">'+cur.getDate()+'</span>'+evHtml+'</div>';
+
+    // 요일 헤더
+    var dowRow='<div class="cal-dowrow">'+dows.map(function(d,i){
+      return '<div class="cal-dow'+(i===0?" sun":i===6?" sat":"")+'">'+d+'</div>';
+    }).join("")+'</div>';
+
+    // 주별 행
+    var weeks="";
+    for(var w=0; w<6; w++){
+      var cells="";
+      for(var di=0; di<7; di++){
+        var cur=new Date(gridStart); cur.setDate(gridStart.getDate()+w*7+di);
+        var ds=ymd(cur), inMonth=(cur.getMonth()===mo), dow=cur.getDay();
+        var evs=byDate[ds]||[];
+        var wkCls="";
+        if(PERIOD.aStart && ds>=PERIOD.aStart && ds<=PERIOD.aEnd) wkCls=" wk-a";
+        else if(PERIOD.pStart && ds>=PERIOD.pStart && ds<=PERIOD.pEnd) wkCls=" wk-p";
+        var cls="cal-cell"+(inMonth?"":" out")+wkCls+(dow===0?" sun":dow===6?" sat":"");
+        var evHtml=evs.slice(0,2).map(function(e){
+          var st=PROJ_STYLE[e.r.project]||PROJ_STYLE["기타"];
+          var pre=e.plan?"계획 · ":"";
+          return '<div class="cal-ev" style="color:'+st.c+';background:'+st.bg+'" data-evday="'+ds+'">'+esc(pre+(e.r.title||""))+'</div>';
+        }).join("");
+        if(evs.length>2) evHtml+='<div class="cal-more" data-more="'+ds+'">+'+(evs.length-2)+'건 더보기</div>';
+        cells+='<div class="'+cls+'"><div class="cal-daynum">'+cur.getDate()+'</div>'+evHtml+'</div>';
+      }
+      weeks+='<div class="cal-week">'+cells+'</div>';
+      // 다음 주 첫날이 이미 다음달로 넘어갔고 이번달 안 걸치면 종료
+      var chk=new Date(gridStart); chk.setDate(gridStart.getDate()+(w+1)*7);
+      if(chk.getMonth()!==mo && chk>new Date(y,mo+1,0)) break;
     }
+
+    // caption: 실적주/계획주 범위
+    var cap="";
+    if(PERIOD.aStart && PERIOD.aEnd) cap+="실적주 "+PERIOD.aStart.slice(5).replace("-",".")+"~"+PERIOD.aEnd.slice(5).replace("-",".");
+    if(PERIOD.pStart && PERIOD.pEnd) cap+=" · 계획주 "+PERIOD.pStart.slice(5).replace("-",".")+"~"+PERIOD.pEnd.slice(5).replace("-",".");
+
     var legend='<div class="cal-legend">'
-      +'<span class="lg"><span class="wk" style="background:color-mix(in srgb,var(--blue-soft) 45%,var(--surface))"></span>이번 주(실적)</span>'
-      +'<span class="lg"><span class="wk" style="background:color-mix(in srgb,var(--blue-soft) 80%,var(--surface))"></span>다음 주(계획)</span>'
+      +'<span class="lg"><span class="wk" style="background:#f6f7fa"></span>이번 주(실적)</span>'
+      +'<span class="lg"><span class="wk" style="background:#eef3fd"></span>다음 주(계획)</span>'
+      +'<span style="opacity:.4">|</span>'
       +PROJECTS.slice(0,5).map(function(p){var st=PROJ_STYLE[p];return '<span class="lg"><span class="dot" style="background:'+st.c+'"></span>'+esc(PROJ_SHORT[p])+'</span>';}).join("")
       +'</div>';
     return '<div class="card">'
       +'<div class="card-h"><span class="bar"></span><h3>팀 캘린더</h3>'
       +'<span class="sub">'+y+'년 '+(mo+1)+'월</span>'
+      +(cap?'<span class="sub" style="color:var(--muted)">'+esc(cap)+'</span>':'')
       +'<div class="right">'+legend
       +'<button class="addbtn" id="calPrev">‹</button><button class="addbtn" id="calNext">›</button></div></div>'
-      +'<div class="cal-grid">'+cells+'</div></div>';
+      +'<div class="cal-wrap">'+dowRow+weeks+'</div></div>';
   }
 
   function achieveCard(){
