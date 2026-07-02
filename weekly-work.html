@@ -14,7 +14,7 @@
     --bg:#eef1f6; --surface:#ffffff; --line:#dfe5ef; --line-2:#cdd6ec;
     --text:#16265e; --text-2:#5a6680; --muted:#9fb0cf;
     --shadow:0 1px 3px rgba(16,38,94,.06),0 8px 24px rgba(16,38,94,.07);
-    --radius:14px; --maxw:1500px;
+    --radius:6px; --maxw:1500px;
   }
   html[data-theme="dark"]{
     --navy:#0d1836; --navy-2:#0a1228; --blue:#5b8def; --blue-soft:#16233f;
@@ -24,6 +24,9 @@
     --text:#e7eef7; --text-2:#a8b6d4; --muted:#6b7ba0;
     --shadow:0 1px 3px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35);
   }
+  html[data-theme="dark"] .cal-cell.out{background:#0c1428}
+  html[data-theme="dark"] .cal-cell.wk-a{background:#14203a}
+  html[data-theme="dark"] .cal-cell.wk-p{background:#152740}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
     font-family:"Pretendard Variable","Pretendard","Apple SD Gothic Neo",-apple-system,sans-serif;
@@ -86,14 +89,23 @@
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);padding:14px 18px}
   .cal-dow{text-align:center;font-size:12px;font-weight:800;padding:6px 0;color:var(--text-2)}
   .cal-dow.sun{color:var(--red)} .cal-dow.sat{color:var(--blue)}
-  .cal-cell{min-height:88px;border:1px solid var(--line);margin:-0.5px;padding:5px 7px;background:var(--surface);
-    display:flex;flex-direction:column;gap:3px;overflow:hidden}
-  .cal-cell.out{background:var(--bg);color:var(--muted)}
-  .cal-cell.wk-a{background:color-mix(in srgb,var(--blue-soft) 45%,var(--surface))}
-  .cal-cell.wk-p{background:color-mix(in srgb,var(--blue-soft) 80%,var(--surface))}
+  .cal-cell{height:92px;border:1px solid var(--line);margin:-0.5px;padding:5px 7px;background:var(--surface);
+    display:flex;flex-direction:column;gap:2px;overflow:hidden;position:relative}
+  .cal-cell.out{background:#f4f6fa}
+  .cal-cell.wk-a{background:#f5f6f8}
+  .cal-cell.wk-p{background:#eef4fc}
   .cal-daynum{font-size:12px;font-weight:700;color:var(--text-2)}
   .cal-cell.sun .cal-daynum{color:var(--red)} .cal-cell.sat .cal-daynum{color:var(--blue)}
-  .cal-ev{font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+  .cal-ev{font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;cursor:pointer}
+  .cal-more{font-size:10px;font-weight:700;color:var(--text-2);cursor:pointer;padding:0 5px}
+  .cal-more:hover{color:var(--blue);text-decoration:underline}
+  /* 팝오버 */
+  .popover{position:fixed;z-index:200;background:var(--surface);border:1px solid var(--line-2);border-radius:8px;
+    box-shadow:0 8px 28px rgba(16,38,94,.18);padding:12px 14px;min-width:240px;max-width:320px;display:none}
+  .popover.open{display:block}
+  .popover .pv-date{font-size:12.5px;font-weight:800;color:var(--navy);margin-bottom:8px}
+  .popover .pv-ev{font-size:12px;font-weight:600;padding:5px 8px;border-radius:4px;margin-bottom:4px;display:flex;gap:6px;align-items:center}
+  .popover .pv-ev .pv-tag{font-size:10px;font-weight:800;padding:1px 6px;border-radius:3px;white-space:nowrap}
 
   .tbl{width:100%;border-collapse:collapse;font-size:13.5px}
   .tbl th{text-align:left;font-size:12px;font-weight:800;color:var(--text-2);padding:11px 14px;border-bottom:2px solid var(--line);white-space:nowrap}
@@ -104,8 +116,8 @@
   .tbl .t-title{font-weight:700;color:var(--navy)}
   .tbl .t-title.dim{color:var(--muted);text-decoration:line-through}
   .tbl .t-sub{color:var(--text-2)}
-  .ptag{display:inline-block;font-size:11px;font-weight:800;padding:3px 9px;border-radius:6px;white-space:nowrap}
-  .badge{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .ptag{display:inline-block;font-size:11px;font-weight:800;padding:3px 9px;border-radius:4px;white-space:nowrap}
+  .badge{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:4px;white-space:nowrap}
   .empty-row td{text-align:center;color:var(--muted);padding:26px;font-size:13px}
 
   .state{padding:48px;text-align:center;color:var(--text-2)}
@@ -166,6 +178,8 @@
 </div>
 
 <footer>주간업무 작성 · 한국교통연구원 교통빅데이터연구본부</footer>
+
+<div class="popover" id="popover"></div>
 
 <script>
   var WORKER_URL = "https://notion-proxy.ekqls0458.workers.dev";
@@ -294,9 +308,9 @@
       var evHtml=evs.slice(0,3).map(function(e){
         var st=PROJ_STYLE[e.r.project]||PROJ_STYLE["기타"];
         var pre=e.plan?"계획 · ":"";
-        return '<div class="cal-ev" style="color:'+st.c+';background:'+st.bg+'">'+esc(pre+(e.r.title||""))+'</div>';
+        return '<div class="cal-ev" style="color:'+st.c+';background:'+st.bg+'" data-evday="'+ds+'">'+esc(pre+(e.r.title||""))+'</div>';
       }).join("");
-      if(evs.length>3) evHtml+='<div class="cal-ev" style="color:var(--muted)">+'+(evs.length-3)+'건</div>';
+      if(evs.length>3) evHtml+='<div class="cal-more" data-more="'+ds+'">+'+(evs.length-3)+'건 더보기</div>';
       cells+='<div class="'+cls+'"><span class="cal-daynum">'+cur.getDate()+'</span>'+evHtml+'</div>';
     }
     var legend='<div class="cal-legend">'
@@ -368,10 +382,46 @@
   document.getElementById("content").addEventListener("click", function(e){
     if(e.target.id==="calPrev"){ VIEW.mo--; if(VIEW.mo<0){VIEW.mo=11;VIEW.y--;} render(); return; }
     if(e.target.id==="calNext"){ VIEW.mo++; if(VIEW.mo>11){VIEW.mo=0;VIEW.y++;} render(); return; }
+    // +N건 더보기 → 팝오버
+    var more = e.target.closest("[data-more]");
+    if(more){ showPopover(more.dataset.more, more); return; }
+    // 달력 이벤트 클릭 → 그 날 팝오버
+    var ev = e.target.closest("[data-evday]");
+    if(ev){ showPopover(ev.dataset.evday, ev); return; }
     var addBtn = e.target.closest("[data-add]");
     if(addBtn){ alert("항목 추가 기능은 다음 단계에서 연결됩니다."); return; }
     var row = e.target.closest("tr[data-kind]");
     if(row){ alert("상세/수정 모달은 다음 단계에서 연결됩니다."); return; }
+  });
+
+  function showPopover(ds, anchor){
+    var pop = document.getElementById("popover");
+    var evs = [];
+    DATA.achievements.forEach(function(r){ if(r.date===ds) evs.push({r:r,plan:false}); });
+    DATA.plans.forEach(function(r){ if(r.date===ds) evs.push({r:r,plan:true}); });
+    if(!evs.length){ pop.classList.remove("open"); return; }
+    var p=ds.split("-"); var dObj=new Date(ds+"T00:00:00"); var dows=["일","월","화","수","목","금","토"];
+    pop.innerHTML = '<div class="pv-date">'+(+p[1])+'월 '+(+p[2])+'일('+dows[dObj.getDay()]+') · '+evs.length+'건</div>'
+      + evs.map(function(e){
+          var st=PROJ_STYLE[e.r.project]||PROJ_STYLE["기타"];
+          return '<div class="pv-ev" style="background:'+st.bg+'">'
+            + '<span class="pv-tag" style="color:'+st.c+';background:var(--surface)">'+esc(e.plan?"계획":"실적")+'</span>'
+            + '<span style="color:var(--text)">'+esc(e.r.title||"")+'</span></div>';
+        }).join("");
+    pop.classList.add("open");
+    // 위치: 앵커 근처
+    var rect = anchor.getBoundingClientRect();
+    var top = rect.bottom + 6, left = rect.left;
+    if(left + 320 > window.innerWidth) left = window.innerWidth - 330;
+    if(top + 200 > window.innerHeight) top = rect.top - 200;
+    pop.style.top = top + "px"; pop.style.left = left + "px";
+  }
+  // 팝오버 바깥 클릭 시 닫기
+  document.addEventListener("click", function(e){
+    var pop=document.getElementById("popover");
+    if(pop.classList.contains("open") && !pop.contains(e.target) && !e.target.closest("[data-more],[data-evday]")){
+      pop.classList.remove("open");
+    }
   });
 
   ["fProject","fOwner","fStatus"].forEach(function(id){
