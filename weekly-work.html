@@ -125,6 +125,41 @@
   .empty-row td{text-align:center;color:var(--muted);padding:26px;font-size:13px}
 
   .state{padding:48px;text-align:center;color:var(--text-2)}
+  /* 모달 */
+  .ov{display:none;position:fixed;inset:0;background:rgba(10,20,45,.5);z-index:300;align-items:center;justify-content:center;padding:20px}
+  .ov.open{display:flex}
+  .modal{background:var(--surface);border-radius:10px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,.3);animation:mpop .16s ease}
+  @keyframes mpop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .modal-head{background:var(--navy);color:#fff;font-size:16px;font-weight:800;padding:16px 22px;
+    display:flex;align-items:center;justify-content:space-between;border-radius:10px 10px 0 0}
+  .modal-body{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+  .modal-foot{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;justify-content:flex-end}
+  .mbtn{font-size:13.5px;font-weight:700;padding:9px 18px;border-radius:7px;cursor:pointer;border:1px solid var(--line-2);background:var(--surface);color:var(--navy)}
+  .mbtn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .mbtn.danger{background:var(--surface);color:var(--red);border-color:var(--red)}
+  .mbtn:hover{filter:brightness(.97)}
+  /* 상세 보기 */
+  .v-title{font-size:19px;font-weight:850;color:var(--navy);margin-bottom:16px}
+  .v-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px}
+  .v-item .v-lab{font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:2px}
+  .v-item .v-val{font-size:14px;font-weight:600;color:var(--text)}
+  .v-full{grid-column:1/3}
+  .v-content{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px 14px;font-size:13.5px;color:var(--text);white-space:pre-wrap}
+  /* 수정 폼 */
+  .fld{display:flex;flex-direction:column;gap:5px}
+  .fld>span{font-size:12.5px;font-weight:700;color:var(--text-2)}
+  .fld input,.fld select,.fld textarea{border:1px solid var(--line-2);border-radius:6px;padding:9px 11px;font-size:13.5px;
+    background:var(--surface);color:var(--text);font-family:inherit;resize:vertical}
+  .fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(44,95,191,.13)}
+  .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .fld-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .estatus{margin:0}
+  .status{font-size:13px;padding:9px 13px;border-radius:6px;display:none}
+  .status.show{display:block}
+  .status.info{background:var(--blue-soft);color:var(--blue)}
+  .status.err{background:var(--red-soft);color:var(--red)}
+  .status.ok{background:var(--green-soft);color:var(--green)}
   footer{padding:30px 0 48px;color:var(--muted);font-size:13px;text-align:center}
 </style>
 </head>
@@ -185,6 +220,47 @@
 
 <div class="popover" id="popover"></div>
 
+<!-- 상세 보기 모달 -->
+<div class="ov" id="viewOv">
+  <div class="modal">
+    <div class="modal-head" id="viewHead">업무 상세</div>
+    <div class="modal-body" id="viewBody"></div>
+    <div class="modal-foot">
+      <button class="mbtn ghost" id="viewClose">닫기</button>
+      <button class="mbtn primary" id="viewEdit">수정</button>
+    </div>
+  </div>
+</div>
+
+<!-- 항목 수정/추가 모달 -->
+<div class="ov" id="editOv">
+  <div class="modal">
+    <div class="modal-head" id="editHead">항목 수정</div>
+    <div class="modal-body">
+      <label class="fld"><span>제목 <b style="color:var(--red)">*</b></span><input type="text" id="edTitle"></label>
+      <div class="fld-row">
+        <label class="fld"><span>과제</span><select id="edProject"></select></label>
+        <label class="fld"><span>담당자</span><select id="edOwner"></select></label>
+      </div>
+      <div class="fld-row3">
+        <label class="fld"><span>일자</span><input type="date" id="edDate"></label>
+        <label class="fld"><span>시간</span><input type="text" id="edTime" placeholder="예) 14:00"></label>
+        <label class="fld"><span>상태</span><select id="edStatus"></select></label>
+      </div>
+      <label class="fld"><span>장소</span><input type="text" id="edLocation" placeholder="예) 본원 3층 회의실 / 화상"></label>
+      <label class="fld"><span>내용</span><textarea id="edContent" rows="3" placeholder="업무 내용을 입력하세요"></textarea></label>
+      <label class="fld"><span>참석자</span><textarea id="edAttendees" rows="2" placeholder="예) 이종우, 전준수, 외부 자문 2인"></textarea></label>
+      <div class="estatus status" id="editStatus"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="mbtn danger" id="editDelete">삭제</button>
+      <div style="flex:1"></div>
+      <button class="mbtn ghost" id="editCancel">취소</button>
+      <button class="mbtn primary" id="editSave">저장</button>
+    </div>
+  </div>
+</div>
+
 <script>
   var WORKER_URL = "https://notion-proxy.ekqls0458.workers.dev";
 
@@ -222,7 +298,7 @@
 
   async function load(){
     try {
-      var res = await fetch(WORKER_URL, {cache:"no-store"});
+      var res = await fetch(WORKER_URL + "?scope=work", {cache:"no-store"});
       var data = await res.json();
       var work = data.work || {};
       DATA.week = work.week || "";
@@ -413,9 +489,9 @@
     var ev = e.target.closest("[data-evday]");
     if(ev){ showPopover(ev.dataset.evday, ev); return; }
     var addBtn = e.target.closest("[data-add]");
-    if(addBtn){ alert("항목 추가 기능은 다음 단계에서 연결됩니다."); return; }
+    if(addBtn){ openEdit(addBtn.dataset.add, -1); return; }
     var row = e.target.closest("tr[data-kind]");
-    if(row){ alert("상세/수정 모달은 다음 단계에서 연결됩니다."); return; }
+    if(row){ openView(row.dataset.kind, +row.dataset.idx); return; }
   });
 
   function showPopover(ds, anchor){
@@ -469,6 +545,144 @@
   document.getElementById("pdfBtn").addEventListener("click", function(){ alert("PDF 불러오기는 다음 단계에서 연결됩니다."); });
   document.getElementById("wordBtn").addEventListener("click", function(){ alert("Word 다운로드는 다음 단계에서 연결됩니다."); });
   document.querySelectorAll("[data-todo]").forEach(function(a){ a.addEventListener("click", function(e){ e.preventDefault(); alert("이 페이지는 준비 중입니다."); }); });
+
+  // ===== 모달: 상세 보기 =====
+  var EDIT = { kind:"", idx:-1, id:null };
+  var STATUS_OPTIONS = { achieve:["", "삭제필요"], plan:["예정","완료","수정됨"] };
+
+  function curStatusText(r, isPlan){
+    if(isPlan){ return r.modified ? "수정됨" : ((r.status==="완료"||r.status==="작성완료")?"완료":(r.status||"예정")); }
+    return r.modified ? "수정됨" : (r.status==="삭제필요"?"삭제필요":"-");
+  }
+
+  function openView(kind, idx){
+    var isPlan = (kind==="plan");
+    var r = (isPlan?DATA.plans:DATA.achievements)[idx];
+    if(!r) return;
+    EDIT.kind=kind; EDIT.idx=idx; EDIT.id=r.id;
+    document.getElementById("viewHead").textContent = "업무 상세 · " + (isPlan?"업무계획":"업무실적");
+    var owner = isPlan ? (r.writer||"-") : (r.modifier||"-");
+    document.getElementById("viewBody").innerHTML =
+      '<div class="v-title">'+esc(r.title)+'</div>'
+      +'<div class="v-grid">'
+      +'<div class="v-item"><div class="v-lab">과제</div><div class="v-val">'+esc(r.project||"-")+'</div></div>'
+      +'<div class="v-item"><div class="v-lab">담당자</div><div class="v-val">'+esc(owner)+'</div></div>'
+      +'<div class="v-item"><div class="v-lab">'+(isPlan?"예정일":"일시")+'</div><div class="v-val">'+fmtDateDow(r.date)+(r.time?" "+esc(r.time):"")+'</div></div>'
+      +'<div class="v-item"><div class="v-lab">상태</div><div class="v-val">'+esc(curStatusText(r,isPlan))+'</div></div>'
+      +'<div class="v-item"><div class="v-lab">장소</div><div class="v-val">'+esc(r.location||"-")+'</div></div>'
+      +'<div class="v-item"><div class="v-lab">참석자</div><div class="v-val">'+esc(r.attendees||"-")+'</div></div>'
+      +'<div class="v-item v-full"><div class="v-lab">내용</div><div class="v-content">'+esc(r.content||"내용 없음")+'</div></div>'
+      +'</div>';
+    document.getElementById("viewOv").classList.add("open");
+  }
+  function closeView(){ document.getElementById("viewOv").classList.remove("open"); }
+  document.getElementById("viewClose").addEventListener("click", closeView);
+  document.getElementById("viewOv").addEventListener("click", function(e){ if(e.target.id==="viewOv") closeView(); });
+  document.getElementById("viewEdit").addEventListener("click", function(){ closeView(); openEdit(EDIT.kind, EDIT.idx); });
+
+  // ===== 모달: 수정/추가 =====
+  function fillSelect(sel, opts, val){
+    sel.innerHTML = opts.map(function(o){ return '<option value="'+esc(o)+'"'+(o===val?" selected":"")+'>'+esc(o||"(없음)")+'</option>'; }).join("");
+  }
+  function openEdit(kind, idx){
+    var isPlan = (kind==="plan");
+    var isNew = (idx<0);
+    var r = isNew ? {} : (isPlan?DATA.plans:DATA.achievements)[idx];
+    EDIT.kind=kind; EDIT.idx=idx; EDIT.id=isNew?null:r.id;
+    document.getElementById("editHead").textContent = (isNew?"항목 추가 · ":"항목 수정 · ")+(isPlan?"업무계획":"업무실적");
+    document.getElementById("edTitle").value = r.title||"";
+    fillSelect(document.getElementById("edProject"), PROJECTS, r.project||"");
+    fillSelect(document.getElementById("edOwner"), [""].concat(OWNERS), (isPlan?r.writer:r.modifier)||"");
+    document.getElementById("edDate").value = r.date||"";
+    document.getElementById("edTime").value = r.time||"";
+    // 상태 옵션
+    var stOpts = isPlan ? ["예정","완료","수정됨"] : ["","삭제필요"];
+    fillSelect(document.getElementById("edStatus"), stOpts, curStatusForEdit(r,isPlan));
+    document.getElementById("edLocation").value = r.location||"";
+    document.getElementById("edContent").value = r.content||"";
+    document.getElementById("edAttendees").value = r.attendees||"";
+    document.getElementById("editStatus").className="estatus status";
+    document.getElementById("editDelete").style.display = isNew?"none":"";
+    document.getElementById("editOv").classList.add("open");
+  }
+  function curStatusForEdit(r, isPlan){
+    if(!r || !r.status && !r.modified) return isPlan?"예정":"";
+    if(isPlan) return r.modified?"수정됨":((r.status==="완료"||r.status==="작성완료")?"완료":(r.status||"예정"));
+    return r.status==="삭제필요"?"삭제필요":"";
+  }
+  function closeEdit(){ document.getElementById("editOv").classList.remove("open"); }
+  document.getElementById("editCancel").addEventListener("click", closeEdit);
+  document.getElementById("editOv").addEventListener("click", function(e){ if(e.target.id==="editOv") closeEdit(); });
+
+  function nowStr(){
+    var d=new Date(); function z(n){return(n<10?"0":"")+n;}
+    return (d.getMonth()+1)+"."+z(d.getDate())+" "+z(d.getHours())+":"+z(d.getMinutes());
+  }
+
+  document.getElementById("editSave").addEventListener("click", async function(){
+    var isPlan=(EDIT.kind==="plan"), isNew=(EDIT.idx<0);
+    var st=document.getElementById("editStatus");
+    var title=document.getElementById("edTitle").value.trim();
+    if(!title){ st.className="estatus status show err"; st.textContent="제목을 입력하세요."; return; }
+    var who=document.getElementById("edOwner").value;
+    var selStatus=document.getElementById("edStatus").value;
+    var item={
+      id: EDIT.id,
+      title: title,
+      project: document.getElementById("edProject").value,
+      date: document.getElementById("edDate").value,
+      time: document.getElementById("edTime").value.trim(),
+      location: document.getElementById("edLocation").value.trim(),
+      content: document.getElementById("edContent").value.trim(),
+      attendees: document.getElementById("edAttendees").value.trim(),
+      week: DATA.week
+    };
+    if(isPlan) item.writer=who; else item.modifier=who;
+
+    st.className="estatus status show info"; st.textContent="저장 중…";
+    try {
+      var body;
+      if(isNew){
+        // 추가: 실적이면 삭제필요 여부, 계획이면 예정 기본
+        if(isPlan) item.status = selStatus||"예정"; else item.status = selStatus||"";
+        body={ action:"create", isPlan:isPlan, item:item };
+      } else {
+        var prev=(isPlan?DATA.plans:DATA.achievements)[EDIT.idx];
+        // 상태 처리: 모달에서 고른 값 반영
+        if(isPlan){
+          // 사용자가 상태를 직접 골랐으면 그 값, 아니면 로직(완료→수정됨) 자동
+          item.status = selStatus;  // 예정/완료/수정됨 중 선택값
+        } else {
+          item.status = selStatus;  // "" or 삭제필요
+          item.prevStatus = prev?prev.status:"";
+        }
+        item.now = nowStr();
+        body={ action:"update", isPlan:isPlan, item:item, now:nowStr() };
+      }
+      var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      var data=await res.json();
+      if(!data.ok) throw new Error(data.error||"실패");
+      st.className="estatus status show ok"; st.textContent="저장 완료 — 새로고침합니다…";
+      setTimeout(function(){ closeEdit(); load(); }, 700);
+    } catch(err){
+      st.className="estatus status show err"; st.textContent="저장 실패: "+err.message;
+    }
+  });
+
+  document.getElementById("editDelete").addEventListener("click", async function(){
+    if(EDIT.idx<0 || !EDIT.id) return;
+    if(!confirm("이 항목을 정말 삭제하시겠어요?\n삭제하면 되돌릴 수 없습니다.")) return;
+    var st=document.getElementById("editStatus");
+    st.className="estatus status show info"; st.textContent="삭제 중…";
+    try {
+      var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"delete",id:EDIT.id})});
+      var data=await res.json();
+      if(!data.ok) throw new Error(data.error||"실패");
+      setTimeout(function(){ closeEdit(); load(); }, 500);
+    } catch(err){
+      st.className="estatus status show err"; st.textContent="삭제 실패: "+err.message;
+    }
+  });
 
   (function(){
     var root=document.documentElement, btn=document.getElementById("themeBtn");

@@ -10,7 +10,7 @@
     --line:#dce4e8; --accent:#0e7c86; --accent-2:#13a3b0; --accent-soft:#e2f3f4;
     --warn:#d64545; --warn-soft:#fbe9e9; --ok:#1d9a6c; --ok-soft:#e1f4ec;
     --shadow:0 1px 2px rgba(16,40,48,.06),0 8px 24px rgba(16,40,48,.06);
-    --radius:16px; --maxw:1320px;
+    --radius:16px; --maxw:1100px;
   }
   html[data-theme="dark"]{
     --bg:#0c1417; --surface:#111d22; --surface-2:#15242a; --text:#e7eef1; --muted:#9bb0b7;
@@ -55,7 +55,6 @@
   .cal-nav{display:flex;gap:6px}
   .cal-nav button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);
     background:var(--surface);color:var(--text);cursor:pointer;font-size:15px}
-  .cal-nav button[data-mv="today"]{width:auto;padding:0 12px;font-size:13px;font-weight:700}
   .cal-nav button:hover{background:var(--surface-2)}
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
   .cal-dow{text-align:center;font-size:12px;font-weight:800;color:var(--muted);padding:4px 0}
@@ -105,8 +104,6 @@
     font-size:14px;background:var(--surface);color:var(--text);font-family:inherit}
   .cmt-form textarea{flex:1;min-width:200px;resize:vertical;min-height:40px}
   .cmt-empty{font-size:13px;color:var(--muted);font-style:italic;padding:4px 0}
-  .refresh-btn{margin-left:10px;border:1px solid var(--line);background:var(--surface);color:var(--accent);
-    font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;vertical-align:middle}
 
   /* 수정 모달 */
   .ov{display:none;position:fixed;inset:0;background:rgba(10,20,24,.55);z-index:100;align-items:center;justify-content:center;padding:20px}
@@ -140,8 +137,6 @@
       <a href="index.html">대시보드</a>
       <a href="weekly-work.html">주간업무 작성</a>
       <a class="cur" href="weekly-meeting.html">주간회의 자료</a>
-      <span class="nav-sep"></span>
-      <a class="ext" href="https://www.koti.re.kr" target="_blank" rel="noopener">연구원 홈페이지 ↗</a>
     </nav>
     <button class="toggle" id="themeBtn">🌙</button>
   </div>
@@ -150,7 +145,7 @@
 <div class="wrap">
   <div class="titlebar">
     <div class="eyebrow">모빌리티 빅데이터팀 · WEEKLY MEETING</div>
-    <h1>주간회의 자료 <button class="refresh-btn" id="refreshBtn">↻ 새로고침</button></h1>
+    <h1>주간회의 자료</h1>
     <div class="sub">과제별 주간회의 요약을 보고, 요약을 수정하거나 코멘트를 남길 수 있습니다.</div>
   </div>
 
@@ -201,7 +196,7 @@
 
   async function load(){
     try {
-      var res = await fetch(WORKER_URL, {cache:"no-store"});
+      var res = await fetch(WORKER_URL + "?scope=meetings", {cache:"no-store"});
       var data = await res.json();
       MEETINGS = data.meetings || [];
       // 초기 표시월/선택날짜: 가장 최근 회의 기준 (없으면 오늘)
@@ -313,7 +308,7 @@
 
     area.innerHTML='<div class="cal">'
       +'<div class="cal-top"><div class="cal-title">'+y+'년 '+(mo+1)+'월</div>'
-      +'<div class="cal-nav"><button data-mv="-1">◀</button><button data-mv="today">오늘</button><button data-mv="1">▶</button></div></div>'
+      +'<div class="cal-nav"><button data-mv="-1">‹</button><button data-mv="today">오늘</button><button data-mv="1">›</button></div></div>'
       +'<div class="cal-grid">'+cells+'</div></div>';
   }
 
@@ -447,8 +442,6 @@
     set(saved);
     btn.addEventListener("click", function(){ set(root.getAttribute("data-theme")==="dark"?"light":"dark"); });
   })();
-
-  document.getElementById("refreshBtn").addEventListener("click", function(){ SEL_DATE=""; load(); });
 
   load();
 </script>
