@@ -504,7 +504,7 @@
     return '<div class="card">'
       +'<div class="card-h"><span class="bar" style="background:var(--blue)"></span><h3>업무계획</h3>'
       +'<span class="sub">다음 주 수행할 업무 · '+DATA.plans.length+'건</span>'
-      +'<div class="right"><button class="addbtn" data-add="plan">+ 항목 추가</button></div></div>'
+      +'<div class="right"><button class="addbtn" id="syncPlanBtn">🔄 캘린더 동기화</button><button class="addbtn" data-add="plan">+ 항목 추가</button></div></div>'
       +'<table class="tbl"><thead><tr>'
       +'<th>No</th><th>과제</th><th>제목</th><th>일시</th><th>장소</th><th>담당자</th><th>상태</th><th>수정일시</th>'
       +'</tr></thead><tbody>'+body+'</tbody></table></div>';
@@ -513,6 +513,7 @@
   document.getElementById("content").addEventListener("click", function(e){
     if(e.target.id==="calPrev"){ VIEW.mo--; if(VIEW.mo<0){VIEW.mo=11;VIEW.y--;} render(); return; }
     if(e.target.id==="calNext"){ VIEW.mo++; if(VIEW.mo>11){VIEW.mo=0;VIEW.y++;} render(); return; }
+    if(e.target.id==="syncPlanBtn"){ syncPlans(e.target); return; }
     // +N건 더보기 → 팝오버
     var more = e.target.closest("[data-more]");
     if(more){ showPopover(more.dataset.more, more); return; }
@@ -524,6 +525,26 @@
     var row = e.target.closest("tr[data-kind]");
     if(row){ openView(row.dataset.kind, +row.dataset.idx); return; }
   });
+
+  async function syncPlans(btn){
+    var orig = btn.textContent;
+    btn.textContent = "동기화 중…"; btn.disabled = true;
+    try {
+      var res = await fetch(WORKER_URL, { method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ action:"syncPlans" }) });
+      var data = await res.json();
+      if(!data.ok) throw new Error(data.error || "실패");
+      var r = data.result || {};
+      var msg = "캘린더 동기화 완료\n\n확인: "+(r.checked||0)+"건 · 변경 반영: "+(r.updated||0)+"건";
+      if(r.missing) msg += " · 캘린더에서 삭제됨: "+r.missing+"건";
+      alert(msg);
+      load();
+    } catch(err){
+      alert("동기화 실패: " + err.message);
+    } finally {
+      btn.textContent = orig; btn.disabled = false;
+    }
+  }
 
   function showPopover(ds, anchor){
     var pop = document.getElementById("popover");
