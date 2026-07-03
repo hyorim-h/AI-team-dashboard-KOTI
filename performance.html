@@ -323,6 +323,11 @@
     var done = list.filter(function(x){return x.done;}).length;
     return Math.round(done/list.length*100);
   }
+  // 화면 표시용 진행률: 상태가 완료면 무조건 100%, 아니면 저장된 진행률
+  function displayProgress(r){
+    if(r.status === "완료") return 100;
+    return r.progress || 0;
+  }
 
   // ===== 데이터 로드 =====
   async function load(){
@@ -380,7 +385,7 @@
         + '<td class="t-sub">'+esc(r.detail||"-")+'</td>'
         + '<td class="t-sub">'+esc(r.owner||"-")+'</td>'
         + '<td class="t-sub">'+fmtDue(r.due)+'</td>'
-        + '<td>'+progBar(r.progress||0)+'</td>'
+        + '<td>'+progBar(displayProgress(r))+'</td>'
         + '<td>'+statusBadge(r)+'</td>'
         + '</tr>';
     }).join("") : '<tr class="empty-row"><td colspan="8">'+TYPE_LABEL[type]+'가 없습니다.</td></tr>';
@@ -461,7 +466,7 @@
       +'<div class="v-item"><div class="v-lab">과제</div><div class="v-val">'+esc(r.project||"-")+'</div></div>'
       +'<div class="v-item"><div class="v-lab">담당자</div><div class="v-val">'+esc(r.owner||"-")+'</div></div>'
       +'<div class="v-item"><div class="v-lab">구분</div><div class="v-val">'+esc(TYPE_LABEL[r.type]||r.type||"-")+'</div></div>'
-      +'<div class="v-item"><div class="v-lab">상태</div><div class="v-val">'+esc(r.status||"-")+' · '+(r.progress||0)+'%</div></div>'
+      +'<div class="v-item"><div class="v-lab">상태</div><div class="v-val">'+esc(r.status||"-")+' · '+displayProgress(r)+'%</div></div>'
       +'<div class="v-item"><div class="v-lab">기간</div><div class="v-val">'+((typeof r.start_year==="number"&&r.start_year>0)?(r.start_year+"년 ~ "):"")+fmtDue(r.due)+'</div></div>'
       +'<div class="v-item"><div class="v-lab">세부내용</div><div class="v-val">'+esc(r.detail||"-")+'</div></div>'
       + chkHtml
@@ -555,6 +560,9 @@
     if(!name){ st.className="estatus status show err"; st.textContent="성과목표를 입력하세요."; return; }
     // 빈 체크리스트 항목 제거
     var clean = EDIT.checklist.filter(function(c){ return (c.text||"").trim(); });
+    var statusVal = document.getElementById("edStatus").value;
+    // 상태가 완료면 체크리스트 유무와 무관하게 100%, 아니면 체크리스트 비율
+    var progressVal = (statusVal === "완료") ? 100 : calcProgress(clean);
     var item = {
       id: EDIT.id,
       name: name,
@@ -564,9 +572,9 @@
       detail: document.getElementById("edDetail").value.trim(),
       due: document.getElementById("edDue").value,
       start_year: document.getElementById("edStartYear").value ? parseInt(document.getElementById("edStartYear").value,10) : null,
-      status: document.getElementById("edStatus").value,
+      status: statusVal,
       checklist: JSON.stringify(clean),
-      progress: calcProgress(clean)
+      progress: progressVal
     };
     st.className="estatus status show info"; st.textContent="저장 중…";
     try {
