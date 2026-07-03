@@ -114,9 +114,17 @@
   .popover .pv-ev{font-size:12px;font-weight:600;padding:5px 8px;border-radius:4px;margin-bottom:4px;display:flex;gap:6px;align-items:center}
   .popover .pv-ev .pv-tag{font-size:10px;font-weight:800;padding:1px 6px;border-radius:3px;white-space:nowrap}
 
-  .tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+  .tbl{width:100%;border-collapse:collapse;font-size:13.5px;table-layout:fixed}
   .tbl th{text-align:center;font-size:12px;font-weight:800;color:var(--text-2);padding:11px 14px;border-bottom:2px solid var(--line);white-space:nowrap}
-  .tbl td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:middle;text-align:center}
+  .tbl td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:middle;text-align:center;overflow:hidden;text-overflow:ellipsis}
+  .tbl th:nth-child(1),.tbl td:nth-child(1){width:5%}
+  .tbl th:nth-child(2),.tbl td:nth-child(2){width:11%}
+  .tbl th:nth-child(3),.tbl td:nth-child(3){width:26%}
+  .tbl th:nth-child(4),.tbl td:nth-child(4){width:15%}
+  .tbl th:nth-child(5),.tbl td:nth-child(5){width:16%}
+  .tbl th:nth-child(6),.tbl td:nth-child(6){width:9%}
+  .tbl th:nth-child(7),.tbl td:nth-child(7){width:9%}
+  .tbl th:nth-child(8),.tbl td:nth-child(8){width:9%}
   .tbl tbody tr{cursor:pointer;transition:background .12s}
   .tbl tbody tr:hover{background:var(--blue-soft)}
   .tbl .col-no{width:44px;color:var(--muted);font-weight:700}
@@ -319,14 +327,20 @@
   }
 
   function computePeriod(){
-    var aDates = DATA.achievements.map(function(x){return x.date;}).filter(Boolean).sort();
-    var pDates = DATA.plans.map(function(x){return x.date;}).filter(Boolean).sort();
-    PERIOD.aStart = aDates[0]||""; PERIOD.aEnd = aDates[aDates.length-1]||"";
-    PERIOD.pStart = pDates[0]||""; PERIOD.pEnd = pDates[pDates.length-1]||"";
+    // 오늘 기준 이번 주 월~금(실적), 다음 주 월~금(계획) 자동 계산
+    var today = new Date();
+    var dow = today.getDay(); // 0=일
+    var monOffset = (dow===0) ? -6 : (1-dow); // 이번 주 월요일까지 오프셋
+    var mon = new Date(today); mon.setDate(today.getDate()+monOffset); mon.setHours(0,0,0,0);
+    var fri = new Date(mon); fri.setDate(mon.getDate()+4);
+    var nextMon = new Date(mon); nextMon.setDate(mon.getDate()+7);
+    var nextFri = new Date(nextMon); nextFri.setDate(nextMon.getDate()+4);
+    PERIOD.aStart = ymd(mon); PERIOD.aEnd = ymd(fri);
+    PERIOD.pStart = ymd(nextMon); PERIOD.pEnd = ymd(nextFri);
   }
 
   function initView(){
-    var base = PERIOD.aStart || PERIOD.pStart;
+    var base = PERIOD.aStart;
     var d = base ? new Date(base+"T00:00:00") : new Date();
     VIEW.y = d.getFullYear(); VIEW.mo = d.getMonth();
   }
@@ -340,10 +354,21 @@
     ["수정됨","삭제필요","예정","완료"].forEach(function(s){ var o=document.createElement("option"); o.value=s; o.textContent=s; fs.appendChild(o); });
   }
 
+  function isoWeekNum(ymdStr){
+    var d=new Date(ymdStr+"T00:00:00");
+    var target=new Date(d.valueOf()); var dayNr=(d.getDay()+6)%7;
+    target.setDate(target.getDate()-dayNr+3);
+    var firstThu=target.valueOf();
+    target.setMonth(0,1);
+    if(target.getDay()!==4){ target.setMonth(0,1+((4-target.getDay())+7)%7); }
+    return 1+Math.ceil((firstThu-target)/604800000);
+  }
   function weekLabelText(){
-    var wk = DATA.week ? (" ("+DATA.week.split("-")[1]+"주차)") : "";
-    if(PERIOD.aStart && PERIOD.aEnd) return PERIOD.aStart+" ~ "+PERIOD.aEnd.slice(5)+wk;
-    return DATA.week || "주간업무";
+    if(PERIOD.aStart && PERIOD.aEnd){
+      var wn = isoWeekNum(PERIOD.aStart);
+      return PERIOD.aStart+" ~ "+PERIOD.aEnd.slice(5)+" ("+wn+"주차)";
+    }
+    return "주간업무";
   }
 
   function applyFilter(rows, isPlan){
@@ -441,7 +466,7 @@
         + '<td class="col-no">'+(i+1)+'</td>'
         + '<td>'+ptag(r.project)+'</td>'
         + '<td class="'+titleCls+'">'+esc(r.title)+'</td>'
-        + '<td class="t-sub">'+fmtDateDow(r.date)+(r.time?" "+esc(r.time):"")+'</td>'
+        + '<td class="t-sub">'+fmtDateDow(r.date)+(r.time?", "+esc(r.time):"")+'</td>'
         + '<td class="t-sub">'+esc(r.location||"-")+'</td>'
         + '<td class="t-sub">'+esc(r.modifier||"-")+'</td>'
         + '<td>'+stt+'</td>'
@@ -467,7 +492,7 @@
         + '<td class="col-no">'+(i+1)+'</td>'
         + '<td>'+ptag(r.project)+'</td>'
         + '<td class="t-title">'+esc(r.title)+'</td>'
-        + '<td class="t-sub">'+fmtDateDow(r.date)+'</td>'
+        + '<td class="t-sub">'+fmtDateDow(r.date)+(r.time?", "+esc(r.time):"")+'</td>'
         + '<td class="t-sub">'+esc(r.location||"-")+'</td>'
         + '<td class="t-sub">'+esc(r.writer||"-")+'</td>'
         + '<td>'+stt+'</td>'
@@ -479,7 +504,7 @@
       +'<span class="sub">다음 주 수행할 업무 · '+DATA.plans.length+'건</span>'
       +'<div class="right"><button class="addbtn" data-add="plan">+ 항목 추가</button></div></div>'
       +'<table class="tbl"><thead><tr>'
-      +'<th>No</th><th>과제</th><th>제목</th><th>예정일</th><th>장소</th><th>담당자</th><th>상태</th><th>수정일시</th>'
+      +'<th>No</th><th>과제</th><th>제목</th><th>일시</th><th>장소</th><th>담당자</th><th>상태</th><th>수정일시</th>'
       +'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }
 
@@ -572,7 +597,7 @@
       +'<div class="v-grid">'
       +'<div class="v-item"><div class="v-lab">과제</div><div class="v-val">'+esc(r.project||"-")+'</div></div>'
       +'<div class="v-item"><div class="v-lab">담당자</div><div class="v-val">'+esc(owner)+'</div></div>'
-      +'<div class="v-item"><div class="v-lab">'+(isPlan?"예정일":"일시")+'</div><div class="v-val">'+fmtDateDow(r.date)+(r.time?" "+esc(r.time):"")+'</div></div>'
+      +'<div class="v-item"><div class="v-lab">일시</div><div class="v-val">'+fmtDateDow(r.date)+(r.time?", "+esc(r.time):"")+'</div></div>'
       +'<div class="v-item"><div class="v-lab">상태</div><div class="v-val">'+esc(curStatusText(r,isPlan))+'</div></div>'
       +'<div class="v-item"><div class="v-lab">장소</div><div class="v-val">'+esc(r.location||"-")+'</div></div>'
       +'<div class="v-item"><div class="v-lab">참석자</div><div class="v-val">'+esc(r.attendees||"-")+'</div></div>'
@@ -749,6 +774,9 @@
       if(!hit.length) return;
       var title = it.trim().split("\n")[0].trim();
       var loc = it.match(/일\s*시[·\s]*장소\s*[:：]\s*(.+)/);
+      var locText = loc ? loc[1].trim() : "";
+      // "06.29(월) 10:30, 본원 104호" → 콤마로 나눠 맨 마지막(장소)만
+      if(locText.indexOf(",")>=0){ var parts=locText.split(","); locText=parts[parts.length-1].trim(); }
       var content = it.match(/내\s*용\s*[:：]\s*([\s\S]+?)(?=-\s*참|$)/);
       var attendees = it.match(/참\s*석\s*자\s*[:：]\s*([\s\S]+?)(?=\n\s*\d+\.\s|\n\s*-\s*\d+\s*-|\n\s*<|$)/);
       events.push({
@@ -756,7 +784,7 @@
         time: m[3]||"",
         title: title,
         project: "기타",
-        location: loc?loc[1].trim():"",
+        location: locText,
         content: content?content[1].replace(/\s+/g," ").trim():"",
         attendees: attendees?attendees[1].replace(/\s+/g," ").trim():""
       });
