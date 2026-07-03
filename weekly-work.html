@@ -426,8 +426,8 @@
         var cls="cal-cell"+(inMonth?"":" out")+wkCls+(dow===0?" sun":dow===6?" sat":"");
         var evHtml=evs.slice(0,2).map(function(e){
           var st=PROJ_STYLE[e.r.project]||PROJ_STYLE["기타"];
-          var pre=e.plan?"계획 · ":"";
-          return '<div class="cal-ev" style="color:'+st.c+';background:'+st.bg+'" data-evday="'+ds+'">'+esc(pre+(e.r.title||""))+'</div>';
+          var pre=e.r.time?(esc(e.r.time)+" "):"";
+          return '<div class="cal-ev" style="color:'+st.c+';background:'+st.bg+'" data-evday="'+ds+'">'+pre+esc(e.r.title||"")+'</div>';
         }).join("");
         if(evs.length>2) evHtml+='<div class="cal-more" data-more="'+ds+'">+'+(evs.length-2)+'건 더보기</div>';
         cells+='<div class="'+cls+'"><div class="cal-daynum">'+cur.getDate()+'</div>'+evHtml+'</div>';
@@ -535,9 +535,10 @@
     pop.innerHTML = '<div class="pv-date">'+(+p[1])+'월 '+(+p[2])+'일('+dows[dObj.getDay()]+') · '+evs.length+'건</div>'
       + evs.map(function(e){
           var st=PROJ_STYLE[e.r.project]||PROJ_STYLE["기타"];
+          var tm=e.r.time?(esc(e.r.time)+" "):"";
           return '<div class="pv-ev" style="background:'+st.bg+'">'
             + '<span class="pv-tag" style="color:'+st.c+';background:var(--surface)">'+esc(e.plan?"계획":"실적")+'</span>'
-            + '<span style="color:var(--text)">'+esc(e.r.title||"")+'</span></div>';
+            + '<span style="color:var(--text)">'+tm+esc(e.r.title||"")+'</span></div>';
         }).join("");
     pop.classList.add("open");
     // 위치: 앵커 근처
