@@ -4,6 +4,7 @@
 const REPORT_DB_ID = "383ce6a25dc6801c874bc6bb96dc83c1"; // 주간 리포트 DB
 const WBS_DB_ID    = "f1a718244eb54c399b70eb216067804d"; // WBS DB
 const PROJECT_DB_ID = "5a75146603614e489364b66e5eab2e1c"; // 과제 정보 DB (노션 확인 database_id)
+const SCHEDULE_DB_ID = "42e3b67332af431a93e8fdc9b5979d88"; // 일정관리 DB
 const PERF_DB_ID   = "2f590aa04b1243f09255ca3850833038"; // 성과 DB
 const ACHIEVE_DB_ID = "34ab53ea4afb4b1481c8c5358cd67b29"; // 업무실적 DB
 const PLAN_DB_ID    = "d104d01ba9b140e6a83ceaea36e86b48"; // 업무계획 DB
@@ -314,6 +315,30 @@ function parseProjectInfo(page){
   const end = (p["종료"] && p["종료"].date && p["종료"].date.start) || "";
   const order = (p["정렬순서"] && typeof p["정렬순서"].number === "number") ? p["정렬순서"].number : 999;
   return { id: page.id, name: name, main: main, sub: sub, start: start, end: end, order: order };
+}
+
+// 일정관리 페이지 파싱
+function parseSchedule(page){
+  const p = page.properties || {};
+  const titleList = (p["내용"] && p["내용"].title) || [];
+  const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
+  const type = (p["유형"] && p["유형"].select && p["유형"].select.name) || "";
+  const person = (p["담당자"] && p["담당자"].select && p["담당자"].select.name) || "";
+  const project = (p["과제"] && p["과제"].select && p["과제"].select.name) || "";
+  const vacation = (p["휴가구분"] && p["휴가구분"].select && p["휴가구분"].select.name) || "";
+  const start = (p["시작일"] && p["시작일"].date && p["시작일"].date.start) || "";
+  const end = (p["종료일"] && p["종료일"].date && p["종료일"].date.start) || "";
+  const timeRt = (p["시간"] && p["시간"].rich_text) || [];
+  const time = timeRt.map(function(t){return t.plain_text;}).join("");
+  const locRt = (p["장소"] && p["장소"].rich_text) || [];
+  const location = locRt.map(function(t){return t.plain_text;}).join("");
+  const gcalRt = (p["캘린더ID"] && p["캘린더ID"].rich_text) || [];
+  const gcalId = gcalRt.map(function(t){return t.plain_text;}).join("");
+  return {
+    id: page.id, title: title, type: type, person: person, project: project,
+    vacation: vacation, start: start, end: end, time: time, location: location,
+    gcal_id: gcalId, page_url: page.url || ""
+  };
 }
 
 function parsePerf(page){
@@ -824,6 +849,43 @@ async function deleteWbs(env, payload){
   return { deleted: true };
 }
 
+// ===== 일정관리 CRUD =====
+function scheduleProps(item){
+  var props = {
+    "내용": { title: rt(item.title || "") },
+    "시간": { rich_text: rt(item.time || "") },
+    "장소": { rich_text: rt(item.location || "") },
+  };
+  if(item.type)   props["유형"] = { select: { name: item.type } };
+  if(item.person) props["담당자"] = { select: { name: item.person } };
+  // 과제는 유형이 '과제'일 때만, 휴가구분은 '휴가'일 때만 기록
+  props["과제"] = (item.type === "과제" && item.project) ? { select: { name: item.project } } : { select: null };
+  props["휴가구분"] = (item.type === "휴가" && item.vacation) ? { select: { name: item.vacation } } : { select: null };
+  props["시작일"] = item.start ? { date: { start: item.start } } : { date: null };
+  var end = (item.end && item.end >= item.start) ? item.end : item.start;
+  props["종료일"] = end ? { date: { start: end } } : { date: null };
+  return props;
+}
+async function createSchedule(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  var res = await notionFetch("/pages", token, "POST", { parent:{ database_id: SCHEDULE_DB_ID }, properties: scheduleProps(item) });
+  return { created: true, id: res.id };
+}
+async function updateSchedule(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  if(!item.id) throw new Error("page id 없음");
+  await notionFetch("/pages/" + item.id, token, "PATCH", { properties: scheduleProps(item) });
+  return { updated: true };
+}
+async function deleteSchedule(env, payload){
+  const token = env.NOTION_TOKEN;
+  if(!payload.id) throw new Error("page id 없음");
+  await notionFetch("/pages/" + payload.id, token, "PATCH", { archived: true });
+  return { deleted: true };
+}
+
 
 // 코멘트 추가 → 코멘트 DB에 새 행 + 회의자료 코멘트수 +1
 async function addComment(env, payload){
@@ -926,6 +988,12 @@ export default {
           result = await updateWbs(env, payload);
         } else if(payload.action === "wbsDelete"){
           result = await deleteWbs(env, payload);
+        } else if(payload.action === "schedCreate"){
+          result = await createSchedule(env, payload);
+        } else if(payload.action === "schedUpdate"){
+          result = await updateSchedule(env, payload);
+        } else if(payload.action === "schedDelete"){
+          result = await deleteSchedule(env, payload);
         } else if(payload.action === "comment"){
           result = await addComment(env, payload);
         } else if(payload.action === "deleteComment"){
@@ -977,6 +1045,13 @@ export default {
           const perfPages = await getAllPages(PERF_DB_ID, token);
           body.perf = perfPages.map(parsePerf).filter(function(x){ return x.name; });
         } catch(e){ body.perf = []; }
+      }
+
+      if(want("schedule")){
+        try {
+          const schedPages = await getAllPages(SCHEDULE_DB_ID, token);
+          body.schedule = schedPages.map(parseSchedule).filter(function(s){ return s.start; });
+        } catch(e){ body.schedule = []; body.scheduleError = String(e); }
       }
 
       if(want("calendar")){

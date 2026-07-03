@@ -396,6 +396,13 @@
     if(sY>eY){ var x=sY; sY=eY; eY=x; }
     return sY<=YEAR && eY>=YEAR;
   }
+  // 과제 기간이 선택 연도를 덮는지 (기간 미설정이면 작업이 있을 때만 표시)
+  function projCoversYear(g){
+    if(!g.start && !g.end) return false;
+    var sY=yearOf(g.start||g.end), eY=yearOf(g.end||g.start);
+    if(sY>eY){ var x=sY; sY=eY; eY=x; }
+    return sY<=YEAR && eY>=YEAR;
+  }
 
   // 표시용 상태: 완료면 완료 / 종료월 지났는데 미완료면 지연 / 그 외 저장값
   function displayStatus(t){
@@ -506,16 +513,18 @@
     extra.forEach(function(nm){ groups.push({name:nm,main:[],sub:[],start:"",end:""}); });
     if(FILTER.project!=="전체") groups=groups.filter(function(g){return g.name===FILTER.project;});
 
-    var total=0;
+    var total=0, shown=0;
     var html=groups.map(function(g){
       var tasks=applyTaskFilter(DATA.wbs.filter(function(t){return t.project===g.name && taskInYear(t);}));
+      if(!projCoversYear(g) && tasks.length===0) return "";  // 이 연도에 해당 없음 → 숨김
+      shown++;
       // 종료월 순 정렬
       tasks.sort(function(a,b){ return (a.start||"")<(b.start||"")?-1:1; });
       total+=tasks.length;
       var overall=tasks.length?Math.round(tasks.reduce(function(s,t){return s+displayProgress(t);},0)/tasks.length):0;
       return '<div class="pgroup">'+groupHead(g,overall)+ganttTable(tasks)+'</div>';
     }).join("");
-    if(!groups.length) html='<div class="state">표시할 과제가 없습니다.</div>';
+    if(!shown) html='<div class="state">'+YEAR+'년에 해당하는 과제가 없습니다.</div>';
     document.getElementById("content").innerHTML=html;
     document.getElementById("visCnt").textContent=total;
   }
