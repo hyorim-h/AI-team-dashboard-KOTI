@@ -3,6 +3,7 @@
 
 const REPORT_DB_ID = "383ce6a25dc6801c874bc6bb96dc83c1"; // 주간 리포트 DB
 const WBS_DB_ID    = "f1a718244eb54c399b70eb216067804d"; // WBS DB
+const PROJECT_DB_ID = "5a75146603614e489364b66e5eab2e1c"; // 과제 정보 DB (노션 확인 database_id)
 const PERF_DB_ID   = "2f590aa04b1243f09255ca3850833038"; // 성과 DB
 const ACHIEVE_DB_ID = "34ab53ea4afb4b1481c8c5358cd67b29"; // 업무실적 DB
 const PLAN_DB_ID    = "d104d01ba9b140e6a83ceaea36e86b48"; // 업무계획 DB
@@ -287,7 +288,32 @@ function parseWbs(page){
   const start = (p["시작일"] && p["시작일"].date && p["시작일"].date.start) || "";
   const end = (p["종료일"] && p["종료일"].date && p["종료일"].date.start) || "";
   const done = (p["완료일"] && p["완료일"].date && p["완료일"].date.start) || "";
-  return { task: task, project: project, owner: owner, status: status, progress: progress, start: start, end: end, done: done, page_url: page.url || "" };
+  const noteRt = (p["비고"] && p["비고"].rich_text) || [];
+  const note = noteRt.map(function(t){return t.plain_text;}).join("");
+  const chkRt = (p["체크리스트"] && p["체크리스트"].rich_text) || [];
+  const checklist = chkRt.map(function(t){return t.plain_text;}).join("");
+  return {
+    id: page.id, task: task, project: project, owner: owner, status: status,
+    progress: progress, start: start, end: end, done: done,
+    note: note, checklist: checklist, page_url: page.url || ""
+  };
+}
+
+// 과제 정보 DB 파싱 (과제별 그룹 헤더용: PM·참여자·기간)
+function parseProjectInfo(page){
+  const p = page.properties || {};
+  const titleList = (p["과제명"] && p["과제명"].title) || [];
+  const name = titleList.map(function(t){return t.plain_text;}).join("").trim();
+  function msNames(prop){
+    var arr = (prop && prop.multi_select) || [];
+    return arr.map(function(x){return x.name;});
+  }
+  const main = msNames(p["Main"]);
+  const sub = msNames(p["Sub"]);
+  const start = (p["시작"] && p["시작"].date && p["시작"].date.start) || "";
+  const end = (p["종료"] && p["종료"].date && p["종료"].date.start) || "";
+  const order = (p["정렬순서"] && typeof p["정렬순서"].number === "number") ? p["정렬순서"].number : 999;
+  return { id: page.id, name: name, main: main, sub: sub, start: start, end: end, order: order };
 }
 
 function parsePerf(page){
@@ -749,6 +775,55 @@ async function deletePerf(env, payload){
   return { deleted: true };
 }
 
+// ===== WBS CRUD =====
+// item: { id?, task, project, owner, status, start('YYYY-MM'|'YYYY-MM-DD'), end, note, checklist(JSON str), progress }
+function ymToDate(s, endOfRange){
+  // 'YYYY-MM' → 'YYYY-MM-01' (종료는 그대로 1일로 저장; 간트는 월만 사용)
+  if(!s) return null;
+  var t = String(s).slice(0,10);
+  if(/^\d{4}-\d{2}$/.test(t)) return t + "-01";
+  if(/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  return null;
+}
+function wbsProps(item){
+  var props = {
+    "작업명": { title: rt(item.task || "") },
+    "비고": { rich_text: rt(item.note || "") },
+    "체크리스트": { rich_text: rt(item.checklist || "") },
+    "진척률": { number: (typeof item.progress === "number" ? item.progress : 0) },
+  };
+  if(item.project) props["과제"] = { select: { name: item.project } };
+  if(item.owner)   props["담당자"] = { select: { name: item.owner } };
+  if(item.status)  props["상태"] = { select: { name: item.status } };
+  var sd = ymToDate(item.start);
+  var ed = ymToDate(item.end);
+  props["시작일"] = sd ? { date: { start: sd } } : { date: null };
+  props["종료일"] = ed ? { date: { start: ed } } : { date: null };
+  // 상태가 완료면 완료일 자동 기록, 아니면 비움
+  if(item.status === "완료") props["완료일"] = { date: { start: (ed || sd || new Date().toISOString().slice(0,10)) } };
+  else props["완료일"] = { date: null };
+  return props;
+}
+async function createWbs(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  var res = await notionFetch("/pages", token, "POST", { parent:{ database_id: WBS_DB_ID }, properties: wbsProps(item) });
+  return { created: true, id: res.id };
+}
+async function updateWbs(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  if(!item.id) throw new Error("page id 없음");
+  await notionFetch("/pages/" + item.id, token, "PATCH", { properties: wbsProps(item) });
+  return { updated: true };
+}
+async function deleteWbs(env, payload){
+  const token = env.NOTION_TOKEN;
+  if(!payload.id) throw new Error("page id 없음");
+  await notionFetch("/pages/" + payload.id, token, "PATCH", { archived: true });
+  return { deleted: true };
+}
+
 
 // 코멘트 추가 → 코멘트 DB에 새 행 + 회의자료 코멘트수 +1
 async function addComment(env, payload){
@@ -845,6 +920,12 @@ export default {
           result = await updatePerf(env, payload);
         } else if(payload.action === "perfDelete"){
           result = await deletePerf(env, payload);
+        } else if(payload.action === "wbsCreate"){
+          result = await createWbs(env, payload);
+        } else if(payload.action === "wbsUpdate"){
+          result = await updateWbs(env, payload);
+        } else if(payload.action === "wbsDelete"){
+          result = await deleteWbs(env, payload);
         } else if(payload.action === "comment"){
           result = await addComment(env, payload);
         } else if(payload.action === "deleteComment"){
@@ -880,8 +961,15 @@ export default {
       if(want("wbs")){
         try {
           const wbsPages = await getAllPages(WBS_DB_ID, token);
-          body.wbs = wbsPages.map(parseWbs).filter(function(w){ return w.task && w.start && w.end; });
+          body.wbs = wbsPages.map(parseWbs).filter(function(w){ return w.task; });
         } catch(e){ body.wbs = []; }
+        // 과제 정보(그룹 헤더용). ID가 틀리면 빈 배열 → 프론트가 fallback 사용.
+        try {
+          const projPages = await getAllPages(PROJECT_DB_ID, token);
+          var pinfo = projPages.map(parseProjectInfo).filter(function(x){ return x.name; });
+          pinfo.sort(function(a,b){ return a.order - b.order; });
+          body.projectInfo = pinfo;
+        } catch(e){ body.projectInfo = []; body.projectInfoError = String(e); }
       }
 
       if(want("perf")){
