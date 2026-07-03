@@ -139,6 +139,7 @@
     background:var(--surface);color:var(--text);font-family:inherit;resize:vertical}
   .fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(44,95,191,.13)}
   .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .fld-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
   /* 체크리스트 */
   .chk-head{display:flex;align-items:center;justify-content:space-between}
   .chk-head .chk-lab{font-size:12.5px;font-weight:700;color:var(--text-2)}
@@ -252,7 +253,8 @@
         <label class="fld"><span>담당자</span><select id="edOwner"></select></label>
       </div>
       <label class="fld"><span>성과지표 · 목표치</span><input type="text" id="edDetail" placeholder="예) 예측 정확도 92% 이상 / 논문 2편"></label>
-      <div class="fld-row">
+      <div class="fld-row3">
+        <label class="fld"><span>시작연도</span><select id="edStartYear"></select></label>
         <label class="fld"><span>기한</span><input type="date" id="edDue"></label>
         <label class="fld"><span>상태</span><select id="edStatus"></select></label>
       </div>
@@ -335,13 +337,20 @@
     }
   }
 
+  function yearRange(r){
+    // 시작연도 ~ 기한연도 범위 반환. 없는 쪽은 다른 쪽으로 대체.
+    var dueY = r.due ? parseInt(r.due.slice(0,4),10) : null;
+    var startY = (typeof r.start_year==="number" && r.start_year>0) ? r.start_year : null;
+    if(startY && dueY) return [Math.min(startY,dueY), Math.max(startY,dueY)];
+    if(startY) return [startY, startY];
+    if(dueY) return [dueY, dueY];
+    return null;  // 둘 다 없으면 연도 무관(항상 표시)
+  }
   function applyFilter(rows){
     return rows.filter(function(r){
-      // 연도: 기한의 연도로 판단. 기한 없으면 모든 연도에 표시
-      if(r.due){
-        var dueYear = parseInt(r.due.slice(0,4), 10);
-        if(dueYear !== YEAR) return false;
-      }
+      // 연도: 시작연도~기한연도 범위 안에 YEAR가 들어가면 표시. 범위 없으면 항상 표시.
+      var rng = yearRange(r);
+      if(rng && (YEAR < rng[0] || YEAR > rng[1])) return false;
       if(FILTER.project!=="전체" && r.project!==FILTER.project) return false;
       if(FILTER.owner!=="전체" && r.owner!==FILTER.owner) return false;
       if(FILTER.type!=="전체" && r.type!==FILTER.type) return false;
@@ -453,7 +462,7 @@
       +'<div class="v-item"><div class="v-lab">담당자</div><div class="v-val">'+esc(r.owner||"-")+'</div></div>'
       +'<div class="v-item"><div class="v-lab">구분</div><div class="v-val">'+esc(TYPE_LABEL[r.type]||r.type||"-")+'</div></div>'
       +'<div class="v-item"><div class="v-lab">상태</div><div class="v-val">'+esc(r.status||"-")+' · '+(r.progress||0)+'%</div></div>'
-      +'<div class="v-item"><div class="v-lab">기한</div><div class="v-val">'+fmtDue(r.due)+'</div></div>'
+      +'<div class="v-item"><div class="v-lab">기간</div><div class="v-val">'+((typeof r.start_year==="number"&&r.start_year>0)?(r.start_year+"년 ~ "):"")+fmtDue(r.due)+'</div></div>'
       +'<div class="v-item"><div class="v-lab">세부내용</div><div class="v-val">'+esc(r.detail||"-")+'</div></div>'
       + chkHtml
       +'</div>';
@@ -506,6 +515,13 @@
     fillSelect(document.getElementById("edOwner"), OWNERS, r.owner||"이종우", false);
     document.getElementById("edDetail").value = r.detail||"";
     document.getElementById("edDue").value = r.due ? r.due.slice(0,10) : "";
+    // 시작연도: 현재~±3년 옵션. 신규는 현재 보는 YEAR 기본, 수정은 저장값(없으면 빈값)
+    var ySel = document.getElementById("edStartYear");
+    var years = [];
+    for(var y=YEAR-3; y<=YEAR+3; y++) years.push(y);
+    var curStart = (typeof r.start_year==="number" && r.start_year>0) ? r.start_year : (isNew ? YEAR : "");
+    ySel.innerHTML = '<option value="">(미지정)</option>' + years.map(function(y){
+      return '<option value="'+y+'"'+(y===curStart?" selected":"")+'>'+y+'년</option>'; }).join("");
     fillSelect(document.getElementById("edStatus"), STATUSES, r.status||"예정", false);
     renderChkEditor();
     var estat=document.getElementById("editStatus"); estat.className="estatus status"; estat.textContent="";
@@ -547,6 +563,7 @@
       owner: document.getElementById("edOwner").value,
       detail: document.getElementById("edDetail").value.trim(),
       due: document.getElementById("edDue").value,
+      start_year: document.getElementById("edStartYear").value ? parseInt(document.getElementById("edStartYear").value,10) : null,
       status: document.getElementById("edStatus").value,
       checklist: JSON.stringify(clean),
       progress: calcProgress(clean)

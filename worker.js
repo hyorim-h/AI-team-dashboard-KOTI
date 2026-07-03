@@ -302,11 +302,13 @@ function parsePerf(page){
   const detail = detailRt.map(function(t){return t.plain_text;}).join("");
   const due = (p["기한"] && p["기한"].date && p["기한"].date.start) || "";
   const progress = (p["진행률"] && typeof p["진행률"].number === "number") ? p["진행률"].number : 0;
+  const startYear = (p["시작연도"] && typeof p["시작연도"].number === "number") ? p["시작연도"].number : null;
   const chkRt = (p["체크리스트"] && p["체크리스트"].rich_text) || [];
   const checklist = chkRt.map(function(t){return t.plain_text;}).join("");
   return {
     id: page.id, name: name, project: project, type: type, owner: owner,
     status: status, detail: detail, due: due, progress: progress, checklist: checklist,
+    start_year: startYear,
     page_url: page.url || ""
   };
 }
@@ -723,6 +725,8 @@ function perfProps(item){
   if(item.status) props["상태"] = { select: { name: item.status } };
   if(item.due) props["기한"] = { date: { start: item.due } };
   else props["기한"] = { date: null };
+  if(typeof item.start_year === "number") props["시작연도"] = { number: item.start_year };
+  else props["시작연도"] = { number: null };
   return props;
 }
 async function createPerf(env, payload){
