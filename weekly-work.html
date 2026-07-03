@@ -605,6 +605,7 @@
       +'<div class="v-item"><div class="v-lab">참석자</div><div class="v-val">'+esc(r.attendees||"-")+'</div></div>'
       +'<div class="v-item v-full"><div class="v-lab">내용</div><div class="v-content">'+esc(r.content||"내용 없음")+'</div></div>'
       +'</div>';
+    var vdel=document.getElementById("viewDelete"); vdel.disabled=false; vdel.textContent="삭제";
     document.getElementById("viewOv").classList.add("open");
   }
   function closeView(){ document.getElementById("viewOv").classList.remove("open"); }
@@ -649,8 +650,10 @@
     document.getElementById("edLocation").value = r.location||"";
     document.getElementById("edContent").value = r.content||"";
     document.getElementById("edAttendees").value = r.attendees||"";
-    document.getElementById("editStatus").className="estatus status";
-    document.getElementById("editDelete").style.display = isNew?"none":"";
+    var estat=document.getElementById("editStatus"); estat.className="estatus status"; estat.textContent="";
+    var edel=document.getElementById("editDelete");
+    edel.disabled=false; edel.textContent="삭제";
+    edel.style.display = isNew?"none":"";
     document.getElementById("editOv").classList.add("open");
   }
   function curStatusForEdit(r, isPlan){
