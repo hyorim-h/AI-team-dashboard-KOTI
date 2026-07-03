@@ -237,6 +237,8 @@
     <div class="modal-head" id="viewHead">업무 상세</div>
     <div class="modal-body" id="viewBody"></div>
     <div class="modal-foot">
+      <button class="mbtn danger" id="viewDelete">삭제</button>
+      <div style="flex:1"></div>
       <button class="mbtn ghost" id="viewClose">닫기</button>
       <button class="mbtn primary" id="viewEdit">수정</button>
     </div>
@@ -276,8 +278,8 @@
   var WORKER_URL = "https://notion-proxy.ekqls0458.workers.dev";
 
   var PROJECTS = ["국가교통조사사업","자율주행R&D","탄소공간지도R&D","교통SOC R&D","데이터스페이스R&D","기타"];
-  var PROJ_SHORT = { "국가교통조사사업":"국가교통조사", "자율주행R&D":"자율주행", "탄소공간지도R&D":"탄소지도",
-    "교통SOC R&D":"교통SOC", "데이터스페이스R&D":"데이터스페이스", "기타":"기타" };
+  var PROJ_SHORT = { "국가교통조사사업":"국가교통조사", "자율주행R&D":"자율주행R&D", "탄소공간지도R&D":"탄소공간지도R&D",
+    "교통SOC R&D":"교통SOC R&D", "데이터스페이스R&D":"데이터스페이스R&D", "기타":"기타" };
   var PROJ_STYLE = {
     "국가교통조사사업": {c:"#2c5fbf", bg:"var(--blue-soft)"},
     "자율주행R&D":     {c:"#1f8a5b", bg:"var(--green-soft)"},
@@ -340,8 +342,8 @@
   }
 
   function initView(){
-    var base = PERIOD.aStart;
-    var d = base ? new Date(base+"T00:00:00") : new Date();
+    // 달력은 항상 오늘 날짜가 있는 달로 시작
+    var d = new Date();
     VIEW.y = d.getFullYear(); VIEW.mo = d.getMonth();
   }
 
@@ -365,7 +367,7 @@
   }
   function weekLabelText(){
     if(PERIOD.aStart && PERIOD.aEnd){
-      var wn = isoWeekNum(PERIOD.aStart);
+      var wn = isoWeekNum(PERIOD.aStart) - 1;  // KOTI 기준 = ISO -1
       return PERIOD.aStart+" ~ "+PERIOD.aEnd.slice(5)+" ("+wn+"주차)";
     }
     return "주간업무";
@@ -609,6 +611,20 @@
   document.getElementById("viewClose").addEventListener("click", closeView);
   document.getElementById("viewOv").addEventListener("click", function(e){ if(e.target.id==="viewOv") closeView(); });
   document.getElementById("viewEdit").addEventListener("click", function(){ closeView(); openEdit(EDIT.kind, EDIT.idx); });
+  document.getElementById("viewDelete").addEventListener("click", async function(){
+    if(!EDIT.id) return;
+    if(!confirm("이 항목을 정말 삭제하시겠어요?\n삭제하면 되돌릴 수 없습니다.")) return;
+    var btn=document.getElementById("viewDelete"); btn.disabled=true; btn.textContent="삭제 중…";
+    try {
+      var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"delete",id:EDIT.id})});
+      var data=await res.json();
+      if(!data.ok) throw new Error(data.error||"실패");
+      closeView(); load();
+    } catch(err){
+      alert("삭제 실패: "+err.message);
+      btn.disabled=false; btn.textContent="삭제";
+    }
+  });
 
   // ===== 모달: 수정/추가 =====
   function fillSelect(sel, opts, val){
@@ -720,7 +736,7 @@
   });
 
   // ===== PDF 불러오기 =====
-  var PDF_EXCLUDE = ["휴가","연차","반차","외출","출장"];
+  var PDF_EXCLUDE = ["휴가","연차","오전반차","오후반차","반차","재택","건강검진","병가","공가","외출","출장","출근"];
   function isExcluded(title){ return PDF_EXCLUDE.some(function(k){ return (title||"").indexOf(k)>=0; }); }
   function minus7(ymd){ var d=new Date(ymd+"T00:00:00"); d.setDate(d.getDate()-7);
     function z(n){return(n<10?"0":"")+n;} return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate()); }
@@ -762,33 +778,54 @@
     return res;
   }
 
-  // 업무실적: 팀원 참석 일정 추출 (과제는 기타 기본)
+  // 사업명(과제명) → 노션 과제 매칭
+  function matchProject(bizName){
+    var n = bizName || "";
+    if(n.indexOf("국가교통조사")>=0) return "국가교통조사사업";
+    if(n.indexOf("자율주행시대 고위험")>=0 || (n.indexOf("자율주행")>=0 && n.indexOf("고위험")>=0)) return "자율주행R&D";
+    if(n.indexOf("탄소공간지도")>=0) return "탄소공간지도R&D";
+    return "기타";
+  }
+
+  // 업무실적: 사업 단위로 나눠 과제 매칭 + 팀원 참석 일정 추출
   function extractAchievements(fullText, year){
     var 실적 = fullText.split("업무계획")[0];
-    var items = 실적.split("□");
+    // 사업 헤더 "숫자. (구분) 「과제명」" 위치로 분할
+    var headerRe = /(\d+)\.\s*\([^)]+\)\s*[「『]([^」』]+)[」』]/g;
+    var headers = [], m;
+    while((m = headerRe.exec(실적)) !== null){
+      headers.push({ index: m.index, name: m[2], project: matchProject(m[2]) });
+    }
     var events = [];
-    items.forEach(function(it){
-      var m = it.match(/(\d{2})\.(\d{2})\([월화수목금토일]\)\s*(\d{1,2}:\d{2})?/);
-      if(!m) return;
-      var hit = TEAM.filter(function(n){ return it.indexOf(n)>=0; });
-      if(!hit.length) return;
-      var title = it.trim().split("\n")[0].trim();
-      var loc = it.match(/일\s*시[·\s]*장소\s*[:：]\s*(.+)/);
-      var locText = loc ? loc[1].trim() : "";
-      // "06.29(월) 10:30, 본원 104호" → 콤마로 나눠 맨 마지막(장소)만
-      if(locText.indexOf(",")>=0){ var parts=locText.split(","); locText=parts[parts.length-1].trim(); }
-      var content = it.match(/내\s*용\s*[:：]\s*([\s\S]+?)(?=-\s*참|$)/);
-      var attendees = it.match(/참\s*석\s*자\s*[:：]\s*([\s\S]+?)(?=\n\s*\d+\.\s|\n\s*-\s*\d+\s*-|\n\s*<|$)/);
-      events.push({
-        date: (year||"2026")+"-"+m[1]+"-"+m[2],
-        time: m[3]||"",
-        title: title,
-        project: "기타",
-        location: locText,
-        content: content?content[1].replace(/\s+/g," ").trim():"",
-        attendees: attendees?attendees[1].replace(/\s+/g," ").trim():""
+    for(var h=0; h<headers.length; h++){
+      var segStart = headers[h].index;
+      var segEnd = (h+1<headers.length) ? headers[h+1].index : 실적.length;
+      var seg = 실적.slice(segStart, segEnd);
+      var proj = headers[h].project;
+      // 이 사업 구간 안의 □ 항목들
+      var items = seg.split("□");
+      items.forEach(function(it){
+        var dm = it.match(/(\d{2})\.(\d{2})\([월화수목금토일]\)\s*(\d{1,2}:\d{2})?/);
+        if(!dm) return;
+        var hit = TEAM.filter(function(n){ return it.indexOf(n)>=0; });
+        if(!hit.length) return;
+        var title = it.trim().split("\n")[0].trim();
+        var loc = it.match(/일\s*시[·\s]*장소\s*[:：]\s*(.+)/);
+        var locText = loc ? loc[1].trim() : "";
+        if(locText.indexOf(",")>=0){ var parts=locText.split(","); locText=parts[parts.length-1].trim(); }
+        var content = it.match(/내\s*용\s*[:：]\s*([\s\S]+?)(?=-\s*참|$)/);
+        var attendees = it.match(/참\s*석\s*자\s*[:：]\s*([\s\S]+?)(?=\n\s*\d+\.\s|\n\s*-\s*\d+\s*-|\n\s*<|$)/);
+        events.push({
+          date: (year||"2026")+"-"+dm[1]+"-"+dm[2],
+          time: dm[3]||"",
+          title: title,
+          project: proj,
+          location: locText,
+          content: content?content[1].replace(/\s+/g," ").trim():"",
+          attendees: attendees?attendees[1].replace(/\s+/g," ").trim():""
+        });
       });
-    });
+    }
     return events;
   }
 
