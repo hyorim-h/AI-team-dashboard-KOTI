@@ -168,11 +168,24 @@ async function parseMeeting(page, token){
   const titleList = (p["제목"] && p["제목"].title) || [];
   const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
   const project = (p["과제"] && p["과제"].select && p["과제"].select.name) || "";
+  const kind = (p["구분"] && p["구분"].select && p["구분"].select.name) || "주간회의";
   const date = (p["회의날짜"] && p["회의날짜"].date && p["회의날짜"].date.start) || "";
   const weekRt = (p["주차"] && p["주차"].rich_text) || [];
   const week = weekRt.map(function(t){return t.plain_text;}).join("");
   var wRt = (p["작성자"] && p["작성자"].rich_text) || [];
   const writer = wRt.map(function(t){return t.plain_text;}).join("");
+  const timeRt = (p["시간"] && p["시간"].rich_text) || [];
+  const time = timeRt.map(function(t){return t.plain_text;}).join("");
+  const placeRt = (p["장소"] && p["장소"].rich_text) || [];
+  const place = placeRt.map(function(t){return t.plain_text;}).join("");
+  const attRt = (p["참석자"] && p["참석자"].rich_text) || [];
+  const attendees = attRt.map(function(t){return t.plain_text;}).join("");
+  // "요약"은 꼭지 제목을 자동 나열한 값(updateMeeting이 매번 덮어씀) — 진짜 요약문이 아니므로 headingList로만 보존
+  const sumRt = (p["요약"] && p["요약"].rich_text) || [];
+  const headingList = sumRt.map(function(t){return t.plain_text;}).join("");
+  // "회의요약"은 직접 작성하는 진짜 요약문(자동 덮어쓰기 없음) — 화면에 보여줄 summary는 이걸로
+  const overviewRt = (p["회의요약"] && p["회의요약"].rich_text) || [];
+  const summary = overviewRt.map(function(t){return t.plain_text;}).join("");
 
   // 본문 꼭지 (heading별로 묶음)
   const content = await getPageContent(page.id, token);
@@ -180,7 +193,8 @@ async function parseMeeting(page, token){
   for(const h in content){ sections.push({ heading: h, body: content[h] }); }
 
   return {
-    id: page.id, title: title, project: project, date: date, week: week,
+    id: page.id, title: title, project: project, kind: kind, date: date, week: week,
+    time: time, place: place, attendees: attendees, summary: summary, headingList: headingList,
     writer: writer, sections: sections, last_edited: page.last_edited_time || "",
     page_url: page.url || ""
   };
@@ -1096,6 +1110,16 @@ async function deleteComment(env, payload){
   return { deleted: true };
 }
 
+// 회의요약(진짜 요약문, 자동 덮어쓰기 없음) 수정 — 꼭지 편집(updateMeeting)과 별개
+async function updateMeetingSummary(env, payload){
+  const token = env.NOTION_TOKEN;
+  const meetingId = payload.meetingId;
+  const summary = payload.summary || "";
+  if(!meetingId) throw new Error("회의자료 id 누락");
+  await notionFetch("/pages/" + meetingId, token, "PATCH", { properties: { "회의요약": { rich_text: rt(summary) } } });
+  return { updated: true };
+}
+
 // 회의자료 꼭지(본문) 수정 — 본문 전체를 새 섹션으로 교체
 async function updateMeeting(env, payload){
   const token = env.NOTION_TOKEN;
@@ -1117,6 +1141,11 @@ async function updateMeeting(env, payload){
   if(children.length){
     await notionFetch("/blocks/" + meetingId + "/children", token, "PATCH", { children: children });
   }
+  // 요약 속성도 꼭지 제목 나열로 동기화 (개요 표에 표시되는 값)
+  try {
+    const summaryText = sections.map(function(s){ return s.heading; }).filter(Boolean).join(" / ");
+    await notionFetch("/pages/" + meetingId, token, "PATCH", { properties: { "요약": { rich_text: rt(summaryText) } } });
+  } catch(e){}
   return { updated: true };
 }
 
@@ -1161,6 +1190,8 @@ export default {
           result = await deleteComment(env, payload);
         } else if(payload.action === "updateMeeting"){
           result = await updateMeeting(env, payload);
+        } else if(payload.action === "updateMeetingSummary"){
+          result = await updateMeetingSummary(env, payload);
         } else {
           result = await saveWork(env, payload);
         }
