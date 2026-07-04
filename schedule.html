@@ -196,6 +196,13 @@
   .evchip{display:block;font-size:10.5px;font-weight:700;padding:3px 6px;border-radius:4px;margin-bottom:3px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:filter .12s}
   .evchip:hover{filter:brightness(.94)}
+  .evchip.evmore{text-align:center;font-weight:800;color:var(--navy);background:var(--blue-soft)}
+  .modal.modal-sm{max-width:380px}
+  .day-item{display:flex;align-items:center;gap:9px;padding:10px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+  .day-item:last-child{border-bottom:none}
+  .day-item:hover{background:var(--blue-soft)}
+  .day-dot{width:9px;height:9px;border-radius:3px;flex:none}
+  .day-lbl{font-size:12.5px;font-weight:600;color:var(--text)}
 
   /* 근태 현황 */
   .att-h{display:flex;align-items:center;gap:8px;margin:8px 0 11px}
@@ -221,10 +228,16 @@
   .att-dt{font-size:11.5px;color:var(--text-2);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
   /* 전체일정 테이블 열폭 (No/일자/유형/담당자/내용/장소·비고) */
-  .tbl.sched{table-layout:auto}
-  .tbl.sched th,.tbl.sched td{text-align:left}
-  .tbl.sched th:first-child,.tbl.sched td:first-child{text-align:center;width:44px}
-  .tbl.sched td.c{text-align:center}
+  .tbl.sched{table-layout:fixed}
+  .tbl.sched th,.tbl.sched td{text-align:center}
+  .tbl.sched th:nth-child(1),.tbl.sched td:nth-child(1){width:4%}
+  .tbl.sched th:nth-child(2),.tbl.sched td:nth-child(2){width:20%}
+  .tbl.sched th:nth-child(3),.tbl.sched td:nth-child(3){width:12%}
+  .tbl.sched th:nth-child(4),.tbl.sched td:nth-child(4){width:11%}
+  .tbl.sched th:nth-child(5),.tbl.sched td:nth-child(5){width:33%}
+  .tbl.sched th:nth-child(6),.tbl.sched td:nth-child(6){width:20%}
+  .cal-cell[data-date]{cursor:pointer}
+  .cal-cell[data-date]:hover{border-color:var(--line-2);background:var(--blue-soft)}
 
   @media(max-width:1000px){ .att-grid{grid-template-columns:repeat(2,1fr)} }
   @media(max-width:560px){ .att-grid{grid-template-columns:1fr} }
@@ -273,9 +286,9 @@
     <span class="flabel">필터</span>
     <select id="fType"></select>
     <select id="fProject"></select>
+    <button class="hbtn primary" id="addBtn">+ 일정 추가</button>
     <span class="cnt">이번 주 <b id="visCnt">0</b>건</span>
     <button class="reset" id="resetBtn">초기화</button>
-    <button class="hbtn primary" id="addBtn" style="margin-left:auto">+ 일정 추가</button>
   </div>
 
   <div id="content"><div class="state">불러오는 중…</div></div>
@@ -293,15 +306,17 @@
         <label class="fld"><span>담당자</span><select id="edPerson"></select></label>
       </div>
       <label class="fld" id="wrapProject"><span>과제</span><select id="edProject"></select></label>
+      <label class="fld" id="wrapAttendees"><span>참석자(출장)</span><input type="text" id="edAttendees" placeholder="예) 효림, 준수"></label>
       <label class="fld"><span id="labTitle">내용</span> <input type="text" id="edTitle" placeholder="일정 내용"></label>
       <div class="fld-row">
         <label class="fld"><span>시작일</span><input type="date" id="edStart"></label>
         <label class="fld"><span>종료일</span><input type="date" id="edEnd"></label>
       </div>
-      <div class="fld-row">
-        <label class="fld" id="wrapTime"><span>시간</span><input type="time" id="edTime"></label>
-        <label class="fld" id="wrapVac"><span>휴가 구분</span><select id="edVac"></select></label>
+      <div class="fld-row" id="wrapTime">
+        <label class="fld"><span>시작시간</span><input type="time" id="edTime"></label>
+        <label class="fld"><span>종료시간</span><input type="time" id="edTimeEnd"></label>
       </div>
+      <label class="fld" id="wrapVac"><span>휴가 구분</span><select id="edVac"></select></label>
       <label class="fld"><span id="labDetail">장소·기관</span><input type="text" id="edLoc" placeholder="장소 또는 기관명"></label>
       <div class="estatus status" id="editStatus"></div>
     </div>
@@ -314,17 +329,27 @@
   </div>
 </div>
 
+<!-- 하루 전체 일정 목록 (더보기) -->
+<div class="ov" id="dayOv">
+  <div class="modal modal-sm">
+    <div class="modal-head"><span id="dayHead">일정 목록</span><button class="x" id="dayX">×</button></div>
+    <div class="modal-body" id="dayBody"></div>
+    <div class="modal-foot"><div style="flex:1"></div><button class="mbtn ghost" id="dayClose">닫기</button></div>
+  </div>
+</div>
+
 <script>
   var WORKER_URL = "https://notion-proxy.ekqls0458.workers.dev";
-  var PROJECTS = ["국가교통조사사업","자율주행R&D","탄소공간지도R&D","교통SOC R&D","데이터스페이스R&D"];
+  var PROJECTS = ["국가교통조사사업","자율주행R&D","탄소공간지도R&D","교통SOC R&D","데이터스페이스R&D","기타"];
   var PROJ_SHORT = { "국가교통조사사업":"국가교통조사","자율주행R&D":"자율주행R&D","탄소공간지도R&D":"탄소공간지도R&D",
-    "교통SOC R&D":"교통SOC","데이터스페이스R&D":"데이터스페이스R&D" };
+    "교통SOC R&D":"교통SOC","데이터스페이스R&D":"데이터스페이스R&D","기타":"기타" };
   var PROJ_STYLE = {
     "국가교통조사사업":{c:"#2c5fbf",bg:"#e8eefb"},
     "자율주행R&D":{c:"#1f8a5b",bg:"#e3f5ec"},
     "탄소공간지도R&D":{c:"#c8273c",bg:"#fdeaec"},
     "교통SOC R&D":{c:"#4338ca",bg:"#e9e7fb"},
-    "데이터스페이스R&D":{c:"#be185d",bg:"#fbe4ef"}
+    "데이터스페이스R&D":{c:"#be185d",bg:"#fbe4ef"},
+    "기타":{c:"#5a6680",bg:"#eef1f6"}
   };
   var TYPE_STYLE = {
     "과제":{c:"#2c5fbf",bg:"#e8eefb"},
@@ -337,6 +362,16 @@
   var OWNERS = ["이종우","전준수","이채영","한효림","김예원","정승환","심지윤","정정호"];
   var TYPES = ["과제","출장","외출","휴가","재택근무","기타"];
   var VACATIONS = ["휴가","오전반차","오후반차","공가","병가","건강검진"];
+  var ATT_TYPES = VACATIONS.concat(["외출","재택근무"]); // 제목이 "유형(이름)"로 자동 구성되는 유형
+  function extractNote(ev){
+    // description에서 "담당자: …", "과제: …", 단독 "출장" 라인을 뺀 나머지를 사유로 반환
+    var lines = (ev.raw_desc||"").split(/\r?\n/);
+    var kept = lines.filter(function(l){
+      var t=l.trim();
+      return t && t!=="출장" && !/^담당자\s*[:：]/.test(t) && !/^과제\s*[:：]/.test(t);
+    });
+    return kept.join("\n");
+  }
   var DOW = ["일","월","화","수","목","금","토"];
 
   var DATA = { schedule: [] };
@@ -363,15 +398,40 @@
   function containsToday(ev){ return containsDay(ev, TODAY); }
   function isMulti(ev){ return ev.end && ev.end!==ev.start; }
   function shortName(p){ return (p && p.length>=3) ? p.slice(1) : (p||""); }
+  // "효림, 준수" 같은 짧은 이름 입력 → OWNERS 목록에서 매칭해 "한효림, 전준수"로 정규화
+  function normalizeAttendees(raw){
+    if(!raw) return "";
+    var tokens = raw.split(/[,\s]+/).map(function(t){return t.trim();}).filter(Boolean);
+    var out = tokens.map(function(t){
+      var hit = OWNERS.filter(function(o){ return o===t || shortName(o)===t || o.indexOf(t)>=0; })[0];
+      return hit || t;
+    });
+    // 중복 제거
+    var seen={}, uniq=[];
+    out.forEach(function(n){ if(!seen[n]){ seen[n]=1; uniq.push(n); } });
+    return uniq.join(", ");
+  }
 
   function evStyle(ev){ return ev.type==="과제" ? (PROJ_STYLE[ev.project]||TYPE_STYLE["기타"]) : (TYPE_STYLE[ev.type]||TYPE_STYLE["기타"]); }
+  function startTime(ev){ return (ev.time||"").split("~")[0].trim(); } // 종료시간은 표시하지 않음
+  function displayPerson(ev){ return ev.attendees || ev.person || ""; }
   function evLabel(ev){
-    var sh=shortName(ev.person);
-    if(ev.type==="과제") return (ev.time?ev.time+" ":"")+(PROJ_SHORT[ev.project]||"")+" "+ev.title;
-    if(ev.type==="외출") return (ev.time?ev.time+" ":"")+"외출("+sh+")";
+    var sh=shortName(ev.person), t=startTime(ev);
+    if(ev.type==="과제") return (t?t+" ":"")+ev.title;               // 과제는 색으로만 구분, 과제명 프리픽스 없음
+    if(ev.type==="외출") return (t?t+" ":"")+"외출("+sh+")";
     if(ev.type==="휴가") return (ev.vacation||"휴가")+"("+sh+")";
     if(ev.type==="재택근무") return "재택("+sh+")";
-    return (ev.time?ev.time+" ":"")+ev.title; // 출장·기타
+    return (t?t+" ":"")+ev.title; // 출장·기타
+  }
+  // 날짜 안 정렬 순위: 휴가/외출/재택근무 최상단, 과제·출장 중간, 기타 최하단
+  var TYPE_ORDER = { "휴가":0, "외출":0, "재택근무":0, "과제":1, "출장":1, "기타":2 };
+  function sortDayEvents(list){
+    return list.slice().sort(function(a,b){
+      var oa=(TYPE_ORDER[a.type]!==undefined)?TYPE_ORDER[a.type]:1;
+      var ob=(TYPE_ORDER[b.type]!==undefined)?TYPE_ORDER[b.type]:1;
+      if(oa!==ob) return oa-ob;
+      return startTime(a) < startTime(b) ? -1 : (startTime(a) > startTime(b) ? 1 : 0);
+    });
   }
 
   function passFilter(ev){
@@ -416,17 +476,21 @@
         var dowc=(i===0?" sun":(i===6?" sat":""));
         var chips="";
         if(inMonth){
-          evs.filter(function(ev){return containsDay(ev,dIso);}).forEach(function(ev){
+          var dayEvs = sortDayEvents(evs.filter(function(ev){return containsDay(ev,dIso);}));
+          dayEvs.slice(0,4).forEach(function(ev){
             var st=evStyle(ev);
             chips+='<div class="evchip" data-id="'+esc(ev.id)+'" style="color:'+st.c+';background:'+st.bg+'">'+esc(evLabel(ev))+'</div>';
           });
+          if(dayEvs.length>4){
+            chips+='<div class="evchip evmore" data-more-date="'+dIso+'">+'+(dayEvs.length-4)+'건 더보기</div>';
+          }
         }
-        html+='<div class="'+cls+'"><div class="dnum'+dowc+'">'+d.getDate()+'</div>'+chips+'</div>';
+        var dattr = inMonth ? ' data-date="'+dIso+'"' : '';
+        html+='<div class="'+cls+'"'+dattr+'><div class="dnum'+dowc+'">'+d.getDate()+'</div>'+chips+'</div>';
       }
       html+='</div>';
     }
-    var legend=PROJECTS.map(function(p){ var st=PROJ_STYLE[p]; return '<span class="lg"><span class="dot" style="background:'+st.c+'"></span>'+esc(PROJ_SHORT[p])+'</span>'; }).join("")
-      +'<span class="lg"><span class="dot" style="background:'+TYPE_STYLE["기타"].c+'"></span>기타</span>';
+    var legend=PROJECTS.map(function(p){ var st=PROJ_STYLE[p]; return '<span class="lg"><span class="dot" style="background:'+st.c+'"></span>'+esc(PROJ_SHORT[p])+'</span>'; }).join("");
     var dow=DOW.map(function(x,i){ return '<div class="'+(i===0?"sun":(i===6?"sat":""))+'">'+x+'</div>'; }).join("");
     return '<div class="cal">'
       +'<div class="cal-h"><div class="cal-ttl"><span class="bar"></span><h3>팀 캘린더</h3><span class="hint">파란 음영이 이번 주입니다</span></div>'
@@ -436,22 +500,28 @@
 
   // ===== 근태 현황 =====
   function attRange(ev){
+    var t=startTime(ev);
     if(ev.type==="출장") return isMulti(ev)?(fmtMD(ev.start)+" ~ "+fmtMD(ev.end)):fmtMDW(ev.start);
-    if(ev.type==="외출") return fmtMDW(ev.start)+(ev.time?" "+ev.time:"");
+    if(ev.type==="외출") return fmtMDW(ev.start)+(t?" "+t:"");
     if(ev.type==="휴가") return (isMulti(ev)?(fmtMD(ev.start)+" ~ "+fmtMD(ev.end)):fmtMDW(ev.start))+" · "+(ev.vacation||"휴가");
     return isMulti(ev)?(fmtMD(ev.start)+" ~ "+fmtMD(ev.end)):fmtMDW(ev.start); // 재택근무
+  }
+  // 출장은 "일정 이름, (장소)" 배치, 그 외는 장소만
+  function attDesc(ev){
+    if(ev.type==="출장") return ev.title + (ev.location ? ", ("+ev.location+")" : "");
+    return ev.location || "";
   }
   function attCard(type, wkEvents){
     var st=TYPE_STYLE[type];
     var list=wkEvents.filter(function(e){return e.type===type;});
     var rows=list.length ? list.map(function(ev){
-      var sh=shortName(ev.person);
+      var nm=displayPerson(ev);
       return '<div class="att-row" data-id="'+esc(ev.id)+'">'
-        +'<span class="att-av" style="background:'+st.c+'">'+esc((ev.person||"?").slice(0,1))+'</span>'
-        +'<div class="att-info"><div class="att-nm"><b>'+esc(ev.person||"-")+'</b>'
+        +'<span class="att-av" style="background:'+st.c+'">'+esc((nm||"?").slice(0,1))+'</span>'
+        +'<div class="att-info"><div class="att-nm"><b>'+esc(nm||"-")+'</b>'
         +(containsToday(ev)?'<span class="att-today">오늘</span>':'')+'</div>'
         +'<div class="att-rg" style="color:'+st.c+'">'+esc(attRange(ev))+'</div>'
-        +'<div class="att-dt">'+esc(ev.location||ev.title||"")+'</div></div></div>';
+        +'<div class="att-dt">'+esc(attDesc(ev))+'</div></div></div>';
     }).join("") : '<div class="att-empty">'+type+' 일정이 없습니다.</div>';
     return '<div class="att-card"><div class="ac-h"><span class="lab"><span class="dot" style="background:'+st.c+'"></span>'+type+'자</span>'
       +'<span class="cnt" style="color:'+st.c+';background:'+st.bg+'">'+list.length+'명</span></div>'
@@ -467,7 +537,8 @@
   }
   function dateText(ev){
     var base=isMulti(ev)?(fmtMD(ev.start)+" ~ "+fmtMD(ev.end)):fmtMDW(ev.start);
-    if((ev.type==="외출"||ev.type==="과제") && ev.time) base+=" "+ev.time;
+    var t=startTime(ev);
+    if(t) base+=" "+t;
     return base;
   }
   function weekTable(wkEvents){
@@ -480,15 +551,14 @@
         +'<td class="col-no">'+(i+1)+'</td>'
         +'<td>'+esc(dateText(ev))+'</td>'
         +'<td class="c">'+typeBadge(ev)+'</td>'
-        +'<td>'+esc(ev.person||"-")+'</td>'
+        +'<td>'+esc(displayPerson(ev)||"-")+'</td>'
         +'<td class="t-title">'+esc(ev.title||"-")+'</td>'
         +'<td class="t-sub">'+esc(ev.location||"-")+'</td>'
         +'</tr>';
     }).join("") : '<tr class="empty-row"><td colspan="6">이번 주 일정이 없습니다.</td></tr>';
-    return '<div class="card"><div class="card-h"><span class="bar"></span><h3>이번 주 전체 일정</h3>'
-      +'<span class="sub">행을 클릭하면 수정할 수 있습니다</span></div>'
-      +'<table class="tbl sched"><thead><tr>'
-      +'<th>No</th><th>일자</th><th>유형</th><th>담당자</th><th>내용</th><th>장소·비고</th>'
+    return '<div class="att-h"><span class="bar"></span><h3>이번 주 전체 일정</h3><span class="wk">행을 클릭하면 수정할 수 있습니다</span></div>'
+      +'<div class="att-card"><table class="tbl sched"><thead><tr>'
+      +'<th>No</th><th>일자</th><th class="c">유형</th><th>담당자</th><th>내용</th><th>장소·비고</th>'
       +'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }
 
@@ -522,10 +592,35 @@
   document.getElementById("syncBtn").addEventListener("click", load);
   document.getElementById("addBtn").addEventListener("click", function(){ openEdit(null); });
 
-  // content 클릭 (칩·근태행·테이블행 → 수정)
+  // content 클릭 (더보기·칩·근태행·테이블행 → 수정 / 빈 날짜칸 → 그 날짜로 추가)
   document.getElementById("content").addEventListener("click", function(e){
-    var el=e.target.closest("[data-id]");
-    if(el){ openEdit(el.dataset.id); }
+    var moreEl=e.target.closest("[data-more-date]");
+    if(moreEl){ openDayModal(moreEl.dataset.moreDate); return; }
+    var idEl=e.target.closest("[data-id]");
+    if(idEl){ openEdit(idEl.dataset.id); return; }
+    var cell=e.target.closest(".cal-cell[data-date]");
+    if(cell){ openEdit(null, cell.dataset.date); return; }
+  });
+
+  // 하루 전체 일정 목록 모달
+  function openDayModal(dIso){
+    var evs=sortDayEvents(visibleEvents().filter(function(ev){return containsDay(ev,dIso);}));
+    var d=parseYMD(dIso);
+    document.getElementById("dayHead").textContent=(d?(pad2(d.getMonth()+1)+"."+pad2(d.getDate())+"("+DOW[d.getDay()]+")"):dIso)+" 전체 일정 · "+evs.length+"건";
+    document.getElementById("dayBody").innerHTML = evs.length ? evs.map(function(ev){
+      var st=evStyle(ev);
+      return '<div class="day-item" data-id="'+esc(ev.id)+'"><span class="day-dot" style="background:'+st.c+'"></span>'
+        +'<span class="day-lbl">'+esc(evLabel(ev))+'</span></div>';
+    }).join("") : '<div class="state">일정이 없습니다.</div>';
+    document.getElementById("dayOv").classList.add("open");
+  }
+  function closeDayModal(){ document.getElementById("dayOv").classList.remove("open"); }
+  document.getElementById("dayX").addEventListener("click", closeDayModal);
+  document.getElementById("dayClose").addEventListener("click", closeDayModal);
+  document.getElementById("dayOv").addEventListener("click", function(e){ if(e.target.id==="dayOv") closeDayModal(); });
+  document.getElementById("dayBody").addEventListener("click", function(e){
+    var it=e.target.closest("[data-id]");
+    if(it){ closeDayModal(); openEdit(it.dataset.id); }
   });
   function findById(id){ return DATA.schedule.filter(function(x){return x.id===id;})[0]; }
 
@@ -534,12 +629,12 @@
   function syncFields(){
     var t=document.getElementById("edType").value;
     document.getElementById("wrapProject").style.display=(t==="과제")?"":"none";
-    document.getElementById("wrapTime").style.display=(t==="외출")?"":"none";
+    document.getElementById("wrapAttendees").style.display=(t==="출장")?"":"none";
     document.getElementById("wrapVac").style.display=(t==="휴가")?"":"none";
     document.getElementById("labTitle").textContent=(t==="과제"||t==="기타"||t==="재택근무")?"내용":"사유";
     document.getElementById("labDetail").textContent=(t==="휴가")?"비고":"장소·기관";
   }
-  function openEdit(id){
+  function openEdit(id, presetDate){
     var isNew=!id;
     var r=isNew?{}:findById(id);
     EDIT.id=isNew?null:id;
@@ -548,11 +643,17 @@
     fillSelect(document.getElementById("edPerson"), OWNERS, r.person||"이종우");
     fillSelect(document.getElementById("edProject"), PROJECTS, r.project||PROJECTS[0]);
     fillSelect(document.getElementById("edVac"), VACATIONS, r.vacation||"휴가");
-    document.getElementById("edTitle").value=r.title||"";
-    document.getElementById("edStart").value=r.start?r.start.slice(0,10):TODAY;
-    document.getElementById("edEnd").value=r.end?r.end.slice(0,10):(r.start?r.start.slice(0,10):TODAY);
-    document.getElementById("edTime").value=r.time||"";
+    document.getElementById("edTitle").value=(ATT_TYPES.indexOf(r.type)>=0) ? extractNote(r) : (r.title||"");
+    var defDate = presetDate || TODAY;
+    document.getElementById("edStart").value=r.start?r.start.slice(0,10):defDate;
+    document.getElementById("edEnd").value=r.end?r.end.slice(0,10):(r.start?r.start.slice(0,10):defDate);
+    // 시간: "14:00~16:00" → 시작/종료 분리
+    var t0="", t1="";
+    if(r.time){ var pp=String(r.time).split("~"); t0=(pp[0]||"").trim(); t1=(pp[1]||"").trim(); }
+    document.getElementById("edTime").value=t0;
+    document.getElementById("edTimeEnd").value=t1;
     document.getElementById("edLoc").value=r.location||"";
+    document.getElementById("edAttendees").value=r.attendees||"";
     syncFields();
     var es=document.getElementById("editStatus"); es.className="estatus status"; es.textContent="";
     var ed=document.getElementById("editDelete"); ed.disabled=false; ed.textContent="삭제"; ed.style.display=isNew?"none":"";
@@ -567,16 +668,20 @@
   document.getElementById("editSave").addEventListener("click", async function(){
     var st=document.getElementById("editStatus");
     var title=document.getElementById("edTitle").value.trim();
-    if(!title){ st.className="estatus status show err"; st.textContent="내용을 입력하세요."; return; }
+    var curType=document.getElementById("edType").value;
+    if(!title && ATT_TYPES.indexOf(curType)<0){ st.className="estatus status show err"; st.textContent="내용을 입력하세요."; return; }
     var s=document.getElementById("edStart").value, e2=document.getElementById("edEnd").value;
     if(!s){ st.className="estatus status show err"; st.textContent="시작일을 입력하세요."; return; }
     if(e2 && e2<s){ st.className="estatus status show err"; st.textContent="종료일이 시작일보다 빠릅니다."; return; }
     var type=document.getElementById("edType").value;
+    var t0=document.getElementById("edTime").value, t1=document.getElementById("edTimeEnd").value;
+    var timeStr = t0 + (t1? "~"+t1 : "");   // 모든 유형에서 시작~종료 시간 입력 가능
     var item={
       id:EDIT.id, type:type, person:document.getElementById("edPerson").value, title:title,
       project:(type==="과제")?document.getElementById("edProject").value:"",
       vacation:(type==="휴가")?document.getElementById("edVac").value:"",
-      time:(type==="외출")?document.getElementById("edTime").value:"",
+      attendees:(type==="출장")?normalizeAttendees(document.getElementById("edAttendees").value.trim()):"",
+      time:timeStr,
       start:s, end:e2||s, location:document.getElementById("edLoc").value.trim()
     };
     st.className="estatus status show info"; st.textContent="저장 중…";

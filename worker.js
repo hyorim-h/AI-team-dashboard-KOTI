@@ -4,7 +4,7 @@
 const REPORT_DB_ID = "383ce6a25dc6801c874bc6bb96dc83c1"; // 주간 리포트 DB
 const WBS_DB_ID    = "f1a718244eb54c399b70eb216067804d"; // WBS DB
 const PROJECT_DB_ID = "5a75146603614e489364b66e5eab2e1c"; // 과제 정보 DB (노션 확인 database_id)
-const SCHEDULE_DB_ID = "42e3b67332af431a93e8fdc9b5979d88"; // 일정관리 DB
+// 일정관리 페이지는 노션 DB가 아니라 구글 캘린더를 소스로 사용 (아래 GCAL_ID 참조)
 const PERF_DB_ID   = "2f590aa04b1243f09255ca3850833038"; // 성과 DB
 const ACHIEVE_DB_ID = "34ab53ea4afb4b1481c8c5358cd67b29"; // 업무실적 DB
 const PLAN_DB_ID    = "d104d01ba9b140e6a83ceaea36e86b48"; // 업무계획 DB
@@ -317,29 +317,114 @@ function parseProjectInfo(page){
   return { id: page.id, name: name, main: main, sub: sub, start: start, end: end, order: order };
 }
 
-// 일정관리 페이지 파싱
-function parseSchedule(page){
-  const p = page.properties || {};
-  const titleList = (p["내용"] && p["내용"].title) || [];
-  const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
-  const type = (p["유형"] && p["유형"].select && p["유형"].select.name) || "";
-  const person = (p["담당자"] && p["담당자"].select && p["담당자"].select.name) || "";
-  const project = (p["과제"] && p["과제"].select && p["과제"].select.name) || "";
-  const vacation = (p["휴가구분"] && p["휴가구분"].select && p["휴가구분"].select.name) || "";
-  const start = (p["시작일"] && p["시작일"].date && p["시작일"].date.start) || "";
-  const end = (p["종료일"] && p["종료일"].date && p["종료일"].date.start) || "";
-  const timeRt = (p["시간"] && p["시간"].rich_text) || [];
-  const time = timeRt.map(function(t){return t.plain_text;}).join("");
-  const locRt = (p["장소"] && p["장소"].rich_text) || [];
-  const location = locRt.map(function(t){return t.plain_text;}).join("");
-  const gcalRt = (p["캘린더ID"] && p["캘린더ID"].rich_text) || [];
-  const gcalId = gcalRt.map(function(t){return t.plain_text;}).join("");
+// ===== 일정관리(구글 캘린더 기반) 분류 =====
+// 제목 규칙: "휴가(효림)" / "외출(효림)" / "재택근무(효림)" / "오전반차(효림)" 등 → 유형(효림)
+// 출장 규칙: description(설명란)에 '출장' 단어 포함 → 유형=출장 (제목은 자유)
+// 그 외 제목에 과제명 키워드 있으면 과제, 없으면 기타(회의 등 자유 제목)
+const SCHED_PROJECT_KEYWORDS = [
+  { kw: "국가교통조사", name: "국가교통조사사업" },
+  { kw: "DB사업", name: "국가교통조사사업" },
+  { kw: "통신", name: "국가교통조사사업" },
+  { kw: "자율주행", name: "자율주행R&D" },
+  { kw: "탄소", name: "탄소공간지도R&D" },        // "탄소공간지도"보다 넓게(탄소 포함이면 매칭)
+  { kw: "교통SOC", name: "교통SOC R&D" },
+  { kw: "데이터스페이스", name: "데이터스페이스R&D" },
+];
+const SCHED_VAC_TYPES = ["휴가","오전반차","오후반차","병가","공가","건강검진"];
+const SCHED_ATT_TYPES = SCHED_VAC_TYPES.concat(["외출","재택근무"]);
+// "휴가(효림)" / "외출(효림)" 등
+const SCHED_RE_PAREN = new RegExp("(" + SCHED_ATT_TYPES.join("|") + ")\\s*\\(([^)]+)\\)\\s*$");
+// 과거 형식 "효림 휴가" / "효림-외출" 등 (이름이 앞)
+const SCHED_RE_LEGACY = new RegExp("^([^\\s()]{2,6})\\s*[\\-\\s]?\\s*(" + SCHED_ATT_TYPES.join("|") + ")\\s*$");
+
+function extractPersonFromDesc(desc){
+  if(!desc) return "";
+  var m = desc.match(/담당자\s*[:：]\s*([^\n\r]+)/);
+  return m ? m[1].trim() : "";
+}
+function extractAttendeesFromDesc(desc){
+  if(!desc) return "";
+  var m = desc.match(/참석자\s*[:：]\s*([^\n\r]+)/);
+  return m ? m[1].trim() : "";
+}
+function classifySchedule(ev){
+  var title = (ev.title || "").trim();
+  var desc = ev.desc || "";
+  var type = "", person = "", vacation = "", project = "";
+
+  var mp = title.match(SCHED_RE_PAREN);
+  var ml = !mp && title.match(SCHED_RE_LEGACY);
+  if(mp){
+    type = (SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) ? "휴가" : mp[1];
+    if(SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) vacation = mp[1];
+    person = mp[2].trim();
+  } else if(ml){
+    type = (SCHED_VAC_TYPES.indexOf(ml[2]) >= 0) ? "휴가" : ml[2];
+    if(SCHED_VAC_TYPES.indexOf(ml[2]) >= 0) vacation = ml[2];
+    person = ml[1].trim();
+  } else if(desc.indexOf("출장") >= 0){
+    type = "출장";
+    person = extractPersonFromDesc(desc);
+  } else {
+    var matched = SCHED_PROJECT_KEYWORDS.filter(function(x){ return title.indexOf(x.kw) >= 0 || desc.indexOf(x.kw) >= 0; })[0];
+    if(matched){ type = "과제"; project = matched.name; person = extractPersonFromDesc(desc); }
+    else { type = "기타"; person = extractPersonFromDesc(desc); }
+  }
+  var attendees = extractAttendeesFromDesc(desc);
+  return { type: type, person: person, vacation: vacation, project: project, attendees: attendees };
+}
+
+// Google Calendar event(list API 결과) → 대시보드 표시용 객체로 변환
+function parseGcalEvent(ev){
+  if(ev.status === "cancelled") return null;
+  var title = ev.summary || "(제목 없음)";
+  var desc = ev.description || "";
+  var location = ev.location || "";
+  var startAllDay = ev.start && ev.start.date;   // "YYYY-MM-DD" (종일)
+  var endAllDay = ev.end && ev.end.date;
+  var start = "", end = "", time = "", timeEnd = "";
+  if(startAllDay){
+    start = startAllDay;
+    // 구글 종일 일정은 end가 다음날(배타적) → 하루 빼서 실제 마지막 날로
+    if(endAllDay){
+      var d = new Date(endAllDay + "T00:00:00"); d.setDate(d.getDate()-1);
+      function z(n){ return (n<10?"0":"")+n; }
+      end = d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate());
+      if(end < start) end = start;
+    } else end = start;
+  } else if(ev.start && ev.start.dateTime){
+    start = ev.start.dateTime.slice(0,10);
+    var m1 = ev.start.dateTime.match(/T(\d{2}):(\d{2})/); if(m1) time = m1[1]+":"+m1[2];
+    end = (ev.end && ev.end.dateTime) ? ev.end.dateTime.slice(0,10) : start;
+    var m2 = (ev.end && ev.end.dateTime) ? ev.end.dateTime.match(/T(\d{2}):(\d{2})/) : null; if(m2) timeEnd = m2[1]+":"+m2[2];
+  } else return null;
+
+  var cls = classifySchedule({ title: title, desc: desc });
+  var timeStr = time ? (time + (timeEnd && timeEnd!==time ? "~"+timeEnd : "")) : "";
   return {
-    id: page.id, title: title, type: type, person: person, project: project,
-    vacation: vacation, start: start, end: end, time: time, location: location,
-    gcal_id: gcalId, page_url: page.url || ""
+    id: ev.id, title: title, type: cls.type, person: cls.person, project: cls.project,
+    vacation: cls.vacation, attendees: cls.attendees, start: start, end: end, time: timeStr, location: location,
+    raw_desc: desc
   };
 }
+
+async function gcalList(env, timeMinISO){
+  var token = await getGcalToken(env);
+  var out = [], pageToken = "";
+  for(var i=0;i<8;i++){ // 최대 8페이지(=최대 약 2000건) 안전장치
+    var url = "https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_ID) + "/events"
+      + "?singleEvents=true&orderBy=startTime&maxResults=250&timeMin=" + encodeURIComponent(timeMinISO)
+      + (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : "");
+    var res = await fetch(url, { headers: { "Authorization": "Bearer " + token } });
+    var data = await res.json();
+    if(data.error) throw new Error("캘린더 조회 실패: " + JSON.stringify(data.error));
+    (data.items || []).forEach(function(ev){ var p = parseGcalEvent(ev); if(p) out.push(p); });
+    if(!data.nextPageToken) break;
+    pageToken = data.nextPageToken;
+  }
+  return out;
+}
+
 
 function parsePerf(page){
   const p = page.properties || {};
@@ -849,42 +934,103 @@ async function deleteWbs(env, payload){
   return { deleted: true };
 }
 
-// ===== 일정관리 CRUD =====
-function scheduleProps(item){
-  var props = {
-    "내용": { title: rt(item.title || "") },
-    "시간": { rich_text: rt(item.time || "") },
-    "장소": { rich_text: rt(item.location || "") },
-  };
-  if(item.type)   props["유형"] = { select: { name: item.type } };
-  if(item.person) props["담당자"] = { select: { name: item.person } };
-  // 과제는 유형이 '과제'일 때만, 휴가구분은 '휴가'일 때만 기록
-  props["과제"] = (item.type === "과제" && item.project) ? { select: { name: item.project } } : { select: null };
-  props["휴가구분"] = (item.type === "휴가" && item.vacation) ? { select: { name: item.vacation } } : { select: null };
-  props["시작일"] = item.start ? { date: { start: item.start } } : { date: null };
-  var end = (item.end && item.end >= item.start) ? item.end : item.start;
-  props["종료일"] = end ? { date: { start: end } } : { date: null };
-  return props;
+// ===== 일정관리 CRUD (구글 캘린더) =====
+// item: { id?, type, person, title, project, vacation, start, end, time('HH:MM' or 'HH:MM~HH:MM'), location }
+function schedSummary(item){
+  if(SCHED_ATT_TYPES.indexOf(item.type) >= 0){
+    // 휴가/오전반차/오후반차/병가/공가/건강검진/외출/재택근무 → "유형(이름)" 고정 규칙
+    var label = (item.type === "휴가" && item.vacation) ? item.vacation : item.type;
+    return label + "(" + (item.person || "") + ")";
+  }
+  return item.title || "(제목 없음)"; // 과제·출장·기타는 자유 제목
+}
+function schedDescription(item){
+  var lines = [];
+  if(item.type === "출장") lines.push("출장"); // 필수 키워드
+  if(item.type === "과제" && item.project) lines.push("과제: " + item.project);
+  if(item.person) lines.push("담당자: " + item.person);
+  if(item.attendees) lines.push("참석자: " + item.attendees);
+  if(item.title && SCHED_ATT_TYPES.indexOf(item.type) >= 0) lines.push(item.title); // 휴가류 비고
+  return lines.join("\n");
+}
+function schedTimeRange(item){
+  // "HH:MM" 또는 "HH:MM~HH:MM" → {start,end} (end 없으면 start+1h)
+  var t = (item.time || "").split("~");
+  var t0 = (t[0] || "").trim(), t1 = (t[1] || "").trim();
+  if(!t0) return null;
+  return { start: t0, end: t1 || null };
+}
+function schedBody(item){
+  var body = { summary: schedSummary(item) };
+  var desc = schedDescription(item);
+  if(desc) body.description = desc;
+  if(item.location) body.location = item.location;
+  var tr = schedTimeRange(item);
+  var endDate = (item.end && item.end >= item.start) ? item.end : item.start;
+  if(tr){
+    var hh = ("0"+tr.start.split(":")[0]).slice(-2), mm = tr.start.split(":")[1];
+    var startISO = item.start + "T" + hh + ":" + mm + ":00+09:00";
+    var endISO;
+    if(tr.end){
+      var eh=("0"+tr.end.split(":")[0]).slice(-2), em=tr.end.split(":")[1];
+      endISO = endDate + "T" + eh + ":" + em + ":00+09:00";
+    } else {
+      var endH = (parseInt(hh,10)+1)%24;
+      endISO = endDate + "T" + ("0"+endH).slice(-2) + ":" + mm + ":00+09:00";
+    }
+    body.start = { dateTime: startISO, timeZone: "Asia/Seoul" };
+    body.end = { dateTime: endISO, timeZone: "Asia/Seoul" };
+  } else {
+    // 종일: end는 배타적이라 하루 다음날로
+    var d = new Date(endDate + "T00:00:00"); d.setDate(d.getDate()+1);
+    function z(n){ return (n<10?"0":"")+n; }
+    var nextDay = d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate());
+    body.start = { date: item.start };
+    body.end = { date: nextDay };
+  }
+  return body;
 }
 async function createSchedule(env, payload){
-  const token = env.NOTION_TOKEN;
   const item = payload.item || {};
-  var res = await notionFetch("/pages", token, "POST", { parent:{ database_id: SCHEDULE_DB_ID }, properties: scheduleProps(item) });
-  return { created: true, id: res.id };
+  if(!item.start) throw new Error("시작일 없음");
+  var token = await getGcalToken(env);
+  var res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_ID) + "/events", {
+    method: "POST",
+    headers: { "Authorization": "Bearer "+token, "Content-Type": "application/json" },
+    body: JSON.stringify(schedBody(item))
+  });
+  var data = await res.json();
+  if(data.error) throw new Error("캘린더 등록 실패: " + JSON.stringify(data.error));
+  return { created: true, id: data.id };
 }
 async function updateSchedule(env, payload){
-  const token = env.NOTION_TOKEN;
   const item = payload.item || {};
-  if(!item.id) throw new Error("page id 없음");
-  await notionFetch("/pages/" + item.id, token, "PATCH", { properties: scheduleProps(item) });
+  if(!item.id) throw new Error("event id 없음");
+  if(!item.start) throw new Error("시작일 없음");
+  var token = await getGcalToken(env);
+  var res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_ID) + "/events/" + encodeURIComponent(item.id), {
+    method: "PATCH",
+    headers: { "Authorization": "Bearer "+token, "Content-Type": "application/json" },
+    body: JSON.stringify(schedBody(item))
+  });
+  var data = await res.json();
+  if(data.error) throw new Error("캘린더 수정 실패: " + JSON.stringify(data.error));
   return { updated: true };
 }
 async function deleteSchedule(env, payload){
-  const token = env.NOTION_TOKEN;
-  if(!payload.id) throw new Error("page id 없음");
-  await notionFetch("/pages/" + payload.id, token, "PATCH", { archived: true });
+  if(!payload.id) throw new Error("event id 없음");
+  var token = await getGcalToken(env);
+  var res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_ID) + "/events/" + encodeURIComponent(payload.id), {
+    method: "DELETE",
+    headers: { "Authorization": "Bearer "+token }
+  });
+  if(res.status !== 204 && res.status !== 200 && res.status !== 410){
+    var data = await res.json().catch(function(){return {};});
+    throw new Error("캘린더 삭제 실패: " + JSON.stringify(data));
+  }
   return { deleted: true };
 }
+
 
 
 // 코멘트 추가 → 코멘트 DB에 새 행 + 회의자료 코멘트수 +1
@@ -1049,8 +1195,7 @@ export default {
 
       if(want("schedule")){
         try {
-          const schedPages = await getAllPages(SCHEDULE_DB_ID, token);
-          body.schedule = schedPages.map(parseSchedule).filter(function(s){ return s.start; });
+          body.schedule = await gcalList(env, "2026-06-01T00:00:00+09:00");
         } catch(e){ body.schedule = []; body.scheduleError = String(e); }
       }
 
