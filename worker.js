@@ -976,9 +976,10 @@ function schedTimeRange(item){
 }
 function schedBody(item){
   var body = { summary: schedSummary(item) };
-  var desc = schedDescription(item);
-  if(desc) body.description = desc;
-  if(item.location) body.location = item.location;
+  // description/location은 값이 없어도 반드시 포함해야 함.
+  // PATCH는 "포함 안 된 필드는 그대로 유지"이므로, 비워서 저장해도 여기서 빠지면 기존 값이 안 지워짐.
+  body.description = schedDescription(item) || "";
+  body.location = item.location || "";
   var tr = schedTimeRange(item);
   var endDate = (item.end && item.end >= item.start) ? item.end : item.start;
   if(tr){

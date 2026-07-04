@@ -188,12 +188,12 @@
   .cal-dow div{font-size:11.5px;font-weight:700;color:var(--text-2)}
   .cal-dow .sun{color:var(--red)} .cal-dow .sat{color:var(--blue)}
   .cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
-  .cal-cell{height:122px;border:1px solid var(--line);border-radius:6px;padding:6px 7px;background:var(--surface);overflow:hidden}
+  .cal-cell{height:128px;border:1px solid var(--line);border-radius:6px;padding:6px 7px;background:var(--surface);overflow:hidden}
   .cal-cell.out{background:var(--bg);opacity:.5}
   .cal-cell.thisweek{background:var(--blue-soft);border-color:var(--line-2)}
-  .cal-cell .dnum{font-size:11.5px;font-weight:700;color:var(--text-2);margin-bottom:4px}
+  .cal-cell .dnum{font-size:11.5px;font-weight:700;color:var(--text-2);margin-bottom:4px;line-height:1.2}
   .cal-cell .dnum.sun{color:var(--red)} .cal-cell .dnum.sat{color:var(--blue)}
-  .evchip{display:block;font-size:10.5px;font-weight:700;padding:3px 6px;border-radius:4px;margin-bottom:3px;
+  .evchip{display:block;font-size:10.5px;font-weight:700;padding:3px 6px;border-radius:4px;margin-bottom:3px;line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:filter .12s}
   .evchip:hover{filter:brightness(.94)}
   .evchip.evmore{text-align:center;font-weight:800;color:var(--navy);background:var(--blue-soft)}
@@ -507,7 +507,8 @@
       }
       html+='</div>';
     }
-    var legend=PROJECTS.map(function(p){ var st=PROJ_STYLE[p]; return '<span class="lg"><span class="dot" style="background:'+st.c+'"></span>'+esc(PROJ_SHORT[p])+'</span>'; }).join("");
+    var legend=PROJECTS.map(function(p){ var st=PROJ_STYLE[p]; return '<span class="lg"><span class="dot" style="background:'+st.c+'"></span>'+esc(PROJ_SHORT[p])+'</span>'; }).join("")
+      + ["휴가","외출","출장","재택근무"].map(function(t){ var st=TYPE_STYLE[t]; return '<span class="lg"><span class="dot" style="background:'+st.c+'"></span>'+t+'</span>'; }).join("");
     var dow=DOW.map(function(x,i){ return '<div class="'+(i===0?"sun":(i===6?"sat":""))+'">'+x+'</div>'; }).join("");
     return '<div class="cal">'
       +'<div class="cal-h"><div class="cal-ttl"><span class="bar"></span><h3>팀 캘린더</h3><span class="hint">파란 음영이 이번 주입니다</span></div>'
@@ -525,7 +526,7 @@
   }
   // 출장은 "일정 이름, (장소)" 배치, 그 외는 장소만
   function attDesc(ev){
-    if(ev.type==="출장") return ev.title + (ev.location ? ", ("+ev.location+")" : "");
+    if(ev.type==="출장") return ev.title + (ev.location ? " ("+ev.location+")" : "");
     return ev.location || "";
   }
   function attCard(type, wkEvents){
@@ -696,8 +697,7 @@
     var attRaw = (type==="출장"||type==="과제") ? document.getElementById("edAttendees").value.trim() : "";
     var attendees = attRaw ? normalizeAttendees(attRaw) : "";
     if(attendees) type = "출장"; // 과제로 두고 참석자를 입력해도 출장으로 태깅
-    var personVal=document.getElementById("edPerson").value;
-    if(personVal==="-" && type!=="기타"){ st.className="estatus status show err"; st.textContent="담당자를 선택하세요."; return; }
+    var personVal=document.getElementById("edPerson").value; // 담당자는 선택사항, "-"(미지정) 그대로 저장 가능
     var t0=document.getElementById("edTime").value, t1=document.getElementById("edTimeEnd").value;
     var timeStr = (type==="휴가") ? "" : (t0 + (t1? "~"+t1 : "")); // 휴가는 종일 일정(시간 불필요)
     var item={
