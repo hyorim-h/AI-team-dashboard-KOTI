@@ -188,7 +188,7 @@
   .cal-dow div{font-size:11.5px;font-weight:700;color:var(--text-2)}
   .cal-dow .sun{color:var(--red)} .cal-dow .sat{color:var(--blue)}
   .cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
-  .cal-cell{min-height:94px;border:1px solid var(--line);border-radius:6px;padding:6px 7px;background:var(--surface);overflow:hidden}
+  .cal-cell{height:122px;border:1px solid var(--line);border-radius:6px;padding:6px 7px;background:var(--surface);overflow:hidden}
   .cal-cell.out{background:var(--bg);opacity:.5}
   .cal-cell.thisweek{background:var(--blue-soft);border-color:var(--line-2)}
   .cal-cell .dnum{font-size:11.5px;font-weight:700;color:var(--text-2);margin-bottom:4px}
@@ -359,7 +359,9 @@
     "기타":{c:"#5a6680",bg:"#eef1f6"}
   };
   var OWNERS = ["이종우","전준수","이채영","한효림","김예원","정승환","심지윤","정정호"];
-  var TYPES = ["과제","출장","외출","휴가","재택근무","기타"];
+  var TYPES = ["과제","출장","외출","휴가","재택근무","기타"];           // 필터용 (기존 출장 데이터도 필터 가능해야 함)
+  var EDIT_TYPES = ["과제","외출","휴가","재택근무","기타"];             // 등록/수정 폼용 (출장은 과제+참석자로 대체)
+  var PERSON_OPTIONS = ["-"].concat(OWNERS);
   var VACATIONS = ["휴가","오전반차","오후반차","공가","병가","건강검진"];
   var ATT_TYPES = VACATIONS.concat(["외출","재택근무"]); // 제목이 "유형(이름)"로 자동 구성되는 유형
   // 사유(내용) 텍스트를 보고 휴가 구분 자동 판단 (건강검진/오전반차/오후반차/병가/공가/그 외→휴가)
@@ -491,12 +493,13 @@
         var chips="";
         if(inMonth){
           var dayEvs = sortDayEvents(evs.filter(function(ev){return containsDay(ev,dIso);}));
-          dayEvs.slice(0,4).forEach(function(ev){
+          var MAX_CHIPS = 3;
+          dayEvs.slice(0,MAX_CHIPS).forEach(function(ev){
             var st=evStyle(ev);
             chips+='<div class="evchip" data-id="'+esc(ev.id)+'" style="color:'+st.c+';background:'+st.bg+'">'+esc(evLabel(ev))+'</div>';
           });
-          if(dayEvs.length>4){
-            chips+='<div class="evchip evmore" data-more-date="'+dIso+'">+'+(dayEvs.length-4)+'건 더보기</div>';
+          if(dayEvs.length>MAX_CHIPS){
+            chips+='<div class="evchip evmore" data-more-date="'+dIso+'">+'+(dayEvs.length-MAX_CHIPS)+'건 더보기</div>';
           }
         }
         var dattr = inMonth ? ' data-date="'+dIso+'"' : '';
@@ -537,8 +540,8 @@
         +'<div class="att-rg" style="color:'+st.c+'">'+esc(attRange(ev))+'</div>'
         +'<div class="att-dt">'+esc(attDesc(ev))+'</div></div></div>';
     }).join("") : '<div class="att-empty">'+type+' 일정이 없습니다.</div>';
-    return '<div class="att-card"><div class="ac-h"><span class="lab"><span class="dot" style="background:'+st.c+'"></span>'+type+'자</span>'
-      +'<span class="cnt" style="color:'+st.c+';background:'+st.bg+'">'+list.length+'명</span></div>'
+    return '<div class="att-card"><div class="ac-h"><span class="lab"><span class="dot" style="background:'+st.c+'"></span>'+type+'</span>'
+      +'<span class="cnt" style="color:'+st.c+';background:'+st.bg+'">'+list.length+'건</span></div>'
       +'<div class="att-list">'+rows+'</div></div>';
   }
 
@@ -644,6 +647,7 @@
     var t=document.getElementById("edType").value;
     document.getElementById("wrapProject").style.display=(t==="과제")?"":"none";
     document.getElementById("wrapAttendees").style.display=(t==="출장"||t==="과제")?"":"none";
+    document.getElementById("wrapTime").style.display=(t==="휴가")?"none":"";
     document.getElementById("labTitle").textContent=(t==="과제"||t==="기타"||t==="재택근무")?"내용":"사유";
     var titleEl=document.getElementById("edTitle");
     titleEl.placeholder=(t==="휴가")?"예) 건강검진 / 오전 반차 / 병가 등 (입력 내용으로 자동 구분됩니다)":"일정 내용";
@@ -655,8 +659,8 @@
     EDIT.id=isNew?null:id;
     EDIT.origVacation=r.vacation||"";
     document.getElementById("editHead").textContent=isNew?"일정 추가":"일정 수정";
-    fillSelect(document.getElementById("edType"), TYPES, r.type||"과제");
-    fillSelect(document.getElementById("edPerson"), OWNERS, r.person||"이종우");
+    fillSelect(document.getElementById("edType"), EDIT_TYPES, (r.type&&r.type!=="출장")?r.type:"과제");
+    fillSelect(document.getElementById("edPerson"), PERSON_OPTIONS, r.person||"-");
     fillSelect(document.getElementById("edProject"), PROJECTS, r.project||PROJECTS[0]);
     document.getElementById("edTitle").value=(ATT_TYPES.indexOf(r.type)>=0) ? extractNote(r) : (r.title||"");
     var defDate = presetDate || TODAY;
@@ -692,10 +696,12 @@
     var attRaw = (type==="출장"||type==="과제") ? document.getElementById("edAttendees").value.trim() : "";
     var attendees = attRaw ? normalizeAttendees(attRaw) : "";
     if(attendees) type = "출장"; // 과제로 두고 참석자를 입력해도 출장으로 태깅
+    var personVal=document.getElementById("edPerson").value;
+    if(personVal==="-" && type!=="기타"){ st.className="estatus status show err"; st.textContent="담당자를 선택하세요."; return; }
     var t0=document.getElementById("edTime").value, t1=document.getElementById("edTimeEnd").value;
-    var timeStr = t0 + (t1? "~"+t1 : "");   // 모든 유형에서 시작~종료 시간 입력 가능
+    var timeStr = (type==="휴가") ? "" : (t0 + (t1? "~"+t1 : "")); // 휴가는 종일 일정(시간 불필요)
     var item={
-      id:EDIT.id, type:type, person:document.getElementById("edPerson").value, title:title,
+      id:EDIT.id, type:type, person:(personVal==="-"?"":personVal), title:title,
       project:(type==="과제")?document.getElementById("edProject").value:"",
       vacation:(type==="휴가")?deriveVacationType(title, EDIT.origVacation):"",
       attendees:attendees,

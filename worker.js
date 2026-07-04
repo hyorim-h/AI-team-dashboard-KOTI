@@ -961,7 +961,8 @@ function schedDescription(item){
   var lines = [];
   if(item.type === "출장") lines.push("출장"); // 필수 키워드
   if(item.type === "과제" && item.project) lines.push("과제: " + item.project);
-  if(item.person) lines.push("담당자: " + item.person);
+  // 휴가/외출/재택근무 등은 제목의 "유형(이름)"이 담당자의 유일한 출처 → 설명란에 중복 기록하지 않음
+  if(item.person && SCHED_ATT_TYPES.indexOf(item.type) < 0) lines.push("담당자: " + item.person);
   if(item.attendees) lines.push("참석자: " + item.attendees);
   if(item.title && SCHED_ATT_TYPES.indexOf(item.type) >= 0) lines.push(item.title); // 휴가류 비고
   return lines.join("\n");
