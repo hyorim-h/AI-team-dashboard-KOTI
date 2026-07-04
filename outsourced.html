@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>위탁과제 관리 · AI빅데이터연구팀</title>
+<style>
+  :root{
+    --navy:#16265e; --navy-2:#1a2942; --blue:#2c5fbf; --blue-soft:#e8eefb;
+    --red:#c8273c; --red-soft:#fdeaec; --green:#1f8a5b; --green-soft:#e3f5ec;
+    --orange:#b45309; --orange-soft:#fdeede; --purple:#4338ca; --purple-soft:#e9e7fb;
+    --surface:#fff; --bg:#f4f6fb; --line:#e6e9f0; --line-2:#d8dce6;
+    --text:#1c2536; --text-2:#5a6680; --muted:#9aa4ba; --shadow:0 1px 3px rgba(16,38,94,.06);
+    --radius:10px;
+  }
+  [data-theme="dark"]{
+    --surface:#151b2c; --bg:#0f1420; --line:#2a3348; --line-2:#37415a;
+    --text:#e7ebf5; --text-2:#a7b0c6; --muted:#6b7690; --blue-soft:#1b2c4d;
+    --red-soft:#3a1f26; --green-soft:#12302344; --orange-soft:#3a2a15; --purple-soft:#241f42;
+    --shadow:0 1px 3px rgba(0,0,0,.3);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Malgun Gothic",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.6}
+  a{text-decoration:none;color:inherit}
+  .utilbar{background:var(--navy-2);color:#c7cfe4;font-size:12px}
+  .utilbar .in{max-width:1320px;margin:0 auto;padding:6px 24px;display:flex;align-items:center;gap:10px}
+  .utilbar a{color:#c7cfe4}
+  .utilbar .sep{color:#4a577a}
+  .util-toggle{margin-left:auto;background:none;border:none;color:#c7cfe4;font-size:12px;cursor:pointer}
+  .head{background:var(--navy);color:#fff}
+  .head .in{max-width:1320px;margin:0 auto;padding:16px 24px;display:flex;align-items:center;gap:12px}
+  .head .logo{height:32px}
+  .head h1{font-size:17px;margin:0;font-weight:800}
+  .head-actions{margin-left:auto;display:flex;gap:8px}
+  .hbtn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;
+    border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .hbtn:hover{background:rgba(255,255,255,.2)}
+  .tabs{background:var(--surface);border-bottom:1px solid var(--line)}
+  .tabs .in{max-width:1320px;margin:0 auto;padding:0 24px;display:flex;gap:4px}
+  .tabs a{padding:13px 16px;font-size:13.5px;font-weight:600;color:var(--text-2);border-bottom:2px solid transparent}
+  .tabs a:hover{color:var(--navy)}
+  .tabs a.cur{color:var(--navy);border-bottom-color:var(--navy)}
+  .wrap{max-width:1320px;margin:0 auto;padding:26px 24px 60px}
+  .ptitle{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px}
+  .crumb{font-size:12px;color:var(--muted);margin-bottom:4px}
+  .ptitle h2{font-size:22px;margin:0;font-weight:800;color:var(--navy)}
+  .placeholder{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:70px 24px;text-align:center}
+  .placeholder .ico{font-size:36px;margin-bottom:14px}
+  .placeholder h3{font-size:16px;color:var(--navy);margin:0 0 8px;font-weight:800}
+  .placeholder p{font-size:13px;color:var(--muted);margin:0}
+  footer{text-align:center;font-size:11.5px;color:var(--muted);padding:20px 0 40px}
+</style>
+</head>
+<body>
+<div class="utilbar"><div class="in">
+  <a href="https://www.koti.re.kr" target="_blank" rel="noopener">한국교통연구원</a>
+  <span class="sep">|</span><span>모빌리티 빅데이터팀</span>
+  <span class="sep">|</span>
+  <button class="util-toggle" id="themeBtn">🌙 다크모드</button>
+</div></div>
+
+<header class="head"><div class="in">
+  <img class="logo" src="assets/koti-logo.png" alt="KOTI" onerror="this.style.display='none'">
+  <h1>AI빅데이터연구팀 업무포털</h1>
+</div></header>
+
+<nav class="tabs"><div class="in">
+  <a href="index.html">대시보드</a>
+  <a href="weekly-work.html">주간업무 작성</a>
+  <a href="weekly-meeting.html">주간회의 자료</a>
+  <a href="performance.html">성과 관리</a>
+  <a href="wbs.html">WBS 관리</a>
+  <a href="schedule.html">일정관리</a>
+  <a class="cur" href="outsourced.html">위탁과제 관리</a>
+</div></nav>
+
+<div class="wrap">
+  <div class="ptitle">
+    <div>
+      <div class="crumb">홈 · 위탁과제 관리</div>
+      <h2>위탁과제 관리</h2>
+    </div>
+  </div>
+  <div class="placeholder">
+    <div class="ico">🚧</div>
+    <h3>이 페이지는 준비 중입니다</h3>
+    <p>위탁과제 관리 기능은 다음 순서로 개발될 예정입니다.</p>
+  </div>
+</div>
+
+<footer>위탁과제 관리 · 한국교통연구원 교통빅데이터연구본부</footer>
+
+<script>
+  (function(){
+    var root=document.documentElement, btn=document.getElementById("themeBtn");
+    function set(t){ root.setAttribute("data-theme",t); btn.textContent=(t==="dark"?"☀️ 라이트모드":"🌙 다크모드"); }
+    btn.addEventListener("click", function(){ set(root.getAttribute("data-theme")==="dark"?"light":"dark"); });
+  })();
+</script>
+</body>
+</html>
