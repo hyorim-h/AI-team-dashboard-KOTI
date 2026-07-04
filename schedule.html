@@ -306,7 +306,7 @@
         <label class="fld"><span>담당자</span><select id="edPerson"></select></label>
       </div>
       <label class="fld" id="wrapProject"><span>과제</span><select id="edProject"></select></label>
-      <label class="fld" id="wrapAttendees"><span>참석자(출장)</span><input type="text" id="edAttendees" placeholder="예) 효림, 준수"></label>
+      <label class="fld" id="wrapAttendees"><span>참석자</span><input type="text" id="edAttendees" placeholder="예) 효림, 준수 (입력 시 출장으로 등록됩니다)"></label>
       <label class="fld"><span id="labTitle">내용</span> <input type="text" id="edTitle" placeholder="일정 내용"></label>
       <div class="fld-row">
         <label class="fld"><span>시작일</span><input type="date" id="edStart"></label>
@@ -316,7 +316,6 @@
         <label class="fld"><span>시작시간</span><input type="time" id="edTime"></label>
         <label class="fld"><span>종료시간</span><input type="time" id="edTimeEnd"></label>
       </div>
-      <label class="fld" id="wrapVac"><span>휴가 구분</span><select id="edVac"></select></label>
       <label class="fld"><span id="labDetail">장소·기관</span><input type="text" id="edLoc" placeholder="장소 또는 기관명"></label>
       <div class="estatus status" id="editStatus"></div>
     </div>
@@ -363,6 +362,21 @@
   var TYPES = ["과제","출장","외출","휴가","재택근무","기타"];
   var VACATIONS = ["휴가","오전반차","오후반차","공가","병가","건강검진"];
   var ATT_TYPES = VACATIONS.concat(["외출","재택근무"]); // 제목이 "유형(이름)"로 자동 구성되는 유형
+  // 사유(내용) 텍스트를 보고 휴가 구분 자동 판단 (건강검진/오전반차/오후반차/병가/공가/그 외→휴가)
+  var VAC_KEYWORDS = [
+    { kw: "건강검진", vac: "건강검진" },
+    { kw: "검진", vac: "건강검진" },
+    { kw: "오전반차", vac: "오전반차" },
+    { kw: "오후반차", vac: "오후반차" },
+    { kw: "공가", vac: "공가" },
+    { kw: "병가", vac: "병가" },
+  ];
+  function deriveVacationType(note, fallback){
+    var flat = (note||"").replace(/\s+/g, ""); // "오전 반차" 같은 띄어쓰기 표기도 매칭되도록
+    var hit = VAC_KEYWORDS.filter(function(x){ return flat.indexOf(x.kw)>=0; })[0];
+    if(hit) return hit.vac;
+    return fallback || "휴가"; // 키워드 없으면 기존 값 유지, 신규면 기본 '휴가'
+  }
   function extractNote(ev){
     // description에서 "담당자: …", "과제: …", 단독 "출장" 라인을 뺀 나머지를 사유로 반환
     var lines = (ev.raw_desc||"").split(/\r?\n/);
@@ -378,7 +392,7 @@
   var now0 = new Date();
   var VIEW = { y: now0.getFullYear(), m: now0.getMonth()+1 };
   var FILTER = { type:"전체", project:"전체" };
-  var EDIT = { id:null };
+  var EDIT = { id:null, origVacation:"" };
 
   function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function pad2(n){ return (n<10?"0":"")+n; }
@@ -629,20 +643,21 @@
   function syncFields(){
     var t=document.getElementById("edType").value;
     document.getElementById("wrapProject").style.display=(t==="과제")?"":"none";
-    document.getElementById("wrapAttendees").style.display=(t==="출장")?"":"none";
-    document.getElementById("wrapVac").style.display=(t==="휴가")?"":"none";
+    document.getElementById("wrapAttendees").style.display=(t==="출장"||t==="과제")?"":"none";
     document.getElementById("labTitle").textContent=(t==="과제"||t==="기타"||t==="재택근무")?"내용":"사유";
+    var titleEl=document.getElementById("edTitle");
+    titleEl.placeholder=(t==="휴가")?"예) 건강검진 / 오전 반차 / 병가 등 (입력 내용으로 자동 구분됩니다)":"일정 내용";
     document.getElementById("labDetail").textContent=(t==="휴가")?"비고":"장소·기관";
   }
   function openEdit(id, presetDate){
     var isNew=!id;
     var r=isNew?{}:findById(id);
     EDIT.id=isNew?null:id;
+    EDIT.origVacation=r.vacation||"";
     document.getElementById("editHead").textContent=isNew?"일정 추가":"일정 수정";
     fillSelect(document.getElementById("edType"), TYPES, r.type||"과제");
     fillSelect(document.getElementById("edPerson"), OWNERS, r.person||"이종우");
     fillSelect(document.getElementById("edProject"), PROJECTS, r.project||PROJECTS[0]);
-    fillSelect(document.getElementById("edVac"), VACATIONS, r.vacation||"휴가");
     document.getElementById("edTitle").value=(ATT_TYPES.indexOf(r.type)>=0) ? extractNote(r) : (r.title||"");
     var defDate = presetDate || TODAY;
     document.getElementById("edStart").value=r.start?r.start.slice(0,10):defDate;
@@ -674,13 +689,16 @@
     if(!s){ st.className="estatus status show err"; st.textContent="시작일을 입력하세요."; return; }
     if(e2 && e2<s){ st.className="estatus status show err"; st.textContent="종료일이 시작일보다 빠릅니다."; return; }
     var type=document.getElementById("edType").value;
+    var attRaw = (type==="출장"||type==="과제") ? document.getElementById("edAttendees").value.trim() : "";
+    var attendees = attRaw ? normalizeAttendees(attRaw) : "";
+    if(attendees) type = "출장"; // 과제로 두고 참석자를 입력해도 출장으로 태깅
     var t0=document.getElementById("edTime").value, t1=document.getElementById("edTimeEnd").value;
     var timeStr = t0 + (t1? "~"+t1 : "");   // 모든 유형에서 시작~종료 시간 입력 가능
     var item={
       id:EDIT.id, type:type, person:document.getElementById("edPerson").value, title:title,
       project:(type==="과제")?document.getElementById("edProject").value:"",
-      vacation:(type==="휴가")?document.getElementById("edVac").value:"",
-      attendees:(type==="출장")?normalizeAttendees(document.getElementById("edAttendees").value.trim()):"",
+      vacation:(type==="휴가")?deriveVacationType(title, EDIT.origVacation):"",
+      attendees:attendees,
       time:timeStr,
       start:s, end:e2||s, location:document.getElementById("edLoc").value.trim()
     };

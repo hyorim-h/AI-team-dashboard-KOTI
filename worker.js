@@ -331,6 +331,19 @@ const SCHED_PROJECT_KEYWORDS = [
   { kw: "데이터스페이스", name: "데이터스페이스R&D" },
 ];
 const SCHED_VAC_TYPES = ["휴가","오전반차","오후반차","병가","공가","건강검진"];
+// 팀원 짧은 이름("예원") → 풀네임("김예원") 정규화 (일정 제목/설명란에 짧게 적힌 경우 대비)
+const SCHED_TEAM = ["이종우","전준수","이채영","한효림","김예원","정승환","심지윤","정정호"];
+function schedShortName(o){ return (o && o.length>=3) ? o.slice(1) : o; }
+function normalizePersonName(t){
+  if(!t) return t;
+  t = t.trim();
+  var hit = SCHED_TEAM.filter(function(o){ return o===t || schedShortName(o)===t; })[0];
+  return hit || t; // 팀원 명단에 없으면(외부인 등) 원문 그대로
+}
+function normalizePersonList(raw){
+  if(!raw) return raw;
+  return raw.split(/[,\s]+/).map(function(x){return x.trim();}).filter(Boolean).map(normalizePersonName).join(", ");
+}
 const SCHED_ATT_TYPES = SCHED_VAC_TYPES.concat(["외출","재택근무"]);
 // "휴가(효림)" / "외출(효림)" 등
 const SCHED_RE_PAREN = new RegExp("(" + SCHED_ATT_TYPES.join("|") + ")\\s*\\(([^)]+)\\)\\s*$");
@@ -340,12 +353,12 @@ const SCHED_RE_LEGACY = new RegExp("^([^\\s()]{2,6})\\s*[\\-\\s]?\\s*(" + SCHED_
 function extractPersonFromDesc(desc){
   if(!desc) return "";
   var m = desc.match(/담당자\s*[:：]\s*([^\n\r]+)/);
-  return m ? m[1].trim() : "";
+  return m ? normalizePersonName(m[1].trim()) : "";
 }
 function extractAttendeesFromDesc(desc){
   if(!desc) return "";
   var m = desc.match(/참석자\s*[:：]\s*([^\n\r]+)/);
-  return m ? m[1].trim() : "";
+  return m ? normalizePersonList(m[1].trim()) : "";
 }
 function classifySchedule(ev){
   var title = (ev.title || "").trim();
@@ -357,11 +370,11 @@ function classifySchedule(ev){
   if(mp){
     type = (SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) ? "휴가" : mp[1];
     if(SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) vacation = mp[1];
-    person = mp[2].trim();
+    person = normalizePersonName(mp[2].trim());
   } else if(ml){
     type = (SCHED_VAC_TYPES.indexOf(ml[2]) >= 0) ? "휴가" : ml[2];
     if(SCHED_VAC_TYPES.indexOf(ml[2]) >= 0) vacation = ml[2];
-    person = ml[1].trim();
+    person = normalizePersonName(ml[1].trim());
   } else if(desc.indexOf("출장") >= 0){
     type = "출장";
     person = extractPersonFromDesc(desc);
