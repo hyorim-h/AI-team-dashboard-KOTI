@@ -353,7 +353,7 @@
     document.getElementById("content").innerHTML="<div class=\"state\">불러오는 중…</div>";
     document.getElementById("todayLabel").textContent = TODAY.getFullYear()+"년 "+(TODAY.getMonth()+1)+"월 "+TODAY.getDate()+"일("+DOW[TODAY.getDay()]+") · "+(isoWeekNum(TODAY_ISO)-1)+"주차";
     try {
-      var res=await fetch(WORKER_URL+"?scope=all",{cache:"no-store"});
+      var res=await fetch(WORKER_URL+"?scope=dashboard",{cache:"no-store"});
       var data=await res.json();
       DATA=data;
       render();
@@ -378,27 +378,7 @@
       +"<div class=\"team-grid\">"+cols+"</div></div>";
   }
 
-  function buildKpiStrip(){
-    var work=DATA.work||{achievements:[],plans:[]};
-    var meetWeek=(DATA.meetings||[]).filter(function(m){return inThisWeek(m.date);});
-    var perfDoing=(DATA.perf||[]).filter(function(g){return g.status==="진행중";}).length;
-    var wbsDoing=(DATA.wbs||[]).filter(function(w){return w.status==="진행중";}).length;
-    var attTypes=["출장","외출","휴가","오전반차","오후반차","병가","공가","건강검진","재택근무"];
-    var attWeek=(DATA.schedule||[]).filter(function(s){
-      return attTypes.indexOf(s.type)>=0 && inThisWeek(s.start||s.date);
-    }).length;
-    var items=[
-      {lab:"이번 주 실적", val:work.achievements.length, unit:"건", url:"weekly-work.html"},
-      {lab:"이번 주 계획", val:work.plans.length, unit:"건", url:"weekly-work.html"},
-      {lab:"이번 주 회의", val:meetWeek.length, unit:"건", url:"weekly-meeting.html"},
-      {lab:"성과목표 진행중", val:perfDoing, unit:"건", url:"performance.html"},
-      {lab:"WBS 진행중 작업", val:wbsDoing, unit:"건", url:"wbs.html"},
-      {lab:"이번 주 근태", val:attWeek, unit:"건", url:"schedule.html"}
-    ];
-    return "<div class=\"kpi-strip\">"+items.map(function(k){
-      return "<div class=\"kpi-card\" data-nav=\""+k.url+"\"><div class=\"kpi-lab\">"+k.lab+"</div><div class=\"kpi-val\">"+k.val+"<span class=\"kpi-unit\">"+k.unit+"</span></div></div>";
-    }).join("")+"</div>";
-  }
+
 
   function buildWorkCard(){
     var work=DATA.work||{achievements:[],plans:[]};
@@ -543,7 +523,7 @@
   }
 
   function render(){
-    var html = buildKpiStrip() + buildTeamCard()
+    var html = buildTeamCard()
       + "<div class=\"widget-grid\">"
       + buildWorkCard() + buildMeetingCard() + buildPerfCard() + buildWbsCard() + buildConsignCard() + buildCalendarCard()
       + "</div>";
