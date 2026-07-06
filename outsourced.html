@@ -429,8 +429,15 @@
       DATA.error = data.consignError || data.consignMeetingError || data.consignRequestError || "";
       var yb=yearBounds();
       if(YEAR<yb[0]) YEAR=yb[1]; if(YEAR>yb[1]) YEAR=yb[1];
-      var avail=DATA.consignments.filter(function(c){return inYear(c,YEAR);});
-      if(!avail.some(function(c){return c.id===SEL;})) SEL = avail.length ? avail[0].id : null;
+      var qProject = new URLSearchParams(location.search).get("project");
+      if(qProject && DATA.consignments.some(function(c){return c.id===qProject;})){
+        SEL = qProject;
+        var qc = DATA.consignments.filter(function(c){return c.id===qProject;})[0];
+        var yr=periodYears(qc); if(yr[0]!=null && (YEAR<yr[0]||YEAR>yr[1])) YEAR=yr[0];
+      } else {
+        var avail=DATA.consignments.filter(function(c){return inYear(c,YEAR);});
+        if(!avail.some(function(c){return c.id===SEL;})) SEL = avail.length ? avail[0].id : null;
+      }
       render();
     } catch(e){
       document.getElementById("content").innerHTML="<div class=\"state\">불러오기 실패: "+esc(String(e))+"</div>";
