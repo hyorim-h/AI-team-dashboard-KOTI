@@ -414,7 +414,12 @@
   function overlaps(ev, a, b){ return ev.start && ev.start<=b && endOf(ev)>=a; }
   function containsToday(ev){ return containsDay(ev, TODAY); }
   function isMulti(ev){ return ev.end && ev.end!==ev.start; }
-  function shortName(p){ return (p && p.length>=3) ? p.slice(1) : (p||""); }
+  function shortOne(p){ return (p && p.length>=3) ? p.slice(1) : (p||""); }
+  function shortName(p){
+    if(!p) return "";
+    if(p.indexOf(",")>=0){ return p.split(",").map(function(x){ return shortOne(x.trim()); }).join(", "); }
+    return shortOne(p);
+  }
   // "효림, 준수" 같은 짧은 이름 입력 → OWNERS 목록에서 매칭해 "한효림, 전준수"로 정규화
   function normalizeAttendees(raw){
     if(!raw) return "";
@@ -653,7 +658,8 @@
     document.getElementById("labTitle").textContent=(t==="과제"||t==="기타"||t==="재택근무")?"내용":"사유";
     var titleEl=document.getElementById("edTitle");
     titleEl.placeholder=(t==="휴가")?"예) 건강검진 / 오전 반차 / 병가 등 (입력 내용으로 자동 구분됩니다)":"일정 내용";
-    document.getElementById("labDetail").textContent=(t==="휴가")?"비고":"장소·기관";
+    document.getElementById("labDetail").textContent=(t==="과제")?"장소·기관":"비고";
+    document.getElementById("edLoc").placeholder=(t==="과제")?"장소 또는 기관명":"참고할 내용";
   }
   function openEdit(id, presetDate){
     var isNew=!id;
@@ -698,7 +704,11 @@
     var attRaw = (type==="출장"||type==="과제") ? document.getElementById("edAttendees").value.trim() : "";
     var attendees = attRaw ? normalizeAttendees(attRaw) : "";
     if(attendees) type = "출장"; // 과제로 두고 참석자를 입력해도 출장으로 태깅
-    var personVal=document.getElementById("edPerson").value; // 담당자는 선택사항, "-"(미지정) 그대로 저장 가능
+    var personVal=document.getElementById("edPerson").value;
+    // 휴가/외출/재택근무는 제목이 "유형(이름)"로 만들어지므로 담당자가 비면 안 됨(분류가 깨짐) → 필수
+    if(ATT_TYPES.indexOf(type)>=0 && personVal==="-"){
+      st.className="estatus status show err"; st.textContent="담당자를 선택하세요."; return;
+    }
     var t0=document.getElementById("edTime").value, t1=document.getElementById("edTimeEnd").value;
     var timeStr = (type==="휴가") ? "" : (t0 + (t1? "~"+t1 : "")); // 휴가는 종일 일정(시간 불필요)
     var item={
