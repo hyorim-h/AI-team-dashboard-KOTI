@@ -508,11 +508,13 @@ function classifySchedule(ev){
   if(mp){
     type = (SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) ? "휴가" : mp[1];
     if(SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) vacation = mp[1];
-    person = normalizePersonName(mp[2].trim());
+    var rawName1 = mp[2].trim();
+    person = (rawName1.indexOf(",")>=0) ? normalizePersonList(rawName1) : normalizePersonName(rawName1);
   } else if(ml){
     type = (SCHED_VAC_TYPES.indexOf(ml[2]) >= 0) ? "휴가" : ml[2];
     if(SCHED_VAC_TYPES.indexOf(ml[2]) >= 0) vacation = ml[2];
-    person = normalizePersonName(ml[1].trim());
+    var rawName2 = ml[1].trim();
+    person = (rawName2.indexOf(",")>=0) ? normalizePersonList(rawName2) : normalizePersonName(rawName2);
   } else if(desc.indexOf("출장") >= 0){
     type = "출장";
     person = extractPersonFromDesc(desc);
@@ -1241,6 +1243,25 @@ async function deleteSchedule(env, payload){
 
 
 // 코멘트 추가 → 코멘트 DB에 새 행 + 회의자료 코멘트수 +1
+// 진짜 노션 댓글(페이지 Discussion)로도 남겨서 노션 알림이 가게 함.
+// 실패해도(권한 등) 우리 앱의 코멘트 저장/표시엔 영향 없도록 항상 try/catch로 감싸서 호출할 것.
+async function postNotionComment(env, pageId, text, author){
+  const token = env.NOTION_TOKEN;
+  const content = (author ? author + ": " : "") + text;
+  try {
+    // 이 페이지에 기존 디스커션이 있으면 거기에 답글로, 없으면 새 디스커션 시작
+    const existing = await notionFetch("/comments?block_id=" + pageId, token, "GET");
+    const discussionId = (existing.results && existing.results[0] && existing.results[0].discussion_id) || null;
+    const body = discussionId
+      ? { discussion_id: discussionId, rich_text: rt(content) }
+      : { parent: { page_id: pageId }, rich_text: rt(content) };
+    await notionFetch("/comments", token, "POST", body);
+    return true;
+  } catch(e){
+    return false;
+  }
+}
+
 async function addComment(env, payload){
   const token = env.NOTION_TOKEN;
   const meetingId = payload.meetingId;
