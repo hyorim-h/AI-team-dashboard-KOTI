@@ -10,6 +10,9 @@ const ACHIEVE_DB_ID = "34ab53ea4afb4b1481c8c5358cd67b29"; // 업무실적 DB
 const PLAN_DB_ID    = "d104d01ba9b140e6a83ceaea36e86b48"; // 업무계획 DB
 const MEETING_DB_ID = "04abad201f3b4d08a5a293749c28626c"; // 회의자료 DB
 const COMMENT_DB_ID = "b65a81a8947b415ebd921c45f155c0f6"; // 코멘트 DB
+const CONSIGN_DB_ID = "3824cab3f1fe427f9e7f8f62664ed8a7"; // 위탁과제 정보 DB
+const CONSIGN_MEETING_DB_ID = "12245461cc924caea18603f30deb6a9f"; // 위탁과제 회의록 DB
+const CONSIGN_REQUEST_DB_ID = "5dbf4ecde36a42e0bffeed87502b3f1b"; // 위탁과제 요청자료 DB
 const NOTION_VERSION = "2022-06-28";
 
 const TEAM = ["이종우","전준수","이채영","한효림","김예원","정승환"];
@@ -162,7 +165,114 @@ async function getPageContent(pageId, token){
 
 function extractWeek(title){ const m = title.match(/\d+월\s*\d+주차/); return m ? m[0] : title; }
 
+// 관계형(relation) 속성에서 첫 번째 연결된 페이지 id 추출
+function firstRelationId(prop){
+  var arr = (prop && prop.relation) || [];
+  return arr.length ? arr[0].id : "";
+}
+
+// 위탁과제 정보 파싱
+function parseConsignment(page){
+  const p = page.properties || {};
+  const titleList = (p["과제명"] && p["과제명"].title) || [];
+  const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
+  const orgRt = (p["수행기관"] && p["수행기관"].rich_text) || [];
+  const org = orgRt.map(function(t){return t.plain_text;}).join("");
+  const piRt = (p["책임자"] && p["책임자"].rich_text) || [];
+  const pi = piRt.map(function(t){return t.plain_text;}).join("");
+  const budgetRt = (p["위탁금액"] && p["위탁금액"].rich_text) || [];
+  const budget = budgetRt.map(function(t){return t.plain_text;}).join("");
+  const start = (p["시작일"] && p["시작일"].date && p["시작일"].date.start) || "";
+  const end = (p["종료일"] && p["종료일"].date && p["종료일"].date.start) || "";
+  const order = (p["정렬순서"] && typeof p["정렬순서"].number === "number") ? p["정렬순서"].number : 999;
+  return { id: page.id, title: title, org: org, pi: pi, start: start, end: end, budget: budget, order: order };
+}
+
+// 위탁과제 회의록 파싱
+function parseConsignMeeting(page){
+  const p = page.properties || {};
+  const titleList = (p["제목"] && p["제목"].title) || [];
+  const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
+  const project = firstRelationId(p["과제"]);
+  const kind = (p["구분"] && p["구분"].select && p["구분"].select.name) || "월간회의";
+  const status = (p["상태"] && p["상태"].select && p["상태"].select.name) || "완료";
+  const mode = (p["형태"] && p["형태"].select && p["형태"].select.name) || "대면";
+  const date = (p["일시"] && p["일시"].date && p["일시"].date.start) || "";
+  const attRt = (p["참석"] && p["참석"].rich_text) || [];
+  const attendees = attRt.map(function(t){return t.plain_text;}).join("");
+  const bodyRt = (p["내용"] && p["내용"].rich_text) || [];
+  const body = bodyRt.map(function(t){return t.plain_text;}).join("");
+  return { id: page.id, project: project, title: title, kind: kind, status: status, mode: mode, date: date, attendees: attendees, body: body };
+}
+
+// 위탁과제 요청자료 파싱 (Q&A는 페이지 본문에서 heading=질문, 본문=답변으로 파싱)
+// getPageContent 확장판: heading 섹션별 본문 + 이미지 블록(그림)까지 캡처 (위탁과제 요청자료 Q&A용)
+async function getPageContentWithFigures(pageId, token){
+  const data = await notionFetch("/blocks/" + pageId + "/children?page_size=100", token);
+  const sections = {}; let cur = null;
+  for(const b of data.results || []){
+    const t = b.type;
+    if(t && t.startsWith("heading")){
+      const rich = b[t].rich_text || [];
+      cur = rich.map(function(x){return x.plain_text;}).join("").trim();
+      sections[cur] = { body: [], figures: [] };
+    } else if(cur !== null){
+      if(t === "image"){
+        const img = b.image;
+        const url = (img.type === "external") ? (img.external && img.external.url) : (img.file && img.file.url);
+        const capRich = img.caption || [];
+        const caption = capRich.map(function(x){return x.plain_text;}).join("").trim();
+        if(url) sections[cur].figures.push({ url: url, caption: caption });
+      } else {
+        const rich = (b[t] && b[t].rich_text) || [];
+        const text = rich.map(function(x){return x.plain_text;}).join("").trim();
+        if(text) sections[cur].body.push(text);
+      }
+    }
+  }
+  const out = {};
+  for(const k in sections){ out[k] = { body: sections[k].body.join("\n"), figures: sections[k].figures }; }
+  return out;
+}
+
+async function parseConsignRequest(page, token){
+  const p = page.properties || {};
+  const titleList = (p["제목"] && p["제목"].title) || [];
+  const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
+  const project = firstRelationId(p["과제"]);
+  const category = (p["구분"] && p["구분"].select && p["구분"].select.name) || "기타";
+  const status = (p["상태"] && p["상태"].select && p["상태"].select.name) || "검토중";
+  const reqDate = (p["요청일"] && p["요청일"].date && p["요청일"].date.start) || "";
+  const replyDate = (p["회신일"] && p["회신일"].date && p["회신일"].date.start) || "";
+  const reqFileRt = (p["요청파일명"] && p["요청파일명"].rich_text) || [];
+  const reqFile = reqFileRt.map(function(t){return t.plain_text;}).join("");
+  const replyFileRt = (p["회신파일명"] && p["회신파일명"].rich_text) || [];
+  const replyFile = replyFileRt.map(function(t){return t.plain_text;}).join("");
+  const content = await getPageContentWithFigures(page.id, token);
+  const qa = [];
+  for(const q in content){ qa.push({ q: q, a: content[q].body, figures: content[q].figures }); }
+  return { id: page.id, project: project, title: title, category: category, status: status,
+    reqDate: reqDate, replyDate: replyDate, reqFile: reqFile, replyFile: replyFile, qa: qa };
+}
+
 // 회의자료 페이지 파싱 (꼭지별 본문 포함)
+// 대시보드용 경량 파싱: 속성만 읽고 본문(꼭지)·코멘트는 조회하지 않음 (빠름)
+function parseMeetingLite(page){
+  const p = page.properties || {};
+  const titleList = (p["제목"] && p["제목"].title) || [];
+  const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
+  const project = (p["과제"] && p["과제"].select && p["과제"].select.name) || "";
+  const kind = (p["구분"] && p["구분"].select && p["구분"].select.name) || "주간회의";
+  const date = (p["회의날짜"] && p["회의날짜"].date && p["회의날짜"].date.start) || "";
+  const sumRt = (p["요약"] && p["요약"].rich_text) || [];
+  const headingList = sumRt.map(function(t){return t.plain_text;}).join("");
+  const overviewRt = (p["회의요약"] && p["회의요약"].rich_text) || [];
+  const summary = overviewRt.map(function(t){return t.plain_text;}).join("");
+  const cntProp = p["코멘트수"];
+  const commentCount = (cntProp && typeof cntProp.number === "number") ? cntProp.number : 0;
+  return { id: page.id, title: title, project: project, kind: kind, date: date, summary: summary, headingList: headingList, commentCount: commentCount };
+}
+
 async function parseMeeting(page, token){
   const p = page.properties || {};
   const titleList = (p["제목"] && p["제목"].title) || [];
@@ -214,6 +324,20 @@ async function getComments(meetingId, token){
     const time = (p["작성시각"] && p["작성시각"].created_time) || "";
     return { id: pg.id, text: text, author: author, time: time };
   });
+}
+
+// parseWorkPage와 동일 로직이지만 동기 함수(추가 API 호출이 원래 없어서 async가 불필요) — map()에서 안전하게 쓰기 위함
+function parseWorkPageLite(page){
+  const p = page.properties || {};
+  const titleList = (p["제목"] && p["제목"].title) || [];
+  const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
+  const date = (p["날짜"] && p["날짜"].date && p["날짜"].date.start) || "";
+  const timeRt = (p["시간"] && p["시간"].rich_text) || [];
+  const time = timeRt.map(function(t){return t.plain_text;}).join("");
+  const weekRt = (p["출처주차"] && p["출처주차"].rich_text) || [];
+  const week = weekRt.map(function(t){return t.plain_text;}).join("");
+  const proj = (p["과제"] && p["과제"].select && p["과제"].select.name) || "";
+  return { id: page.id, title: title, date: date, time: time, project: proj, week: week };
 }
 
 // 업무실적/업무계획 페이지 파싱 (본문 섹션 포함)
@@ -1149,6 +1273,125 @@ async function updateMeeting(env, payload){
   return { updated: true };
 }
 
+// ===== 위탁과제 회의록 CRUD =====
+function consignMeetingProps(item){
+  return {
+    "제목": { title: rt(item.title || "") },
+    "과제": { relation: [{ id: item.project }] },
+    "구분": { select: { name: item.kind || "월간회의" } },
+    "상태": { select: { name: item.status || "예정" } },
+    "형태": { select: { name: item.mode || "대면" } },
+    "일시": item.date ? { date: { start: item.date } } : { date: null },
+    "참석": { rich_text: rt(item.attendees || "") },
+    "내용": { rich_text: rt(item.body || "") },
+  };
+}
+async function createConsignMeeting(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  if(!item.project) throw new Error("과제(project) 누락");
+  var res = await notionFetch("/pages", token, "POST", { parent:{ database_id: CONSIGN_MEETING_DB_ID }, properties: consignMeetingProps(item) });
+  return { created: true, id: res.id };
+}
+async function updateConsignMeeting(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  if(!item.id) throw new Error("page id 누락");
+  await notionFetch("/pages/" + item.id, token, "PATCH", { properties: consignMeetingProps(item) });
+  return { updated: true };
+}
+async function deleteConsignMeeting(env, payload){
+  const token = env.NOTION_TOKEN;
+  if(!payload.id) throw new Error("page id 누락");
+  await notionFetch("/pages/" + payload.id, token, "PATCH", { archived: true });
+  return { deleted: true };
+}
+
+// ===== 위탁과제 요청자료 CRUD (Q&A는 본문 블록으로 저장) =====
+function consignRequestProps(item){
+  return {
+    "제목": { title: rt(item.title || "") },
+    "과제": { relation: [{ id: item.project }] },
+    "구분": { select: { name: item.category || "기타" } },
+    "상태": { select: { name: item.status || "검토중" } },
+    "요청일": item.reqDate ? { date: { start: item.reqDate } } : { date: null },
+    "회신일": item.replyDate ? { date: { start: item.replyDate } } : { date: null },
+    "요청파일명": { rich_text: rt(item.reqFile || "") },
+    "회신파일명": { rich_text: rt(item.replyFile || "") },
+  };
+}
+// 현재 본문을 "꼭지 단위"(heading + 그 뒤 첫 paragraph + 그 뒤 image들)로 순서대로 묶어서 반환
+async function getOrderedQaSections(pageId, token){
+  const data = await notionFetch("/blocks/" + pageId + "/children?page_size=100", token);
+  const sections = []; let cur = null;
+  for(const b of (data.results || [])){
+    const t = b.type;
+    if(t && t.startsWith("heading")){
+      cur = { headingId: b.id, paragraphId: null, imageIds: [] };
+      sections.push(cur);
+    } else if(cur){
+      if(t === "paragraph" && cur.paragraphId === null) cur.paragraphId = b.id;
+      else if(t === "image") cur.imageIds.push(b.id);
+    }
+  }
+  return sections;
+}
+
+// Q&A 저장: 기존 꼭지(질문/답변)는 그 블록을 "그 자리에서" 내용만 교체 → 사이에 있는 이미지 블록은 절대 안 건드림.
+// 새로 추가된 항목은 맨 뒤에 덧붙이고, 삭제된 항목은 그 항목의 블록만 지움(이미지 포함).
+async function writeRequestQaBlocks(pageId, token, qa){
+  const list = qa || [];
+  const sections = await getOrderedQaSections(pageId, token);
+  const n = Math.min(sections.length, list.length);
+  for(let i=0;i<n;i++){
+    const sec = sections[i], item = list[i];
+    await notionFetch("/blocks/" + sec.headingId, token, "PATCH", { heading_3: { rich_text: rt(item.q||"") } });
+    if(sec.paragraphId){
+      await notionFetch("/blocks/" + sec.paragraphId, token, "PATCH", { paragraph: { rich_text: rt(item.a||"") } });
+    } else {
+      await notionFetch("/blocks/" + pageId + "/children", token, "PATCH", { children: [{ object:"block", type:"paragraph", paragraph:{ rich_text: rt(item.a||"") } }], after: sec.headingId });
+    }
+  }
+  // 삭제된 항목(뒤쪽 남는 기존 섹션) 제거 — 이미지도 그 섹션 것만 같이 지움
+  for(let i=list.length; i<sections.length; i++){
+    const sec = sections[i];
+    try { await notionFetch("/blocks/" + sec.headingId, token, "DELETE"); } catch(e){}
+    if(sec.paragraphId){ try { await notionFetch("/blocks/" + sec.paragraphId, token, "DELETE"); } catch(e){} }
+    for(const imgId of sec.imageIds){ try { await notionFetch("/blocks/" + imgId, token, "DELETE"); } catch(e){} }
+  }
+  // 새로 추가된 항목(기존보다 많아진 만큼) — 맨 뒤에 덧붙임
+  if(list.length > sections.length){
+    const children = [];
+    for(let i=sections.length; i<list.length; i++){
+      children.push({ object:"block", type:"heading_3", heading_3:{ rich_text: rt(list[i].q||"") } });
+      children.push({ object:"block", type:"paragraph", paragraph:{ rich_text: rt(list[i].a||"") } });
+    }
+    if(children.length) await notionFetch("/blocks/" + pageId + "/children", token, "PATCH", { children: children });
+  }
+}
+async function createConsignRequest(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  if(!item.project) throw new Error("과제(project) 누락");
+  var res = await notionFetch("/pages", token, "POST", { parent:{ database_id: CONSIGN_REQUEST_DB_ID }, properties: consignRequestProps(item) });
+  await writeRequestQaBlocks(res.id, token, item.qa);
+  return { created: true, id: res.id };
+}
+async function updateConsignRequest(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  if(!item.id) throw new Error("page id 누락");
+  await notionFetch("/pages/" + item.id, token, "PATCH", { properties: consignRequestProps(item) });
+  await writeRequestQaBlocks(item.id, token, item.qa);
+  return { updated: true };
+}
+async function deleteConsignRequest(env, payload){
+  const token = env.NOTION_TOKEN;
+  if(!payload.id) throw new Error("page id 누락");
+  await notionFetch("/pages/" + payload.id, token, "PATCH", { archived: true });
+  return { deleted: true };
+}
+
 export default {
   async fetch(request, env){
     if(request.method === "OPTIONS") return new Response(null, { headers: corsHeaders() });
@@ -1192,6 +1435,18 @@ export default {
           result = await updateMeeting(env, payload);
         } else if(payload.action === "updateMeetingSummary"){
           result = await updateMeetingSummary(env, payload);
+        } else if(payload.action === "consignMeetingCreate"){
+          result = await createConsignMeeting(env, payload);
+        } else if(payload.action === "consignMeetingUpdate"){
+          result = await updateConsignMeeting(env, payload);
+        } else if(payload.action === "consignMeetingDelete"){
+          result = await deleteConsignMeeting(env, payload);
+        } else if(payload.action === "consignRequestCreate"){
+          result = await createConsignRequest(env, payload);
+        } else if(payload.action === "consignRequestUpdate"){
+          result = await updateConsignRequest(env, payload);
+        } else if(payload.action === "consignRequestDelete"){
+          result = await deleteConsignRequest(env, payload);
         } else {
           result = await saveWork(env, payload);
         }
@@ -1210,6 +1465,52 @@ export default {
       var want = function(k){ return scope==="all" || scope===k; };
 
       const body = { updated_at: new Date().toISOString() };
+
+      if(scope === "dashboard"){
+        // 대시보드 전용: 필요한 것만, 전부 병렬로 (개별 실패해도 나머지는 계속 진행)
+        const results = await Promise.allSettled([
+          getAllPages(PROJECT_DB_ID, token),                 // 0: 과제 정보
+          getAllPages(WBS_DB_ID, token),                     // 1: WBS
+          getAllPages(PERF_DB_ID, token),                    // 2: 성과
+          getAllPages(ACHIEVE_DB_ID, token),                 // 3: 업무실적
+          getAllPages(PLAN_DB_ID, token),                    // 4: 업무계획
+          getAllPages(MEETING_DB_ID, token),                 // 5: 회의자료(속성만 사용, 본문/코멘트 조회 안 함)
+          getAllPages(CONSIGN_DB_ID, token),                 // 6: 위탁과제 정보만(회의록/요청자료는 대시보드에 안 씀)
+          gcalList(env, "2026-06-01T00:00:00+09:00"),        // 7: 일정(구글 캘린더)
+        ]);
+        function ok(i, map){ return results[i].status==="fulfilled" ? map(results[i].value) : []; }
+
+        var pinfo = ok(0, function(pages){ return pages.map(parseProjectInfo).filter(function(x){return x.name;}); });
+        pinfo.sort(function(a,b){ return a.order - b.order; });
+        body.projectInfo = pinfo;
+        if(results[0].status==="rejected") body.projectInfoError = String(results[0].reason);
+
+        body.wbs = ok(1, function(pages){ return pages.map(parseWbs).filter(function(w){return w.task;}); });
+
+        body.perf = ok(2, function(pages){ return pages.map(parsePerf).filter(function(x){return x.name;}); });
+
+        var aAll = ok(3, function(pages){ return pages.map(parseWorkPageLite); });
+        var pAll = ok(4, function(pages){ return pages.map(parseWorkPageLite); });
+        var allWeeks = aAll.map(function(x){return x.week;}).concat(pAll.map(function(x){return x.week;})).filter(Boolean);
+        var workWeek = "", achievements = [], plans = [];
+        if(allWeeks.length){
+          allWeeks.sort(); workWeek = allWeeks[allWeeks.length-1];
+          achievements = aAll.filter(function(x){return x.week===workWeek;});
+          plans = pAll.filter(function(x){return x.week===workWeek;});
+        }
+        body.work = { week: workWeek, achievements: achievements, plans: plans };
+
+        body.meetings = ok(5, function(pages){ return pages.map(parseMeetingLite).filter(function(m){return m.title;}); });
+
+        var consignments = ok(6, function(pages){ return pages.map(parseConsignment).filter(function(c){return c.title;}); });
+        consignments.sort(function(a,b){ return a.order - b.order; });
+        body.consignments = consignments;
+
+        body.schedule = results[7].status==="fulfilled" ? results[7].value : [];
+        if(results[7].status==="rejected") body.scheduleError = String(results[7].reason);
+
+        return new Response(JSON.stringify(body), { headers: corsHeaders() });
+      }
 
       if(want("reports")){
         const reportPages = await getAllPages(REPORT_DB_ID, token);
@@ -1283,6 +1584,25 @@ export default {
           meetings = parsed;
         } catch(e){ body.meetingError = String(e); }
         body.meetings = meetings;
+      }
+
+      if(want("outsourced")){
+        try {
+          const cPages = await getAllPages(CONSIGN_DB_ID, token);
+          var consignments = cPages.map(parseConsignment).filter(function(c){ return c.title; });
+          consignments.sort(function(a,b){ return a.order - b.order; });
+          body.consignments = consignments;
+        } catch(e){ body.consignments = []; body.consignError = String(e); }
+        try {
+          const cmPages = await getAllPages(CONSIGN_MEETING_DB_ID, token);
+          body.consignMeetings = cmPages.map(parseConsignMeeting).filter(function(m){ return m.title; });
+        } catch(e){ body.consignMeetings = []; body.consignMeetingError = String(e); }
+        try {
+          const crPages = await getAllPages(CONSIGN_REQUEST_DB_ID, token);
+          const parsedReq = [];
+          for(const pg of crPages){ parsedReq.push(await parseConsignRequest(pg, token)); }
+          body.consignRequests = parsedReq;
+        } catch(e){ body.consignRequests = []; body.consignRequestError = String(e); }
       }
 
       return new Response(JSON.stringify(body), { headers: corsHeaders() });
