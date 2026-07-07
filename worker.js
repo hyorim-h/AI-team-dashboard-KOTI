@@ -508,11 +508,13 @@ function classifySchedule(ev){
   if(mp){
     type = (SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) ? "휴가" : mp[1];
     if(SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) vacation = mp[1];
-    person = normalizePersonName(mp[2].trim());
+    var rawName1 = mp[2].trim();
+    person = (rawName1.indexOf(",")>=0) ? normalizePersonList(rawName1) : normalizePersonName(rawName1);
   } else if(ml){
     type = (SCHED_VAC_TYPES.indexOf(ml[2]) >= 0) ? "휴가" : ml[2];
     if(SCHED_VAC_TYPES.indexOf(ml[2]) >= 0) vacation = ml[2];
-    person = normalizePersonName(ml[1].trim());
+    var rawName2 = ml[1].trim();
+    person = (rawName2.indexOf(",")>=0) ? normalizePersonList(rawName2) : normalizePersonName(rawName2);
   } else if(desc.indexOf("출장") >= 0){
     type = "출장";
     person = extractPersonFromDesc(desc);
@@ -776,24 +778,101 @@ async function gcalGet(env, eventId){
 
 // 업무계획 캘린더 동기화: event id로 캘린더 조회 → 날짜·시간·제목만 노션에 반영
 // (장소·내용·참석자는 노션 값 유지)
+// 프론트(weekly-work.html)의 computePeriod/weekLabelText와 동일 로직 (오늘 기준 실시간 계산, 저장 데이터에 의존하지 않음)
+function z2(n){ return (n<10?"0":"")+n; }
+function ymdOf(d){ return d.getFullYear()+"-"+z2(d.getMonth()+1)+"-"+z2(d.getDate()); }
+function isoWeekNumSrv(ymdStr){
+  var d=new Date(ymdStr+"T00:00:00");
+  var target=new Date(d.valueOf()); var dayNr=(d.getDay()+6)%7;
+  target.setDate(target.getDate()-dayNr+3);
+  var firstThu=target.valueOf();
+  target.setMonth(0,1);
+  if(target.getDay()!==4){ target.setMonth(0,1+((4-target.getDay())+7)%7); }
+  return 1+Math.ceil((firstThu-target)/604800000);
+}
+function currentWeekRange(offsetWeeks){
+  var offset = offsetWeeks || 0;
+  var today=new Date();
+  var dow=today.getDay();
+  var monOffset=(dow===0)?-6:(1-dow);
+  var mon=new Date(today); mon.setDate(today.getDate()+monOffset+offset*7); mon.setHours(0,0,0,0);
+  var fri=new Date(mon); fri.setDate(mon.getDate()+4);
+  var nextMon=new Date(mon); nextMon.setDate(mon.getDate()+7);
+  var nextFri=new Date(nextMon); nextFri.setDate(nextMon.getDate()+4);
+  var aStart=ymdOf(mon), aEnd=ymdOf(fri);
+  var pStart=ymdOf(nextMon), pEnd=ymdOf(nextFri);
+  var awn=isoWeekNumSrv(aStart)-1, pwn=isoWeekNumSrv(pStart)-1;
+  return {
+    // 실적주(오프셋 적용된 기준주)
+    start: aStart, end: aEnd, label: aStart+" ~ "+aEnd.slice(5)+" ("+awn+"주차)",
+    // 계획주(기준주+1주) — 캘린더 동기화·PDF 계획 읽기는 오프셋 없이(실제 현재) 이 범위를 대상으로 함
+    planStart: pStart, planEnd: pEnd, planLabel: pStart+" ~ "+pEnd.slice(5)+" ("+pwn+"주차)"
+  };
+}
+function currentWeekLabel(){ return currentWeekRange().label; }
+
+// 업무계획 캘린더 동기화: 이번 주(월~금) 팀 캘린더에서 "과제/기타"(회의 등 업무성) 일정만 대상.
+// 휴가/외출/재택근무/출장은 개인 일정관리용이라 제외. 이미 가져온 항목(캘린더ID로 연결)은 날짜·시간·제목만 갱신,
+// 아직 없는 항목은 새 업무계획으로 생성 (장소·내용·참석자는 비워둠 → 직접 채워넣기).
 async function syncPlansFromCalendar(env){
   const token = env.NOTION_TOKEN;
-  var result = { checked:0, updated:0, missing:0 };
-  var pages = await getAllPages(PLAN_DB_ID, token);
-  for(const pg of pages){
-    var parsed = await parseWorkPage(pg, token, true);
-    if(!parsed.gcal_id){ continue; }        // 캘린더 연동 안 된 항목은 건너뜀
+  var result = { checked:0, updated:0, missing:0, imported:0 };
+  var wk = currentWeekRange();
+  // 캘린더 동기화는 "계획주"(다음주) 범위를 대상으로 함 — 실적주(이번주)가 아님
+  var events = await gcalList(env, wk.planStart + "T00:00:00+09:00");
+  events = events.filter(function(ev){
+    return ev.start >= wk.planStart && ev.start <= wk.planEnd
+      && (ev.type === "과제" || ev.type === "기타"); // 휴가/외출/재택근무/출장 등은 제외
+  });
+
+  // 계획주 기존 업무계획 조회 — 캘린더ID로도, (날짜+제목)으로도 매칭 (PDF 등 다른 경로로 이미 들어온 항목과 중복 방지)
+  var pPages = await getAllPages(PLAN_DB_ID, token);
+  var existing = [];
+  for(const pg of pPages){ existing.push(await parseWorkPage(pg, token, true)); }
+  var byGcalId = {}, byDateTitle = {};
+  existing.forEach(function(p){
+    if(p.gcal_id) byGcalId[p.gcal_id] = p;
+    var key = (p.date||"") + "|" + (p.title||"").trim();
+    if(!byDateTitle[key]) byDateTitle[key] = p;
+  });
+
+  for(const ev of events){
     result.checked++;
-    var ev = await gcalGet(env, parsed.gcal_id);
-    if(!ev){ result.missing++; continue; }  // 캘린더에서 삭제된 경우
-    // 바뀐 필드만 업데이트
-    var props = {};
-    if(ev.date && ev.date !== parsed.date) props["날짜"] = { date: { start: ev.date } };
-    if(ev.time !== parsed.time) props["시간"] = { rich_text: rt(ev.time) };
-    if(ev.title && ev.title !== parsed.title) props["제목"] = { title: rt(ev.title) };
-    if(Object.keys(props).length){
-      await notionFetch("/pages/" + pg.id, token, "PATCH", { properties: props });
-      result.updated++;
+    var evTime = (ev.time||"").split("~")[0].trim(); // 종료시간은 저장하지 않음(시작시간만)
+    var matched = byGcalId[ev.id];
+    if(!matched){
+      // 캘린더ID로 못 찾으면 (날짜+제목)으로도 확인 — 같은 일정이 중복 생성되는 것을 막음
+      var dtKey = (ev.start||"") + "|" + (ev.title||"").trim();
+      matched = byDateTitle[dtKey];
+    }
+    if(matched){
+      // 이미 있는 항목 → 날짜·시간·제목만 갱신 (장소·내용·참석자는 노션 값 유지), 캘린더ID/과제 비어있으면 이번에 채움
+      var props = {};
+      if(ev.start && ev.start !== matched.date) props["날짜"] = { date: { start: ev.start } };
+      if(evTime !== (matched.time||"")) props["시간"] = { rich_text: rt(evTime) };
+      if(ev.title && ev.title !== matched.title) props["제목"] = { title: rt(ev.title) };
+      if(!matched.gcal_id) props["캘린더ID"] = { rich_text: rt(ev.id) };
+      if((!matched.project || matched.project==="기타") && ev.project && ev.project!=="기타") props["과제"] = { select: { name: ev.project } };
+      if(Object.keys(props).length){
+        await notionFetch("/pages/" + matched.id, token, "PATCH", { properties: props });
+        result.updated++;
+      }
+    } else {
+      // 캘린더에는 있는데 노션엔 정말 없는 일정 → 새 업무계획으로 가져오기
+      var item = {
+        title: ev.title || "(제목 없음)", date: ev.start, time: evTime,
+        project: ev.project || "기타", location: ev.location || "", content: "", attendees: ev.attendees || "",
+        week: wk.planLabel
+      };
+      var props2 = {
+        "제목": { title: rt(item.title) }, "날짜": { date: { start: item.date } },
+        "시간": { rich_text: rt(item.time) }, "참석자": { rich_text: rt(item.attendees) },
+        "일시장소": { rich_text: rt(item.location) }, "내용": { rich_text: rt(item.content) },
+        "출처주차": { rich_text: rt(item.week) }, "과제": { select: { name: item.project } },
+        "상태": { select: { name: "예정" } }, "캘린더ID": { rich_text: rt(ev.id) },
+      };
+      await notionFetch("/pages", token, "POST", { parent:{ database_id: PLAN_DB_ID }, properties: props2, children: buildBodyBlocks(item) });
+      result.imported++;
     }
   }
   return result;
@@ -843,33 +922,28 @@ async function createWorkPage(dbId, token, item, isPlan, env){
   }
   const body = { parent: { database_id: dbId }, properties: props, children: buildBodyBlocks(item) };
   const res = await notionFetch("/pages", token, "POST", body);
-  // 캘린더 등록 (실패 무시)
-  if(env){
-    try {
-      var gid = await gcalInsert(env, item);
-      if(gid){ try { await notionFetch("/pages/" + res.id, token, "PATCH", { properties: { "캘린더ID": { rich_text: rt(gid) } } }); } catch(e){} }
-    } catch(e){}
-  }
+  // 주간업무 탭은 구글 캘린더에 아무것도 쓰지 않음(읽기 전용). 캘린더 등록/편집은 일정관리 탭에서만.
   return res;
 }
 
 async function saveWork(env, payload){
   const token = env.NOTION_TOKEN;
-  const week = payload.week || "";
+  const achieveWeek = payload.achieveWeek || payload.week || "";
+  const planWeek = payload.planWeek || payload.week || "";
   const result = { achieve_saved:0, achieve_skipped:0, plan_saved:0, plan_skipped:0 };
 
   // 업무실적
-  const seenA = await queryExisting(ACHIEVE_DB_ID, token, week);
+  const seenA = await queryExisting(ACHIEVE_DB_ID, token, achieveWeek);
   for(const it of (payload.achievements||[])){
-    it.week = week;
+    it.week = achieveWeek;
     if(seenA[it.date + "|" + it.title]){ result.achieve_skipped++; continue; }
     await createWorkPage(ACHIEVE_DB_ID, token, it, false, env);
     result.achieve_saved++;
   }
   // 업무계획
-  const seenP = await queryExisting(PLAN_DB_ID, token, week);
+  const seenP = await queryExisting(PLAN_DB_ID, token, planWeek);
   for(const it of (payload.plans||[])){
-    it.week = week;
+    it.week = planWeek;
     if(seenP[it.date + "|" + it.title]){ result.plan_skipped++; continue; }
     await createWorkPage(PLAN_DB_ID, token, it, true, env);
     result.plan_saved++;
@@ -932,17 +1006,8 @@ async function updateWork(env, payload){
 
   await notionFetch("/pages/" + item.id, token, "PATCH", { properties: props });
 
-  // 구글 캘린더 수정 반영 (event id 있으면 patch, 없으면 새로 등록)
-  var gcalError = null, newGcalId = null;
-  try {
-    newGcalId = await gcalUpdate(env, item.gcal_id || "", item);
-    // 새로 등록됐거나 id가 바뀌었으면 노션에 갱신
-    if(newGcalId && newGcalId !== item.gcal_id){
-      try { await notionFetch("/pages/" + item.id, token, "PATCH", { properties: { "캘린더ID": { rich_text: rt(newGcalId) } } }); } catch(e){}
-    }
-  } catch(e){ gcalError = String(e); }
-
-  return { updated: true, gcalId: newGcalId, gcalError: gcalError };
+  // 주간업무 탭은 구글 캘린더에 아무것도 쓰지 않음(읽기 전용). 캘린더 등록/편집은 일정관리 탭에서만.
+  return { updated: true };
 }
 
 // 항목 생성 (모달에서 + 항목 추가)
@@ -977,17 +1042,8 @@ async function createWork(env, payload){
   }
   var res = await notionFetch("/pages", token, "POST", { parent:{ database_id: dbId }, properties: props });
 
-  // 구글 캘린더에도 등록 (실패해도 노션 저장은 유지)
-  var gcalId = null, gcalError = null;
-  try {
-    gcalId = await gcalInsert(env, item);
-    if(gcalId){
-      // event id를 노션에 저장 (캘린더ID 속성이 있으면)
-      try { await notionFetch("/pages/" + res.id, token, "PATCH", { properties: { "캘린더ID": { rich_text: rt(gcalId) } } }); } catch(e){}
-    }
-  } catch(e){ gcalError = String(e); }
-
-  return { created: true, id: res.id, gcalId: gcalId, gcalError: gcalError };
+  // 주간업무 탭은 구글 캘린더에 아무것도 쓰지 않음(읽기 전용). 캘린더 등록/편집은 일정관리 탭에서만.
+  return { created: true, id: res.id };
 }
 
 // 항목 삭제 (노션 휴지통으로)
@@ -1187,6 +1243,25 @@ async function deleteSchedule(env, payload){
 
 
 // 코멘트 추가 → 코멘트 DB에 새 행 + 회의자료 코멘트수 +1
+// 진짜 노션 댓글(페이지 Discussion)로도 남겨서 노션 알림이 가게 함.
+// 실패해도(권한 등) 우리 앱의 코멘트 저장/표시엔 영향 없도록 항상 try/catch로 감싸서 호출할 것.
+async function postNotionComment(env, pageId, text, author){
+  const token = env.NOTION_TOKEN;
+  const content = (author ? author + ": " : "") + text;
+  try {
+    // 이 페이지에 기존 디스커션이 있으면 거기에 답글로, 없으면 새 디스커션 시작
+    const existing = await notionFetch("/comments?block_id=" + pageId, token, "GET");
+    const discussionId = (existing.results && existing.results[0] && existing.results[0].discussion_id) || null;
+    const body = discussionId
+      ? { discussion_id: discussionId, rich_text: rt(content) }
+      : { parent: { page_id: pageId }, rich_text: rt(content) };
+    await notionFetch("/comments", token, "POST", body);
+    return true;
+  } catch(e){
+    return false;
+  }
+}
+
 async function addComment(env, payload){
   const token = env.NOTION_TOKEN;
   const meetingId = payload.meetingId;
@@ -1491,16 +1566,21 @@ export default {
 
         var aAll = ok(3, function(pages){ return pages.map(parseWorkPageLite); });
         var pAll = ok(4, function(pages){ return pages.map(parseWorkPageLite); });
-        var allWeeks = aAll.map(function(x){return x.week;}).concat(pAll.map(function(x){return x.week;})).filter(Boolean);
-        var workWeek = "", achievements = [], plans = [];
-        if(allWeeks.length){
-          allWeeks.sort(); workWeek = allWeeks[allWeeks.length-1];
-          achievements = aAll.filter(function(x){return x.week===workWeek;});
-          plans = pAll.filter(function(x){return x.week===workWeek;});
-        }
-        body.work = { week: workWeek, achievements: achievements, plans: plans };
+        var wkR = currentWeekRange();
+        var achievements = aAll.filter(function(x){return x.week===wkR.label;});
+        var plans = pAll.filter(function(x){return x.week===wkR.planLabel;});
+        body.work = { week: wkR.label, planWeek: wkR.planLabel, achievements: achievements, plans: plans };
 
         body.meetings = ok(5, function(pages){ return pages.map(parseMeetingLite).filter(function(m){return m.title;}); });
+        // 이번주 회의에 한해서만 코멘트 확인(적은 수라 병렬로 가져와도 빠름) → "이숭봉" 코멘트 있으면 검토완료, 없으면 검토필요
+        try {
+          var thisWeekMeetings = body.meetings.filter(function(m){ return m.date >= wkR.start && m.date <= wkR.end; });
+          var commentResults = await Promise.allSettled(thisWeekMeetings.map(function(m){ return getComments(m.id, token); }));
+          thisWeekMeetings.forEach(function(m, i){
+            var comments = (commentResults[i].status==="fulfilled") ? commentResults[i].value : [];
+            m.needsReview = !comments.some(function(c){ return c.author === "이숭봉"; });
+          });
+        } catch(e){}
 
         var consignments = ok(6, function(pages){ return pages.map(parseConsignment).filter(function(c){return c.title;}); });
         consignments.sort(function(a,b){ return a.order - b.order; });
@@ -1552,7 +1632,9 @@ export default {
       }
 
       if(want("work")){
-        let achievements = [], plans = [], workWeek = "";
+        let achievements = [], plans = [];
+        const weekOffset = parseInt(url.searchParams.get("weekOffset") || "0", 10) || 0;
+        const wkR = currentWeekRange(weekOffset);
         try {
           const aPages = await getAllPages(ACHIEVE_DB_ID, token);
           const pPages = await getAllPages(PLAN_DB_ID, token);
@@ -1560,17 +1642,12 @@ export default {
           for(const pg of aPages){ aAll.push(await parseWorkPage(pg, token, false)); }
           const pAll = [];
           for(const pg of pPages){ pAll.push(await parseWorkPage(pg, token, true)); }
-          const allWeeks = aAll.map(function(x){return x.week;}).concat(pAll.map(function(x){return x.week;})).filter(Boolean);
-          if(allWeeks.length){
-            allWeeks.sort();
-            workWeek = allWeeks[allWeeks.length-1];
-            achievements = aAll.filter(function(x){ return x.week === workWeek; });
-            plans = pAll.filter(function(x){ return x.week === workWeek; });
-            function srt(a,b){ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.time||"")<(b.time||"")?-1:1; }
-            achievements.sort(srt); plans.sort(srt);
-          }
+          achievements = aAll.filter(function(x){ return x.week === wkR.label; });
+          plans = pAll.filter(function(x){ return x.week === wkR.planLabel; });
+          function srt(a,b){ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.time||"")<(b.time||"")?-1:1; }
+          achievements.sort(srt); plans.sort(srt);
         } catch(e){}
-        body.work = { week: workWeek, achievements: achievements, plans: plans };
+        body.work = { week: wkR.label, planWeek: wkR.planLabel, achievements: achievements, plans: plans };
       }
 
       if(want("meetings")){

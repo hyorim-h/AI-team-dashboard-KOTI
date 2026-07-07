@@ -26,16 +26,16 @@
   body{margin:0;background:var(--bg);color:var(--text);
     font-family:"Pretendard Variable","Pretendard","Apple SD Gothic Neo",-apple-system,sans-serif;
     line-height:1.6;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 120px}
 
   .utilbar{background:var(--navy-2);color:#cdd6ec;font-size:12.5px}
-  .utilbar .in{max-width:var(--maxw);margin:0 auto;padding:7px 28px;display:flex;justify-content:flex-end;gap:16px;align-items:center}
+  .utilbar .in{max-width:var(--maxw);margin:0 auto;padding:7px 120px;display:flex;justify-content:flex-end;gap:16px;align-items:center}
   .utilbar a{color:#cdd6ec;text-decoration:none}
   .utilbar .sep{color:#3a4a72}
   .util-toggle{background:none;border:none;color:#cdd6ec;cursor:pointer;font-size:12.5px}
 
   .head{background:var(--surface);border-bottom:1px solid var(--line)}
-  .head .in{max-width:var(--maxw);margin:0 auto;padding:16px 28px;display:flex;align-items:center;gap:16px}
+  .head .in{max-width:var(--maxw);margin:0 auto;padding:16px 120px;display:flex;align-items:center;gap:16px}
   .logo{height:44px}
   .head h1{font-size:20px;font-weight:800;margin:0;color:var(--navy)}
   .head-actions{margin-left:auto;display:flex;gap:10px}
@@ -45,7 +45,7 @@
   .hbtn:hover{filter:brightness(.97)}
 
   nav.tabs{background:var(--navy)}
-  nav.tabs .in{max-width:var(--maxw);margin:0 auto;padding:0 28px;display:flex;gap:2px;flex-wrap:wrap}
+  nav.tabs .in{max-width:var(--maxw);margin:0 auto;padding:0 120px;display:flex;gap:2px;flex-wrap:wrap}
   nav.tabs a{color:#b9c8e8;text-decoration:none;font-size:14.5px;font-weight:700;padding:14px 20px;border-bottom:3px solid transparent}
   nav.tabs a:hover{color:#fff}
   nav.tabs a.cur{color:#fff;background:var(--blue);border-bottom-color:#fff}
@@ -267,6 +267,7 @@
   <a href="wbs.html">WBS 관리</a>
   <a class="cur" href="schedule.html">일정관리</a>
   <a href="outsourced.html">위탁과제 관리</a>
+  <a href="index_aiagent.html">AI에이전트</a>
 </div></nav>
 
 <div class="wrap">
@@ -413,7 +414,12 @@
   function overlaps(ev, a, b){ return ev.start && ev.start<=b && endOf(ev)>=a; }
   function containsToday(ev){ return containsDay(ev, TODAY); }
   function isMulti(ev){ return ev.end && ev.end!==ev.start; }
-  function shortName(p){ return (p && p.length>=3) ? p.slice(1) : (p||""); }
+  function shortOne(p){ return (p && p.length>=3) ? p.slice(1) : (p||""); }
+  function shortName(p){
+    if(!p) return "";
+    if(p.indexOf(",")>=0){ return p.split(",").map(function(x){ return shortOne(x.trim()); }).join(", "); }
+    return shortOne(p);
+  }
   // "효림, 준수" 같은 짧은 이름 입력 → OWNERS 목록에서 매칭해 "한효림, 전준수"로 정규화
   function normalizeAttendees(raw){
     if(!raw) return "";
@@ -646,13 +652,19 @@
   function fillSelect(sel,opts,val){ sel.innerHTML=opts.map(function(o){ return '<option value="'+esc(o)+'"'+(o===val?" selected":"")+'>'+esc(o)+'</option>'; }).join(""); }
   function syncFields(){
     var t=document.getElementById("edType").value;
+    var isAtt=ATT_TYPES.indexOf(t)>=0;
     document.getElementById("wrapProject").style.display=(t==="과제")?"":"none";
-    document.getElementById("wrapAttendees").style.display=(t==="출장"||t==="과제")?"":"none";
+    document.getElementById("wrapAttendees").style.display=(t==="출장"||t==="과제"||isAtt)?"":"none";
+    var attLab=document.querySelector("#wrapAttendees span");
+    if(attLab) attLab.textContent = isAtt ? "대상자(여러 명 가능)" : "참석자";
+    var attInput=document.getElementById("edAttendees");
+    if(attInput) attInput.placeholder = isAtt ? "예) 효림, 준수 (2명 이상이면 콤마로 구분)" : "예) 효림, 준수 (입력 시 출장으로 등록됩니다)";
     document.getElementById("wrapTime").style.display=(t==="휴가")?"none":"";
     document.getElementById("labTitle").textContent=(t==="과제"||t==="기타"||t==="재택근무")?"내용":"사유";
     var titleEl=document.getElementById("edTitle");
     titleEl.placeholder=(t==="휴가")?"예) 건강검진 / 오전 반차 / 병가 등 (입력 내용으로 자동 구분됩니다)":"일정 내용";
-    document.getElementById("labDetail").textContent=(t==="휴가")?"비고":"장소·기관";
+    document.getElementById("labDetail").textContent=(t==="과제")?"장소·기관":"비고";
+    document.getElementById("edLoc").placeholder=(t==="과제")?"장소 또는 기관명":"참고할 내용";
   }
   function openEdit(id, presetDate){
     var isNew=!id;
@@ -660,8 +672,9 @@
     EDIT.id=isNew?null:id;
     EDIT.origVacation=r.vacation||"";
     document.getElementById("editHead").textContent=isNew?"일정 추가":"일정 수정";
+    var isMultiPerson = ATT_TYPES.indexOf(r.type)>=0 && r.person && r.person.indexOf(",")>=0;
     fillSelect(document.getElementById("edType"), EDIT_TYPES, (r.type&&r.type!=="출장")?r.type:"과제");
-    fillSelect(document.getElementById("edPerson"), PERSON_OPTIONS, r.person||"-");
+    fillSelect(document.getElementById("edPerson"), PERSON_OPTIONS, isMultiPerson ? "-" : (r.person||"-"));
     fillSelect(document.getElementById("edProject"), PROJECTS, r.project||PROJECTS[0]);
     document.getElementById("edTitle").value=(ATT_TYPES.indexOf(r.type)>=0) ? extractNote(r) : (r.title||"");
     var defDate = presetDate || TODAY;
@@ -673,7 +686,7 @@
     document.getElementById("edTime").value=t0;
     document.getElementById("edTimeEnd").value=t1;
     document.getElementById("edLoc").value=r.location||"";
-    document.getElementById("edAttendees").value=r.attendees||"";
+    document.getElementById("edAttendees").value=isMultiPerson ? r.person : (r.attendees||"");
     syncFields();
     var es=document.getElementById("editStatus"); es.className="estatus status"; es.textContent="";
     var ed=document.getElementById("editDelete"); ed.disabled=false; ed.textContent="삭제"; ed.style.display=isNew?"none":"";
@@ -694,14 +707,23 @@
     if(!s){ st.className="estatus status show err"; st.textContent="시작일을 입력하세요."; return; }
     if(e2 && e2<s){ st.className="estatus status show err"; st.textContent="종료일이 시작일보다 빠릅니다."; return; }
     var type=document.getElementById("edType").value;
-    var attRaw = (type==="출장"||type==="과제") ? document.getElementById("edAttendees").value.trim() : "";
+    var isAttType = ATT_TYPES.indexOf(type)>=0;
+    var attRaw = document.getElementById("edAttendees").value.trim();
     var attendees = attRaw ? normalizeAttendees(attRaw) : "";
-    if(attendees) type = "출장"; // 과제로 두고 참석자를 입력해도 출장으로 태깅
-    var personVal=document.getElementById("edPerson").value; // 담당자는 선택사항, "-"(미지정) 그대로 저장 가능
+    if(type==="과제" && attendees) type = "출장"; // 과제로 두고 참석자를 입력해도 출장으로 태깅
+    var personVal=document.getElementById("edPerson").value;
+    // 휴가/외출/재택근무: 여러 명이면 "대상자"(참석자 필드)에 콤마로, 한 명이면 담당자 드롭다운으로 — 둘 중 하나는 있어야 함(제목에 이름이 들어가야 하므로)
+    var personFinal = (personVal==="-") ? "" : personVal;
+    if(isAttType){
+      if(attendees) personFinal = attendees; // 여러 명 지정 시 이걸 이름 자리에 사용(자동으로 풀네임 정규화됨)
+      if(!personFinal){
+        st.className="estatus status show err"; st.textContent="담당자 또는 대상자를 입력하세요."; return;
+      }
+    }
     var t0=document.getElementById("edTime").value, t1=document.getElementById("edTimeEnd").value;
     var timeStr = (type==="휴가") ? "" : (t0 + (t1? "~"+t1 : "")); // 휴가는 종일 일정(시간 불필요)
     var item={
-      id:EDIT.id, type:type, person:(personVal==="-"?"":personVal), title:title,
+      id:EDIT.id, type:type, person:personFinal, title:title,
       project:(type==="과제")?document.getElementById("edProject").value:"",
       vacation:(type==="휴가")?deriveVacationType(title, EDIT.origVacation):"",
       attendees:attendees,

@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="ko"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>한지평 · 보고서 · KOTI TALK</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="agent.css"><style>body{--accent:#f6a94a}</style></head><body>
+<nav><div class="wrap"><a class="brand" href="../index.html"><span class="dot">K</span> KOTI TALK</a><a class="back" href="../index.html#agents">← 팀 전체</a><a href="reporter-light.html" style="color:var(--mut);font-size:13px;font-weight:600;margin-left:14px">☀ 라이트</a></div></nav>
+<header class="hero"><div class="wrap"><div class="hrow">
+  <div class="av" style="background:#f6a94a">한</div>
+  <div><div class="hname">한지평</div><div class="hrole">⑧ 보고서 집필</div></div></div>
+  <p class="oneliner">목차·소스·샘플을 근거로 즉시 제출 가능한 수준의 보고서를 쓴다. 근거 없는 정보는 창작하지 않는다.</p>
+  <div class="tags"><span class="tag hi">annual-report 스킬</span><span class="tag">할루시네이션 0</span><span class="tag">빈칸 보존</span><span class="tag">내부 워커</span></div>
+</div></header>
+<section><div class="wrap"><span class="eyebrow">Identity</span><h3 class="sec">이 에이전트는</h3>
+<p style="color:var(--mut);font-size:15px">목차·소스자료·샘플을 근거로 <b>즉시 제출 가능한</b> 보고서를 작성한다. 원칙은 <b>정확성 우선·빈칸 보존·실적 관점·스타일 일관성</b>. 연차보고서는 <b>annual-report 스킬</b>을 정본 엔진으로, 그 외 유형은 사용자가 준 샘플에서 형식을 추출해 적용한다.</p>
+<div class="note">⚠️ 착수 전 관문: 먼저 <b>"연차보고서인가요?"</b>를 확인하고, 아니면 보고서 종류와 샘플을 받아 형식을 추출한다. 자료가 없으면 추측하지 않고 확인 요청.</div></div></section>
+<section><div class="wrap"><span class="eyebrow">Role</span><h3 class="sec">핵심 역할 (내부 서브에이전트)</h3><ul class="rlist">
+<li><b>자료 수집·분류</b> <span>— 목차·소스·샘플 정리 (collector)</span></li>
+<li><b>스타일 가이드 추출</b> <span>— 문체·번호체계·캡션·정형표현 (style-extractor)</span></li>
+<li><b>소스 매핑</b> <span>— 목차↔소스 매핑, 부족 항목 식별 (source-mapper)</span></li>
+<li><b>섹션 초안</b> <span>— 스타일 준수·소스 기반·빈칸 보존 (drafter)</span></li>
+<li><b>할루시네이션·일관성 검증</b> <span>— 소스 역추적, 용어·수치 통일 (checkers)</span></li></ul></div></section>
+<section><div class="wrap"><span class="eyebrow">Flow</span><h3 class="sec">동작 플로우</h3><div class="steps">
+<div class="step gate"><h4>유형 확인</h4><p>연차? 아니면 샘플 요청</p></div>
+<div class="step"><h4>자료 수집</h4><p>목차·소스·샘플</p></div>
+<div class="step gate"><h4>스타일 추출 ✔</h4><p>사용자 확정</p></div>
+<div class="step"><h4>소스 매핑</h4><p>항목↔소스</p></div>
+<div class="step gate"><h4>초안 ✔</h4><p>대분류 단위 확인</p></div>
+<div class="step gate"><h4>검증 ✔</h4><p>할루시네이션 0 → docx</p></div></div>
+<div class="note">✔ 표시 단계(2·4·5)는 사용자 확인 필수. 소스에 없는 수치·날짜·고유명사 창작 금지 — 애매하면 비운다.</div></div></section>
+<section><div class="wrap"><span class="eyebrow">I/O</span><h3 class="sec">입력 · 출력</h3><div class="io">
+<div class="box"><h4>입력</h4><ul><li>보고서 유형(연차/기타)</li><li>목차·소스자료(사업계획서 등)</li><li>샘플 보고서(형식 소스)</li></ul></div>
+<div class="box"><h4>출력 · <span class="mono">workspace/report/</span></h4><ul><li><span class="mono">_스타일가이드.md</span></li><li><span class="mono">&lt;보고서명&gt;_초안.docx</span></li><li>빈칸은 강조 표시 보존</li></ul></div></div></div></section>
+<section><div class="wrap"><span class="eyebrow">Usage</span><h3 class="sec">이렇게 사용하세요</h3>
+<div class="usebox"><b>서달미</b>에게 이렇게 지시하면 한지평으로 라우팅됩니다 (착수 전 유형을 되물어요):<br>
+<span class="quote">연차실적보고서 초안 써줘</span><span class="quote">이 샘플 형식으로 최종보고서 작성해줘</span></div>
+<p style="color:var(--dim);font-size:13px;margin-top:8px">채널: <span class="mono">#report</span></p></div></section>
+<section><div class="wrap"><span class="eyebrow">Collab</span><h3 class="sec">협업 (핸드오프)</h3><div class="hand">
+<div class="box recv"><div class="lbl">← 받는다</div><p>①문헌·②동향·③대정부·④데이터·⑨문헌위키 산출물을 소스로, ⑤디자인에 도표 의뢰</p></div>
+<div class="box supply"><div class="lbl">→ 넘긴다</div><p>완성 보고서를 ⑥발표 소스로, 팀장 경유 연구책임자 제출</p></div></div></div></section>
+<footer><div class="wrap">KOTI TALK · <a href="../index.html">← 팀 전체 보기</a> · <a href="https://github.com/yewon918/KOTI_multi-agent" target="_blank">GitHub ↗</a></div></footer>
+</body></html>

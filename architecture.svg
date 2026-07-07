@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600" role="img" aria-label="KOTI 연구팀 아키텍처 — 연구책임자에서 팀장, 연구원 6명, 메신저 흐름">
+  <defs>
+    <linearGradient id="abg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#161a23"/>
+      <stop offset="1" stop-color="#10131a"/>
+    </linearGradient>
+    <linearGradient id="aaccent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#2f6df6"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b9bff"/>
+    </marker>
+    <marker id="arrowMsg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#f59e0b"/>
+    </marker>
+    <style>
+      .sans { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",Roboto,Helvetica,Arial,sans-serif; }
+      .mono { font-family: "SF Mono",ui-monospace,"Cascadia Code","Consolas",Menlo,monospace; }
+      .role { font-size: 12px; fill:#8b97ab; }
+      .name { font-size: 16px; font-weight:700; fill:#f3f5f9; }
+    </style>
+  </defs>
+
+  <rect width="1000" height="600" rx="16" fill="url(#abg)"/>
+  <rect x="0.5" y="0.5" width="999" height="599" rx="15.5" fill="none" stroke="#262c39" stroke-width="1"/>
+
+  <text x="32" y="44" class="sans" font-size="22" font-weight="700" fill="#f3f5f9">시스템 아키텍처</text>
+  <text x="32" y="66" class="mono" font-size="13" fill="#5b9bff">Orchestrator-driven multi-agent flow</text>
+
+  <!-- ===== flow arrows (drawn first, under boxes) ===== -->
+  <!-- Human -> Orchestrator -->
+  <line x1="232" y1="150" x2="320" y2="150" stroke="#5b9bff" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <!-- Orchestrator -> agents fan-out -->
+  <g stroke="#5b9bff" stroke-width="2" fill="none">
+    <path d="M540 150 C 600 150, 620 280, 700 280" marker-end="url(#arrow)"/>
+    <path d="M540 158 C 600 170, 620 350, 700 350" marker-end="url(#arrow)"/>
+    <path d="M540 166 C 600 200, 620 420, 700 420" marker-end="url(#arrow)"/>
+    <path d="M540 142 C 600 130, 620 210, 700 210" marker-end="url(#arrow)"/>
+    <path d="M540 134 C 600 110, 620 140, 700 140" marker-end="url(#arrow)"/>
+    <path d="M540 150 C 600 150, 620 485, 700 490" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- ===== Human (연구책임자) ===== -->
+  <g transform="translate(32,116)">
+    <rect width="200" height="68" rx="12" fill="#1c2230" stroke="#2f3a4d" stroke-width="1.5"/>
+    <!-- person icon -->
+    <g transform="translate(22,18)" fill="#f59e0b">
+      <circle cx="14" cy="10" r="8"/>
+      <path d="M0 34 C0 22, 28 22, 28 34 z"/>
+    </g>
+    <text x="60" y="30" class="name">연구책임자</text>
+    <text x="60" y="50" class="role">Research Lead · Human</text>
+  </g>
+
+  <!-- ===== Orchestrator (팀장) ===== -->
+  <g transform="translate(320,108)">
+    <rect width="220" height="84" rx="12" fill="#13233f" stroke="url(#aaccent)" stroke-width="2"/>
+    <!-- hub glyph -->
+    <g transform="translate(34,42)">
+      <g stroke="#3b82f6" stroke-width="1.5"><line x1="0" y1="0" x2="0" y2="-16"/><line x1="0" y1="0" x2="14" y2="8"/><line x1="0" y1="0" x2="-14" y2="8"/></g>
+      <g fill="#5b9bff"><circle cx="0" cy="-16" r="3.5"/><circle cx="14" cy="8" r="3.5"/><circle cx="-14" cy="8" r="3.5"/></g>
+      <circle cx="0" cy="0" r="7" fill="url(#aaccent)"/>
+    </g>
+    <text x="66" y="38" class="name">서달미</text>
+    <text x="66" y="58" class="role">팀장 · Orchestrator</text>
+    <text x="66" y="74" class="mono" font-size="11" fill="#5b9bff">메인 Claude Code 세션</text>
+  </g>
+
+  <!-- ===== 6 Subagents ===== -->
+  <!-- coordinates: x=700, width=268; rows at y 108,178,248,318,388,458 (each 56 tall) -->
+  <g class="sans">
+    <!-- helper visual: each row -->
+    <!-- PM -->
+    <g transform="translate(700,112)">
+      <rect width="268" height="48" rx="10" fill="#1c2230" stroke="#2f3a4d" stroke-width="1"/>
+      <rect x="0" y="0" width="5" height="48" rx="2.5" fill="#22c55e"/>
+      <text x="20" y="22" class="name" font-size="15">서인재</text>
+      <text x="20" y="40" class="role">pm · 사업관리 PM</text>
+    </g>
+    <!-- Analyst -->
+    <g transform="translate(700,180)">
+      <rect width="268" height="48" rx="10" fill="#1c2230" stroke="#2f3a4d" stroke-width="1"/>
+      <rect x="0" y="0" width="5" height="48" rx="2.5" fill="#22c55e"/>
+      <text x="20" y="22" class="name" font-size="15">남도산</text>
+      <text x="20" y="40" class="role">analyst · Data Analyst</text>
+    </g>
+    <!-- Dev -->
+    <g transform="translate(700,248)">
+      <rect width="268" height="48" rx="10" fill="#1c2230" stroke="#2f3a4d" stroke-width="1"/>
+      <rect x="0" y="0" width="5" height="48" rx="2.5" fill="#22c55e"/>
+      <text x="20" y="22" class="name" font-size="15">김용산</text>
+      <text x="20" y="40" class="role">developer · Developer</text>
+    </g>
+    <!-- Dev2 -->
+    <g transform="translate(700,316)">
+      <rect width="268" height="48" rx="10" fill="#1c2230" stroke="#2f3a4d" stroke-width="1"/>
+      <rect x="0" y="0" width="5" height="48" rx="2.5" fill="#22c55e"/>
+      <text x="20" y="22" class="name" font-size="15">이철산</text>
+      <text x="20" y="40" class="role">developer2 · Developer 2</text>
+    </g>
+    <!-- Designer -->
+    <g transform="translate(700,384)">
+      <rect width="268" height="48" rx="10" fill="#1c2230" stroke="#2f3a4d" stroke-width="1"/>
+      <rect x="0" y="0" width="5" height="48" rx="2.5" fill="#22c55e"/>
+      <text x="20" y="22" class="name" font-size="15">정사하</text>
+      <text x="20" y="40" class="role">designer · Designer</text>
+    </g>
+    <!-- R&D -->
+    <g transform="translate(700,452)">
+      <rect width="268" height="48" rx="10" fill="#1c2230" stroke="#2f3a4d" stroke-width="1"/>
+      <rect x="0" y="0" width="5" height="48" rx="2.5" fill="#22c55e"/>
+      <text x="20" y="22" class="name" font-size="15">한지평</text>
+      <text x="20" y="40" class="role">researcher · R&amp;D 연구원</text>
+    </g>
+  </g>
+
+  <!-- bracket label for agents -->
+  <text x="834" y="546" class="sans" font-size="13" fill="#8b97ab" text-anchor="middle">연구원 6명 · Subagents</text>
+
+  <!-- ===== Messenger band (bottom) ===== -->
+  <g transform="translate(32,500)">
+    <rect width="508" height="72" rx="12" fill="#241d12" stroke="#5a4520" stroke-width="1.5"/>
+    <!-- chat bubble icon -->
+    <g transform="translate(22,22)" fill="none" stroke="#f59e0b" stroke-width="2">
+      <path d="M2 4 h28 a4 4 0 0 1 4 4 v14 a4 4 0 0 1 -4 4 h-18 l-8 7 v-7 h-2 a4 4 0 0 1 -4 -4 v-14 a4 4 0 0 1 4 -4 z"/>
+    </g>
+    <text x="74" y="30" class="sans" font-size="15" font-weight="700" fill="#f3d9a8">메신저 — 실시간 모니터링</text>
+    <text x="74" y="52" class="mono" font-size="12" fill="#d8a85a">MCP 서버 (post_message) + WebSocket UI</text>
+  </g>
+
+  <!-- messenger flow arrows -->
+  <!-- ===== A안: 연구원 6명 전원 -> 메신저 (앰버 점선 우측 레일 + 6 스텁 -> 합류 1화살표) ===== -->
+  <g stroke="#f59e0b" stroke-width="2" fill="none" stroke-dasharray="6 5">
+    <!-- 6 short stubs from each researcher box right edge (x=968) to rail (x=988) -->
+    <line x1="968" y1="136" x2="988" y2="136"/>  <!-- 서인재 (PM,  row 112) -->
+    <line x1="968" y1="204" x2="988" y2="204"/>  <!-- 남도산 (Analyst, row 180) -->
+    <line x1="968" y1="272" x2="988" y2="272"/>  <!-- 김용산 (Dev, row 248) -->
+    <line x1="968" y1="340" x2="988" y2="340"/>  <!-- 이철산 (Dev2, row 316) -->
+    <line x1="968" y1="408" x2="988" y2="408"/>  <!-- 정사하 (Designer, row 384) -->
+    <line x1="968" y1="476" x2="988" y2="476"/>  <!-- 한지평 (R&D, row 452) -->
+    <!-- vertical rail collecting all six -->
+    <line x1="988" y1="136" x2="988" y2="476"/>
+    <!-- merged report path: rail bottom -> routes BELOW the legend (y586) -> up into messenger bottom edge -->
+    <path d="M988 476 L988 580 Q988 586 982 586 L526 586 Q520 586 520 580 L520 573" marker-end="url(#arrowMsg)"/>
+  </g>
+  <!-- messenger <-> human (monitor) -->
+  <path d="M150 500 C 150 470, 132 200, 132 184" stroke="#f59e0b" stroke-width="2" fill="none" stroke-dasharray="6 5" marker-end="url(#arrowMsg)"/>
+  <!-- orchestrator -> messenger (central logging) -->
+  <path d="M430 192 C 430 360, 360 470, 320 500" stroke="#f59e0b" stroke-width="2" fill="none" stroke-dasharray="6 5" marker-end="url(#arrowMsg)"/>
+
+  <!-- ===== Legend ===== -->
+  <g transform="translate(580,512)" class="sans">
+    <rect x="0" y="0" width="388" height="60" rx="10" fill="#161b25" stroke="#262c39" stroke-width="1"/>
+    <text x="16" y="22" font-size="12" font-weight="700" fill="#aeb8c8">범례</text>
+    <line x1="120" y1="18" x2="150" y2="18" stroke="#5b9bff" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="158" y="22" font-size="11" fill="#8b97ab">오더 / 태스크 위임</text>
+    <line x1="120" y1="44" x2="150" y2="44" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowMsg)"/>
+    <text x="158" y="48" font-size="11" fill="#8b97ab">실시간 보고(연구원 전원) / 모니터링</text>
+    <circle cx="300" cy="18" r="5" fill="url(#aaccent)"/>
+    <text x="312" y="22" font-size="11" fill="#8b97ab">Orchestrator</text>
+    <circle cx="300" cy="44" r="5" fill="#22c55e"/>
+    <text x="312" y="48" font-size="11" fill="#8b97ab">Subagent</text>
+  </g>
+</svg>

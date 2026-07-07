@@ -1,0 +1,40 @@
+<!DOCTYPE html><html lang="ko"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서지원 · 문헌 지식베이스 · KOTI TALK</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="agent.css"><style>body{--accent:#3ddc97}</style></head><body>
+<nav><div class="wrap"><a class="brand" href="../index.html"><span class="dot">K</span> KOTI TALK</a><a class="back" href="../index.html#agents">← 팀 전체</a><a href="paperwiki-light.html" style="color:var(--mut);font-size:13px;font-weight:600;margin-left:14px">☀ 라이트</a></div></nav>
+<header class="hero"><div class="wrap"><div class="hrow">
+  <div class="av" style="background:linear-gradient(135deg,#3ddc97,#49c7e0)">서</div>
+  <div><div class="hname">서지원</div><div class="hrole">⑨ 문헌 지식베이스</div></div></div>
+  <p class="oneliner">외부 논문을 탐색·수집해 개인 위키로 축적하고, 웹검색 대신 <b>쌓아온 위키만을 근거로</b> 답한다.</p>
+  <div class="tags"><span class="tag hi">웹검색 미부여</span><span class="tag">축적형 위키</span><span class="tag">사람 선택 관문</span><span class="tag">근거 인용</span></div>
+</div></header>
+<section><div class="wrap"><span class="eyebrow">Identity</span><h3 class="sec">이 에이전트는</h3>
+<p style="color:var(--mut);font-size:15px">검색 봇이 아니라 <b>연구 사서·지식 큐레이터</b>다. 외부 논문을 찾아 위키로 축적하고, 나중에 질문받으면 웹검색보다 팀이 쌓아온 위키를 먼저 근거로 답한다. (내부 보유문서=①윤서지, 실시간 웹동향=②차은수와 구분)</p>
+<div class="note">4대 규칙: ① 기본 웹검색 금지 ② 위키 우선 ③ 불확실하면 원문 확인 ④ 자료 없으면 추측 말고 요청. — WebSearch 도구를 <b>아예 부여하지 않아</b> 도구 레벨에서 강제.</div></div></section>
+<section><div class="wrap"><span class="eyebrow">Role</span><h3 class="sec">핵심 역할 (TUPA LLM-Wiki)</h3><ul class="rlist">
+<li><b>찾기</b> <span>— arXiv·OpenAlex·Semantic Scholar·Scopus에서 후보 검색</span></li>
+<li><b>선별</b> <span>— keep/exclude 추천 + 사람 선택용 shortlist 생성</span></li>
+<li><b>수집</b> <span>— 선택된 논문 PDF 확보(OA→API→브라우저)</span></li>
+<li><b>지식화</b> <span>— 요약→구조화 노트→종합 허브 (PDF→sources→wiki)</span></li>
+<li><b>질의·종합</b> <span>— 위키만 근거로 리뷰·비교, 주장마다 인용</span></li></ul></div></section>
+<section><div class="wrap"><span class="eyebrow">Flow</span><h3 class="sec">동작 플로우 — 사람이 고르는 관문</h3><div class="steps">
+<div class="step"><h4>주제 검색</h4><p>학술 DB 후보 수집</p></div>
+<div class="step"><h4>shortlist 자동 오픈</h4><p>KOTI TALK에서 체크리스트 열림</p></div>
+<div class="step gate"><h4>사람 선택 (관문)</h4><p>체크 → '선택 논문 다운로드' 버튼</p></div>
+<div class="step"><h4>자동 수집·정리</h4><p>선택 논문만 PDF→요약→위키</p></div>
+<div class="step"><h4>위키 근거 답변</h4><p>"위키만 근거로 써줘" → 출처 인용</p></div></div>
+<div class="note">왜 관문을 두나: 무엇을 지식베이스에 넣을지는 연구자가 결정해야 하므로. 자동 전량 다운로드 대신 사람이 고른 것만 신뢰 위키로 쌓인다.</div></div></section>
+<section><div class="wrap"><span class="eyebrow">I/O</span><h3 class="sec">입력 · 출력</h3><div class="io">
+<div class="box"><h4>입력</h4><ul><li>조사 주제/키워드 (찾기)</li><li>선택된 DOI 목록 (수집)</li><li>위키 근거 질문 (질의)</li></ul></div>
+<div class="box"><h4>출력 · <span class="mono">workspace/paperwiki/</span></h4><ul><li><span class="mono">papers/</span> · <span class="mono">sources/</span> · <span class="mono">wiki/</span></li><li><span class="mono">shortlist_&lt;주제&gt;.html</span> — 관문</li><li><span class="mono">synthesis_&lt;주제&gt;.md</span> — 근거 원고</li></ul></div></div></div></section>
+<section><div class="wrap"><span class="eyebrow">Usage</span><h3 class="sec">이렇게 사용하세요</h3>
+<div class="usebox"><b>서달미</b>에게 이렇게 지시하면 서지원으로 라우팅됩니다:<br>
+<span class="quote">이 주제 논문 조사해서 위키에 쌓아줘</span><span class="quote">위키만 근거로 literature review 원고 써줘</span></div>
+<p style="color:var(--dim);font-size:13px;margin-top:8px">채널: <span class="mono">#paperwiki</span></p></div></section>
+<section><div class="wrap"><span class="eyebrow">Collab</span><h3 class="sec">협업 (핸드오프)</h3><div class="hand">
+<div class="box recv"><div class="lbl">← 받는다</div><p>②차은수·③대정부가 발견한 외부 논문을 넘겨받아 ingest · 팀장 지시</p></div>
+<div class="box supply"><div class="lbl">→ 넘긴다</div><p>위키 근거 요약·종합·서지를 ⑧보고서·③대정부·⑥발표에</p></div></div></div></section>
+<footer><div class="wrap">KOTI TALK · <a href="../index.html">← 팀 전체 보기</a> · <a href="https://github.com/yewon918/KOTI_multi-agent" target="_blank">GitHub ↗</a></div></footer>
+</body></html>

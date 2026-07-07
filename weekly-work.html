@@ -34,16 +34,16 @@
   body{margin:0;background:var(--bg);color:var(--text);
     font-family:"Pretendard Variable","Pretendard","Apple SD Gothic Neo",-apple-system,sans-serif;
     line-height:1.6;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 120px}
 
   .utilbar{background:var(--navy-2);color:#cdd6ec;font-size:12.5px}
-  .utilbar .in{max-width:var(--maxw);margin:0 auto;padding:7px 28px;display:flex;justify-content:flex-end;gap:16px;align-items:center}
+  .utilbar .in{max-width:var(--maxw);margin:0 auto;padding:7px 120px;display:flex;justify-content:flex-end;gap:16px;align-items:center}
   .utilbar a{color:#cdd6ec;text-decoration:none}
   .utilbar .sep{color:#3a4a72}
   .util-toggle{background:none;border:none;color:#cdd6ec;cursor:pointer;font-size:12.5px}
 
   .head{background:var(--surface);border-bottom:1px solid var(--line)}
-  .head .in{max-width:var(--maxw);margin:0 auto;padding:16px 28px;display:flex;align-items:center;gap:16px}
+  .head .in{max-width:var(--maxw);margin:0 auto;padding:16px 120px;display:flex;align-items:center;gap:16px}
   .logo{height:44px}
   .head h1{font-size:20px;font-weight:800;margin:0;color:var(--navy)}
   .head-actions{margin-left:auto;display:flex;gap:10px}
@@ -53,7 +53,7 @@
   .hbtn:hover{filter:brightness(.97)}
 
   nav.tabs{background:var(--navy)}
-  nav.tabs .in{max-width:var(--maxw);margin:0 auto;padding:0 28px;display:flex;gap:2px;flex-wrap:wrap}
+  nav.tabs .in{max-width:var(--maxw);margin:0 auto;padding:0 120px;display:flex;gap:2px;flex-wrap:wrap}
   nav.tabs a{color:#b9c8e8;text-decoration:none;font-size:14.5px;font-weight:700;padding:14px 20px;border-bottom:3px solid transparent}
   nav.tabs a:hover{color:#fff}
   nav.tabs a.cur{color:#fff;background:var(--blue);border-bottom-color:#fff}
@@ -200,6 +200,7 @@
   <a href="wbs.html">WBS 관리</a>
   <a href="schedule.html">일정관리</a>
   <a href="outsourced.html">위탁과제 관리</a>
+  <a href="index_aiagent.html">AI에이전트</a>
 </div></nav>
 
 <div class="wrap">
@@ -295,6 +296,7 @@
   var DATA = { week:"", achievements:[], plans:[] };
   var VIEW = { y:2026, mo:5 };
   var PERIOD = { aStart:"", aEnd:"", pStart:"", pEnd:"" };
+  var WEEK_OFFSET = 0; // 0=이번주(실제 현재), -1=한 주 전, +1=한 주 후 ...
   var FILTER = { project:"", owner:"", status:"" };
 
   function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
@@ -313,7 +315,7 @@
 
   async function load(){
     try {
-      var res = await fetch(WORKER_URL + "?scope=work", {cache:"no-store"});
+      var res = await fetch(WORKER_URL + "?scope=work&weekOffset=" + WEEK_OFFSET, {cache:"no-store"});
       var data = await res.json();
       var work = data.work || {};
       DATA.week = work.week || "";
@@ -329,11 +331,11 @@
   }
 
   function computePeriod(){
-    // 오늘 기준 이번 주 월~금(실적), 다음 주 월~금(계획) 자동 계산
+    // 오늘 기준 + WEEK_OFFSET주 이동한 이번 주 월~금(실적), 다음 주 월~금(계획)
     var today = new Date();
     var dow = today.getDay(); // 0=일
     var monOffset = (dow===0) ? -6 : (1-dow); // 이번 주 월요일까지 오프셋
-    var mon = new Date(today); mon.setDate(today.getDate()+monOffset); mon.setHours(0,0,0,0);
+    var mon = new Date(today); mon.setDate(today.getDate()+monOffset+WEEK_OFFSET*7); mon.setHours(0,0,0,0);
     var fri = new Date(mon); fri.setDate(mon.getDate()+4);
     var nextMon = new Date(mon); nextMon.setDate(mon.getDate()+7);
     var nextFri = new Date(nextMon); nextFri.setDate(nextMon.getDate()+4);
@@ -342,8 +344,8 @@
   }
 
   function initView(){
-    // 달력은 항상 오늘 날짜가 있는 달로 시작
-    var d = new Date();
+    // 달력은 현재 보고 있는 주(실적주)가 속한 달로 이동
+    var d = PERIOD.aStart ? new Date(PERIOD.aStart+"T00:00:00") : new Date();
     VIEW.y = d.getFullYear(); VIEW.mo = d.getMonth();
   }
 
@@ -369,6 +371,13 @@
     if(PERIOD.aStart && PERIOD.aEnd){
       var wn = isoWeekNum(PERIOD.aStart) - 1;  // KOTI 기준 = ISO -1
       return PERIOD.aStart+" ~ "+PERIOD.aEnd.slice(5)+" ("+wn+"주차)";
+    }
+    return "주간업무";
+  }
+  function weekLabelTextPlan(){
+    if(PERIOD.pStart && PERIOD.pEnd){
+      var wn = isoWeekNum(PERIOD.pStart) - 1;  // 계획주(다음주) 기준
+      return PERIOD.pStart+" ~ "+PERIOD.pEnd.slice(5)+" ("+wn+"주차)";
     }
     return "주간업무";
   }
@@ -535,7 +544,7 @@
       var data = await res.json();
       if(!data.ok) throw new Error(data.error || "실패");
       var r = data.result || {};
-      var msg = "캘린더 동기화 완료\n\n확인: "+(r.checked||0)+"건 · 변경 반영: "+(r.updated||0)+"건";
+      var msg = "캘린더 동기화 완료\n\n새로 가져옴: "+(r.imported||0)+"건 · 변경 반영: "+(r.updated||0)+"건 · 확인: "+(r.checked||0)+"건";
       if(r.missing) msg += " · 캘린더에서 삭제됨: "+r.missing+"건";
       alert(msg);
       load();
@@ -593,8 +602,8 @@
     render();
   });
 
-  document.getElementById("weekPrev").addEventListener("click", function(){ alert("주차 이동은 다음 단계에서 연결됩니다."); });
-  document.getElementById("weekNext").addEventListener("click", function(){ alert("주차 이동은 다음 단계에서 연결됩니다."); });
+  document.getElementById("weekPrev").addEventListener("click", function(){ WEEK_OFFSET--; load(); });
+  document.getElementById("weekNext").addEventListener("click", function(){ WEEK_OFFSET++; load(); });
   document.getElementById("pdfBtn").addEventListener("click", function(){ document.getElementById("fileInput").click(); });
   document.getElementById("fileInput").addEventListener("change", function(e){ if(e.target.files[0]) handlePdf(e.target.files[0]); });
   document.getElementById("wordBtn").addEventListener("click", downloadWord);
@@ -708,7 +717,7 @@
       location: document.getElementById("edLocation").value.trim(),
       content: document.getElementById("edContent").value.trim(),
       attendees: document.getElementById("edAttendees").value.trim(),
-      week: DATA.week
+      week: isPlan ? weekLabelTextPlan() : weekLabelText()
     };
     if(isPlan) item.writer=who; else item.modifier=who;
 
@@ -762,8 +771,6 @@
   });
 
   // ===== PDF 불러오기 =====
-  var PDF_EXCLUDE = ["휴가","연차","오전반차","오후반차","반차","재택","건강검진","병가","공가","외출","출장","출근"];
-  function isExcluded(title){ return PDF_EXCLUDE.some(function(k){ return (title||"").indexOf(k)>=0; }); }
   function minus7(ymd){ var d=new Date(ymd+"T00:00:00"); d.setDate(d.getDate()-7);
     function z(n){return(n<10?"0":"")+n;} return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate()); }
 
@@ -857,13 +864,19 @@
 
   async function loadPlanFromCalendar(period){
     if(!period.start || !period.end) return [];
-    var res = await fetch(WORKER_URL + "?scope=calendar", {cache:"no-store"});
+    var res = await fetch(WORKER_URL + "?scope=schedule", {cache:"no-store"});
     var data = await res.json();
-    if(data.calError) throw new Error(data.calError);
-    var cal = data.calendar || [];
-    var plans = cal.filter(function(e){ return e.date>=period.start && e.date<=period.end && !isExcluded(e.title); });
-    plans.sort(function(a,b){ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.time||"")<(b.time||"")?-1:1; });
-    return plans.map(function(e){ return { date:e.date, time:e.time||"", title:e.title, project:"기타", location:"", content:"", attendees:"" }; });
+    if(data.scheduleError) throw new Error(data.scheduleError);
+    var cal = data.schedule || [];
+    // 휴가/외출/재택근무/출장 등은 제외, 업무성 일정(과제/기타)만 — 캘린더 동기화와 동일한 기준
+    var plans = cal.filter(function(e){
+      return e.start>=period.start && e.start<=period.end && (e.type==="과제" || e.type==="기타");
+    });
+    plans.sort(function(a,b){ if(a.start!==b.start) return a.start<b.start?-1:1; return (a.time||"")<(b.time||"")?-1:1; });
+    return plans.map(function(e){
+      var t=(e.time||"").split("~")[0].trim(); // 종료시간은 저장하지 않음(시작시간만)
+      return { date:e.start, time:t, title:e.title, project:e.project||"기타", location:e.location||"", content:"", attendees:e.attendees||"" };
+    });
   }
 
   async function handlePdf(file){
@@ -877,7 +890,15 @@
       var year = period.start ? period.start.slice(0,4) : "2026";
       var achievements = extractAchievements(fullText, year);
       var plans = await loadPlanFromCalendar(period);
-      PDFSTATE.week = year + "-" + (period.week||"");
+      // 실적/계획은 서로 다른 기간(achieveStart~End / start~end)이므로, 각각 정식 포맷(주간업무 페이지와 동일)으로 라벨 생성
+      function canonicalWeekLabel(s, e){
+        if(!s || !e) return year + "-" + (period.week||"");
+        var wn = isoWeekNum(s) - 1;
+        return s + " ~ " + e.slice(5) + " (" + wn + "주차)";
+      }
+      var pdfAchieveWeek = canonicalWeekLabel(period.achieveStart, period.achieveEnd);
+      var pdfPlanWeek = canonicalWeekLabel(period.start, period.end);
+      PDFSTATE.week = pdfPlanWeek; // 화면 표시용(대표값)
       PDFSTATE.achievements = achievements;
       PDFSTATE.plans = plans;
 
@@ -885,17 +906,17 @@
         alert("PDF에서 팀원 참석 일정을 찾지 못했고, 해당 기간 캘린더 일정도 없습니다.");
         btn.textContent=orig; btn.disabled=false; return;
       }
-      if(!confirm("추출 결과\n\n업무실적(팀원 참석): "+achievements.length+"건\n업무계획(캘린더): "+plans.length+"건\n주차: "+PDFSTATE.week+"\n\n노션에 저장할까요? (과제는 모두 '기타'로 저장되며, 이후 수정 가능)")){
+      if(!confirm("추출 결과\n\n업무실적(팀원 참석): "+achievements.length+"건 · 실적주 "+pdfAchieveWeek+"\n업무계획(캘린더): "+plans.length+"건 · 계획주 "+pdfPlanWeek+"\n\n노션에 저장할까요? (과제는 모두 '기타'로 저장되며, 이후 수정 가능)")){
         btn.textContent=orig; btn.disabled=false; return;
       }
       btn.textContent="노션 저장 중…";
       var res = await fetch(WORKER_URL, { method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ week:PDFSTATE.week, achievements:achievements, plans:plans }) });
+        body: JSON.stringify({ achieveWeek:pdfAchieveWeek, planWeek:pdfPlanWeek, achievements:achievements, plans:plans }) });
       var data = await res.json();
       if(!data.ok) throw new Error(data.error||"저장 실패");
       var r = data.result;
-      alert("저장 완료 ("+PDFSTATE.week+")\n업무실적 새로 "+r.achieve_saved+"건"+(r.achieve_skipped?" · 기존 "+r.achieve_skipped+"건 유지":"")
-        +"\n업무계획 새로 "+r.plan_saved+"건"+(r.plan_skipped?" · 기존 "+r.plan_skipped+"건 유지":""));
+      alert("저장 완료\n업무실적("+pdfAchieveWeek+") 새로 "+r.achieve_saved+"건"+(r.achieve_skipped?" · 기존 "+r.achieve_skipped+"건 유지":"")
+        +"\n업무계획("+pdfPlanWeek+") 새로 "+r.plan_saved+"건"+(r.plan_skipped?" · 기존 "+r.plan_skipped+"건 유지":""));
       load();
     } catch(e){
       alert("실패: " + e.message);
@@ -917,6 +938,11 @@
   var PROJECT_ORDER = ["국가교통조사사업","자율주행R&D","탄소공간지도R&D","교통SOC R&D","데이터스페이스R&D","기타"];
   var WFONT = { head:"KoPub돋움체 Bold", proj:"KoPub바탕체 Medium", title:"KoPub바탕체 Bold", body:"KoPub바탕체 Light" };
 
+  function wDateTimeLoc(it){
+    var dt = it.date ? (fmtDateDow(it.date) + (it.time ? " " + it.time : "")) : "";
+    if(dt && it.location) return dt + " · " + it.location;
+    return dt || it.location || "";
+  }
   function wItemParas(d, it){
     var P=d.Paragraph, T=d.TextRun;
     function bl(label,value){ return new P({ indent:{left:360,hanging:360}, spacing:{after:0},
@@ -924,7 +950,7 @@
     return [
       new P({ indent:{left:360,hanging:360}, spacing:{before:120,after:0},
         children:[new T({ text:"□ "+(it.title||""), bold:true, font:WFONT.title, size:24 })] }),
-      bl("일시·장소", it.location), bl("내용", it.content), bl("참석자", it.attendees)
+      bl("일시·장소", wDateTimeLoc(it)), bl("내용", it.content), bl("참석자", it.attendees)
     ];
   }
   function wSection(d, label, items){
