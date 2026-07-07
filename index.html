@@ -191,15 +191,32 @@
   .dcard-h .bar{width:3px;height:15px;background:var(--navy);border-radius:2px}
   .dcard-h h3{font-size:14.5px;font-weight:700;margin:0;color:var(--navy)}
   .dcard-h .r{font-size:11.5px;font-weight:600;color:var(--muted)}
+  .dcard-h .r.click{cursor:pointer}
+  .dcard-h .r.click:hover{color:var(--navy);text-decoration:underline}
 
   /* 과제별 연구진 현황 */
   .team-legend{display:flex;align-items:center;gap:14px}
   .team-legend .lg{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--muted)}
   .team-legend .dot{width:9px;height:9px;border-radius:2px}
   .team-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+  .team-col .tagbox{text-align:center;padding:7px 6px;border-radius:5px;font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:10px}
+  .team-col .pm-row{display:flex;flex-direction:column;gap:8px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line-2)}
   .team-col .pm-chip{display:inline-block;font-size:11.5px;font-weight:700;color:#fff;background:var(--navy);border-radius:4px;padding:4px 8px}
-  .team-col .res-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .team-col .res-wrap{display:flex;flex-wrap:wrap;gap:6px}
   .team-col .res-chip{font-size:11.5px;font-weight:600;color:var(--text);background:var(--bg);border-radius:4px;padding:4px 8px}
+  .team-col .mtg-list{display:flex;flex-direction:column;gap:6px}
+  .team-col .mtg-item{display:flex;flex-direction:column;gap:2px}
+  .team-col .mtg-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .team-col .mtg-l{display:flex;align-items:center;gap:4px;min-width:0}
+  .team-col .mtg-review{flex-shrink:0;font-size:9.5px;font-weight:700;color:#c8273c;background:#fbe7ea;border-radius:8px;padding:2px 6px;white-space:nowrap}
+  .team-col .mtg-sum{font-size:11.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .team-col .mtg-stat{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap}
+  .team-col .mtg-date{font-size:10.5px;font-weight:500;color:var(--muted)}
+  .team-col .mtg-empty{font-size:11px;font-weight:500;color:var(--muted)}
+  .team-col .sch-list{display:flex;flex-direction:column;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line-2)}
+  .team-col .sch-item{display:flex;align-items:baseline;gap:6px;font-size:11px;font-weight:500}
+  .team-col .sch-item .d{color:var(--muted);flex-shrink:0}
+  .team-col .sch-item .l{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
   /* 위젯 2열 그리드 */
   .widget-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -246,12 +263,14 @@
   .minical-dow{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:3px}
   .minical-dow div{text-align:center;font-size:9.5px;font-weight:700;color:var(--muted)}
   .minical-days{display:grid;grid-template-columns:repeat(7,1fr);row-gap:3px}
-  .minical-days .cell{text-align:center}
+  .minical-days .cell{text-align:center;cursor:pointer}
   .minical-days .num{font-size:10.5px;font-weight:500;line-height:19px;color:var(--text)}
   .minical-days .num.today{display:flex;align-items:center;justify-content:center;width:19px;height:19px;margin:0 auto;border-radius:50%;background:var(--blue);color:#fff;font-weight:700;font-size:10.5px;line-height:1}
+  .minical-days .num.sel{display:flex;align-items:center;justify-content:center;width:19px;height:19px;margin:0 auto;border-radius:50%;background:var(--blue-soft);color:var(--blue);font-weight:700;font-size:10.5px;line-height:1}
   .minical-days .dot{width:3px;height:3px;border-radius:50%;background:var(--blue);margin:2px auto 0}
   .minical-days .dot.none{background:transparent}
   .minical-side{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .minical-sel-lab{font-size:11px;font-weight:700;color:var(--muted)}
   .minical-upcoming{display:flex;flex-direction:column;gap:5px;padding-bottom:7px;border-bottom:1px solid var(--line-2)}
   .minical-ev{display:flex;align-items:baseline;gap:7px;font-size:11.5px;font-weight:500}
   .minical-ev .d{color:var(--muted);flex-shrink:0}
@@ -362,47 +381,59 @@
     }
   }
 
+  // 회의요약이 비어있으면 "검토 필요"로 간주 (weekly-meeting.html의 "아직 요약이 작성되지 않았습니다" 상태와 동일 기준)
+  function meetingNeedsReview(m){ return !(m.summary && m.summary.trim()); }
+  function meetingsOfProject(name){
+    return (DATA.meetings||[]).filter(function(m){ return m.project===name && inThisWeek(m.date); })
+      .map(function(m){
+        var review=meetingNeedsReview(m);
+        var done = m.date < TODAY_ISO;
+        return {
+          dateText: fmtMDW(m.date), summary: (m.summary&&m.summary.trim())?m.summary:(m.headingList||m.title),
+          needsReview: review, done: done
+        };
+      })
+      .sort(function(a,b){ return (b.needsReview?1:0)-(a.needsReview?1:0); });
+  }
+  function schedulesOfProject(name){
+    var todayP1 = addDays(TODAY,14);
+    return (DATA.schedule||[]).filter(function(s){
+      return s.type==="과제" && s.project===name && s.start>=TODAY_ISO && s.start<=iso(todayP1);
+    }).sort(function(a,b){ return a.start<b.start?-1:1; }).slice(0,3)
+      .map(function(s){ return { dateText: fmtMDW(s.start)+(s.time?" "+s.time.split("~")[0]:""), label: s.title }; });
+  }
   function buildTeamCard(){
     var info=(DATA.projectInfo||[]).slice().sort(function(a,b){return (a.order||999)-(b.order||999);});
     if(!info.length) return "";
     var cols=info.map(function(p){
+      var st=projStyle(p.name);
       var main=(p.main&&p.main.length)?p.main.join(", "):"-";
       var sub=(p.sub||[]).map(function(n){return "<span class=\"res-chip\">"+esc(n)+"</span>";}).join("");
-      return "<div class=\"team-col\">"+projTag(p.name)
-        +"<div style=\"margin-top:10px\"><span class=\"pm-chip\">"+esc(main)+"</span></div>"
-        +"<div class=\"res-wrap\">"+sub+"</div></div>";
+      var mtgs=meetingsOfProject(p.name);
+      var mtgHtml = mtgs.length ? mtgs.map(function(m){
+        return "<div class=\"mtg-item\"><div class=\"mtg-top\"><span class=\"mtg-l\">"
+          +(m.needsReview?"<span class=\"mtg-review\">검토 필요</span>":"")
+          +"<span class=\"mtg-sum\">"+esc(m.summary)+"</span></span>"
+          +"<span class=\"mtg-stat\" style=\""+(m.done?"background:var(--bg);color:var(--muted)":"background:var(--blue-soft);color:var(--blue)")+"\">"+(m.done?"완료":"예정")+"</span></div>"
+          +"<span class=\"mtg-date\">"+m.dateText+"</span></div>";
+      }).join("") : "<div class=\"mtg-empty\">예정된 회의 없음</div>";
+      var scheds=schedulesOfProject(p.name);
+      var schHtml = scheds.length ? scheds.map(function(s){
+        return "<div class=\"sch-item\"><span class=\"d\">"+s.dateText+"</span><span class=\"l\">"+esc(s.label)+"</span></div>";
+      }).join("") : "";
+      return "<div class=\"team-col\"><div class=\"tagbox\" style=\"background:"+st.bg+";color:"+st.c+"\">"+esc(PROJ_SHORT[p.name]||p.name)+"</div>"
+        +"<div class=\"pm-row\"><div><span class=\"pm-chip\">"+esc(main)+"</span></div><div class=\"res-wrap\">"+sub+"</div></div>"
+        +"<div class=\"mtg-list\">"+mtgHtml+"</div>"
+        +(schHtml?"<div class=\"sch-list\">"+schHtml+"</div>":"")
+        +"</div>";
     }).join("");
-    return "<div class=\"dcard\"><div class=\"dcard-h\"><div class=\"l\"><span class=\"bar\"></span><h3>과제별 연구진 현황</h3></div>"
+    return "<div class=\"dcard\"><div class=\"dcard-h\"><div class=\"l\"><span class=\"bar\"></span><h3>과제 현황</h3></div>"
       +"<div class=\"team-legend\"><span class=\"lg\"><span class=\"dot\" style=\"background:var(--navy)\"></span>Main</span>"
       +"<span class=\"lg\"><span class=\"dot\" style=\"background:var(--bg)\"></span>Sub</span></div></div>"
       +"<div class=\"team-grid\">"+cols+"</div></div>";
   }
 
 
-
-  function buildWorkCard(){
-    var work=DATA.work||{achievements:[],plans:[]};
-    function rows(list){
-      if(!list.length) return "<div class=\"wk-empty\">등록된 항목이 없습니다.</div>";
-      return list.map(function(r){ return "<div class=\"wk-row\">"+projTag(r.project)+"<span class=\"t\">"+esc(r.title)+"</span></div>"; }).join("");
-    }
-    return "<div class=\"dcard click\" data-nav=\"weekly-work.html\"><div class=\"dcard-h\"><div class=\"l\"><span class=\"bar\"></span><h3>이번 주 업무</h3></div>"
-      +"<span class=\"r\">"+(work.week?esc(work.week):"")+" ›</span></div>"
-      +"<div class=\"wk-split\"><div class=\"wk-col left\"><div class=\"wk-sub\">실적</div>"+rows(work.achievements)+"</div>"
-      +"<div class=\"wk-col\"><div class=\"wk-sub\">계획</div>"+rows(work.plans)+"</div></div></div>";
-  }
-
-  function buildMeetingCard(){
-    var list=(DATA.meetings||[]).filter(function(m){return inThisWeek(m.date);}).sort(function(a,b){return (a.date<b.date)?-1:1;});
-    var rows = list.length ? list.map(function(m){
-      var sm = (m.summary&&m.summary.trim()) ? m.summary : (m.headingList||m.title);
-      var done = m.date < TODAY_ISO;
-      var badge = "<span style=\"display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;"+(done?"background:var(--bg);color:var(--muted)":"background:var(--blue-soft);color:var(--blue)")+"\">"+(done?"완료":"예정")+"</span>";
-      return "<div class=\"mt-row\">"+projTag(m.project)+"<span class=\"t\">"+esc(sm)+"</span>"+badge+"<span class=\"d\">"+fmtMDW(m.date)+"</span></div>";
-    }).join("") : "<div class=\"wk-empty\">이번 주 회의가 없습니다.</div>";
-    return "<div class=\"dcard click\" data-nav=\"weekly-meeting.html\"><div class=\"dcard-h\"><div class=\"l\"><span class=\"bar\"></span><h3>이번 주 회의</h3></div>"
-      +"<span class=\"r\">"+list.length+"건 ›</span></div>"+rows+"</div>";
-  }
 
   function displayPerfProgress(g){ return g.status==="완료" ? 100 : g.progress; }
   function buildPerfCard(){
@@ -431,36 +462,6 @@
       +"<span class=\"r\">진행중 "+doing+"건 ›</span></div>"+body+"</div>";
   }
 
-  function displayWbsProgress(w){
-    if(w.status==="완료") return 100;
-    try{ var list=JSON.parse(w.checklist||"[]"); if(list.length) return Math.round(list.filter(function(x){return x.done;}).length/list.length*100); }catch(e){}
-    return w.progress||0;
-  }
-  function buildWbsCard(){
-    var year=TODAY.getFullYear();
-    var tasks=(DATA.wbs||[]).filter(function(w){
-      if(!w.start && !w.end) return true;
-      var sy=w.start?parseInt(w.start.slice(0,4),10):null, ey=w.end?parseInt(w.end.slice(0,4),10):sy;
-      if(sy==null) return true;
-      if(sy>ey){ var t=sy; sy=ey; ey=t; }
-      return year>=sy && year<=ey;
-    });
-    var doing=tasks.filter(function(w){return w.status==="진행중";}).length;
-    var groups={};
-    tasks.forEach(function(w){ (groups[w.project]=groups[w.project]||[]).push(w); });
-    var donuts=Object.keys(groups).map(function(proj){
-      var items=groups[proj];
-      var done=items.filter(function(w){return w.status==="완료";}).length;
-      var pct=items.length?Math.round(done/items.length*100):0;
-      var st=projStyle(proj);
-      return "<div class=\"donut-unit\"><div class=\"short\">"+esc(PROJ_SHORT[proj]||proj)+"</div>"
-        +"<div class=\"donut big\"><div class=\"donut-fill\" style=\"background:"+donutGrad(pct,st.c)+"\"></div><div class=\"donut-hole\">"+pct+"%</div></div></div>";
-    });
-    var body = donuts.length ? "<div class=\"donut-row\">"+donuts.join("<div class=\"donut-sep\"></div>")+"</div>" : "<div class=\"wk-empty\">등록된 WBS 작업이 없습니다.</div>";
-    return "<div class=\"dcard click\" data-nav=\"wbs.html\"><div class=\"dcard-h\"><div class=\"l\"><span class=\"bar\"></span><h3>WBS 진행 현황</h3></div>"
-      +"<span class=\"r\">진행중 "+doing+"건 ›</span></div>"+body+"</div>";
-  }
-
   function buildConsignCard(){
     var list=DATA.consignments||[];
     var rows = list.length ? list.map(function(c){
@@ -486,8 +487,11 @@
   }
 
   // ===== 미니 캘린더 (이번 달, 오늘 강조, 일정 있는 날 점) =====
+  var SELECTED_DAY = null; // null이면 오늘
   function buildCalendarCard(){
     var y=TODAY.getFullYear(), m=TODAY.getMonth();
+    var selDay = SELECTED_DAY || TODAY.getDate();
+    var selIso = y+"-"+pad2(m+1)+"-"+pad2(selDay);
     var first=new Date(y,m,1), startDow=first.getDay(), daysInMonth=new Date(y,m+1,0).getDate();
     var evDays={};
     (DATA.schedule||[]).forEach(function(s){ if(s.start && s.start.slice(0,7)===iso(TODAY).slice(0,7)) evDays[s.start.slice(8,10)]=true; });
@@ -497,13 +501,15 @@
     for(var i=0;i<startDow;i++) cells+="<div class=\"cell\"></div>";
     for(var d=1; d<=daysInMonth; d++){
       var isToday=(d===TODAY.getDate());
+      var isSel=(d===selDay);
       var hasEv=evDays[pad2(d)];
-      cells+="<div class=\"cell\"><div class=\"num"+(isToday?" today":"")+"\">"+d+"</div><div class=\"dot"+(hasEv&&!isToday?"":" none")+"\"></div></div>";
+      cells+="<div class=\"cell\" data-day=\""+d+"\"><div class=\"num"+(isToday?" today":"")+(isSel&&!isToday?" sel":"")+"\">"+d+"</div><div class=\"dot"+(hasEv&&!isToday?"":" none")+"\"></div></div>";
     }
-    var upcoming=(DATA.schedule||[]).concat((DATA.meetings||[]).map(function(m){return {start:m.date, title:(m.summary||m.title)};}))
-      .filter(function(e){ return (e.start||e.date)===TODAY_ISO; })
-      .slice(0,3)
-      .map(function(e){ return "<div class=\"minical-ev\"><span class=\"d\">"+fmtMDW(e.start||e.date)+"</span><span class=\"l\">"+esc(e.title||e.person||"-")+"</span></div>"; }).join("");
+    var selLabel = (selDay===TODAY.getDate()) ? "오늘" : (m+1)+"."+selDay;
+    var upcoming=(DATA.schedule||[]).concat((DATA.meetings||[]).map(function(m2){return {start:m2.date, title:(m2.summary||m2.title)};}))
+      .filter(function(e){ return (e.start||e.date)===selIso; })
+      .slice(0,4)
+      .map(function(e){ return "<div class=\"minical-ev\"><span class=\"l\">"+esc(e.title||e.person||"-")+"</span></div>"; }).join("");
     var att=attWeekByType();
     function attRow(label, arr){
       if(!arr.length) return "";
@@ -512,25 +518,31 @@
     }
     var attHtml = attRow("출장",att.출장)+attRow("외출",att.외출)+attRow("휴가",att.휴가)+attRow("재택근무",att.재택근무);
     if(!attHtml) attHtml="<div class=\"minical-none\">이번 주 출장·외출·휴가·재택근무가 없습니다.</div>";
-    return "<div class=\"dcard click\" data-nav=\"schedule.html\"><div class=\"dcard-h\"><div class=\"l\"><span class=\"bar\"></span><h3>캘린더</h3></div>"
-      +"<span class=\"r\">"+(m+1)+"월 ›</span></div>"
+    return "<div class=\"dcard\"><div class=\"dcard-h\"><div class=\"l\"><span class=\"bar\"></span><h3>캘린더</h3></div>"
+      +"<span class=\"r click\" data-nav=\"schedule.html\">"+(m+1)+"월 ›</span></div>"
       +"<div class=\"minical-wrap\"><div class=\"minical\"><div class=\"minical-dow\">"+dowHtml+"</div><div class=\"minical-days\">"+cells+"</div></div>"
-      +"<div class=\"minical-side\">"+(upcoming?"<div class=\"minical-upcoming\">"+upcoming+"</div>":"")+attHtml+"</div></div></div>";
+      +"<div class=\"minical-side\"><div class=\"minical-sel-lab\">"+selLabel+" 일정</div>"
+      +(upcoming?"<div class=\"minical-upcoming\">"+upcoming+"</div>":"<div class=\"minical-none\">없음</div>")
+      +attHtml+"</div></div></div>";
   }
   function TYPE_STYLE_MAP(label){
     var m={ "출장":{c:"#0f766e",bg:"#d9f0ec"}, "외출":{c:"#7c3aed",bg:"#efe8fb"}, "휴가":{c:"#b45309",bg:"#fdeede"}, "재택근무":{c:"#0369a1",bg:"#e0f2fe"} };
     return m[label];
   }
 
+
   function render(){
     var html = buildTeamCard()
       + "<div class=\"widget-grid\">"
-      + buildWorkCard() + buildMeetingCard() + buildPerfCard() + buildWbsCard() + buildConsignCard() + buildCalendarCard()
-      + "</div>";
+      + buildPerfCard() + buildConsignCard()
+      + "</div>"
+      + buildCalendarCard();
     document.getElementById("content").innerHTML = html;
   }
 
   document.getElementById("content").addEventListener("click", function(e){
+    var day=e.target.closest("[data-day]");
+    if(day){ SELECTED_DAY=parseInt(day.dataset.day,10); render(); return; }
     var t=e.target.closest("[data-nav]");
     if(t) nav(t.dataset.nav);
   });
