@@ -788,11 +788,12 @@ function isoWeekNumSrv(ymdStr){
   if(target.getDay()!==4){ target.setMonth(0,1+((4-target.getDay())+7)%7); }
   return 1+Math.ceil((firstThu-target)/604800000);
 }
-function currentWeekRange(){
+function currentWeekRange(offsetWeeks){
+  var offset = offsetWeeks || 0;
   var today=new Date();
   var dow=today.getDay();
   var monOffset=(dow===0)?-6:(1-dow);
-  var mon=new Date(today); mon.setDate(today.getDate()+monOffset); mon.setHours(0,0,0,0);
+  var mon=new Date(today); mon.setDate(today.getDate()+monOffset+offset*7); mon.setHours(0,0,0,0);
   var fri=new Date(mon); fri.setDate(mon.getDate()+4);
   var nextMon=new Date(mon); nextMon.setDate(mon.getDate()+7);
   var nextFri=new Date(nextMon); nextFri.setDate(nextMon.getDate()+4);
@@ -800,9 +801,9 @@ function currentWeekRange(){
   var pStart=ymdOf(nextMon), pEnd=ymdOf(nextFri);
   var awn=isoWeekNumSrv(aStart)-1, pwn=isoWeekNumSrv(pStart)-1;
   return {
-    // 실적주(이번주)
+    // 실적주(오프셋 적용된 기준주)
     start: aStart, end: aEnd, label: aStart+" ~ "+aEnd.slice(5)+" ("+awn+"주차)",
-    // 계획주(다음주) — 캘린더 동기화는 이 범위를 대상으로 함
+    // 계획주(기준주+1주) — 캘린더 동기화·PDF 계획 읽기는 오프셋 없이(실제 현재) 이 범위를 대상으로 함
     planStart: pStart, planEnd: pEnd, planLabel: pStart+" ~ "+pEnd.slice(5)+" ("+pwn+"주차)"
   };
 }
@@ -822,29 +823,40 @@ async function syncPlansFromCalendar(env){
       && (ev.type === "과제" || ev.type === "기타"); // 휴가/외출/재택근무/출장 등은 제외
   });
 
-  // 계획주 기존 업무계획(캘린더 연결된 것) 조회
+  // 계획주 기존 업무계획 조회 — 캘린더ID로도, (날짜+제목)으로도 매칭 (PDF 등 다른 경로로 이미 들어온 항목과 중복 방지)
   var pPages = await getAllPages(PLAN_DB_ID, token);
   var existing = [];
   for(const pg of pPages){ existing.push(await parseWorkPage(pg, token, true)); }
-  var byGcalId = {};
-  existing.forEach(function(p){ if(p.gcal_id) byGcalId[p.gcal_id] = p; });
+  var byGcalId = {}, byDateTitle = {};
+  existing.forEach(function(p){
+    if(p.gcal_id) byGcalId[p.gcal_id] = p;
+    var key = (p.date||"") + "|" + (p.title||"").trim();
+    if(!byDateTitle[key]) byDateTitle[key] = p;
+  });
 
   for(const ev of events){
     result.checked++;
     var evTime = (ev.time||"").split("~")[0].trim(); // 종료시간은 저장하지 않음(시작시간만)
     var matched = byGcalId[ev.id];
+    if(!matched){
+      // 캘린더ID로 못 찾으면 (날짜+제목)으로도 확인 — 같은 일정이 중복 생성되는 것을 막음
+      var dtKey = (ev.start||"") + "|" + (ev.title||"").trim();
+      matched = byDateTitle[dtKey];
+    }
     if(matched){
-      // 이미 가져온 항목 → 날짜·시간·제목만 갱신 (장소·내용·참석자는 노션 값 유지)
+      // 이미 있는 항목 → 날짜·시간·제목만 갱신 (장소·내용·참석자는 노션 값 유지), 캘린더ID/과제 비어있으면 이번에 채움
       var props = {};
       if(ev.start && ev.start !== matched.date) props["날짜"] = { date: { start: ev.start } };
       if(evTime !== (matched.time||"")) props["시간"] = { rich_text: rt(evTime) };
       if(ev.title && ev.title !== matched.title) props["제목"] = { title: rt(ev.title) };
+      if(!matched.gcal_id) props["캘린더ID"] = { rich_text: rt(ev.id) };
+      if((!matched.project || matched.project==="기타") && ev.project && ev.project!=="기타") props["과제"] = { select: { name: ev.project } };
       if(Object.keys(props).length){
         await notionFetch("/pages/" + matched.id, token, "PATCH", { properties: props });
         result.updated++;
       }
     } else {
-      // 캘린더에는 있는데 노션엔 없는 일정 → 새 업무계획으로 가져오기
+      // 캘린더에는 있는데 노션엔 정말 없는 일정 → 새 업무계획으로 가져오기
       var item = {
         title: ev.title || "(제목 없음)", date: ev.start, time: evTime,
         project: ev.project || "기타", location: ev.location || "", content: "", attendees: ev.attendees || "",
@@ -1539,6 +1551,15 @@ export default {
         body.work = { week: wkR.label, planWeek: wkR.planLabel, achievements: achievements, plans: plans };
 
         body.meetings = ok(5, function(pages){ return pages.map(parseMeetingLite).filter(function(m){return m.title;}); });
+        // 이번주 회의에 한해서만 코멘트 확인(적은 수라 병렬로 가져와도 빠름) → "이숭봉" 코멘트 있으면 검토완료, 없으면 검토필요
+        try {
+          var thisWeekMeetings = body.meetings.filter(function(m){ return m.date >= wkR.start && m.date <= wkR.end; });
+          var commentResults = await Promise.allSettled(thisWeekMeetings.map(function(m){ return getComments(m.id, token); }));
+          thisWeekMeetings.forEach(function(m, i){
+            var comments = (commentResults[i].status==="fulfilled") ? commentResults[i].value : [];
+            m.needsReview = !comments.some(function(c){ return c.author === "이숭봉"; });
+          });
+        } catch(e){}
 
         var consignments = ok(6, function(pages){ return pages.map(parseConsignment).filter(function(c){return c.title;}); });
         consignments.sort(function(a,b){ return a.order - b.order; });
@@ -1591,7 +1612,8 @@ export default {
 
       if(want("work")){
         let achievements = [], plans = [];
-        const wkR = currentWeekRange();
+        const weekOffset = parseInt(url.searchParams.get("weekOffset") || "0", 10) || 0;
+        const wkR = currentWeekRange(weekOffset);
         try {
           const aPages = await getAllPages(ACHIEVE_DB_ID, token);
           const pPages = await getAllPages(PLAN_DB_ID, token);
