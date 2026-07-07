@@ -258,29 +258,16 @@
   .consign-sub{font-size:11.5px;color:var(--soft,var(--text-2));line-height:1.4}
 
   /* 미니 캘린더 */
-  .cal-top{display:grid;grid-template-columns:184px 1fr;gap:18px;align-items:start;margin-bottom:16px}
+  .cal-grid{display:grid;grid-template-columns:184px repeat(5,1fr);gap:18px;align-items:stretch}
   .cal-side-col{border-left:1px solid var(--line-2);padding-left:18px;min-width:0}
   .cal-col-lab{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px}
   .cal-col-body{font-size:12px;font-weight:500;color:var(--text);line-height:1.4}
-  .cal-col-ev{font-size:11.5px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:5px}
+  .cal-col-ev{font-size:11.5px;color:var(--text);margin-bottom:8px;line-height:1.5}
+  .cal-col-ev:last-child{margin-bottom:0}
+  .cal-col-ev .nm{font-weight:700;color:var(--navy);display:block}
+  .cal-col-ev .sub{font-weight:500;color:var(--muted);display:block;font-size:11px}
   .cal-col-empty{color:var(--muted)}
-  .att-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-  .att-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
-  .ac-h{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line)}
-  .ac-h .lab{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:800;color:var(--navy)}
-  .ac-h .dot{width:8px;height:8px;border-radius:2px}
-  .ac-h .cnt{font-size:11px;font-weight:700;border-radius:10px;padding:3px 9px}
-  .att-list{padding:6px 0}
-  .att-empty{padding:18px 14px;text-align:center;font-size:12px;color:var(--muted)}
-  .att-row{display:flex;gap:10px;padding:9px 14px}
-  .att-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex:none}
-  .att-info{min-width:0;flex:1}
-  .att-nm{display:flex;align-items:baseline;gap:6px}
-  .att-nm b{font-size:12.5px;font-weight:800;color:var(--navy)}
-  .att-today{font-size:9.5px;font-weight:800;color:#fff;background:var(--red);border-radius:8px;padding:2px 6px}
-  .att-rg{font-size:11px;font-weight:700;margin-top:3px}
-  .att-dt{font-size:11.5px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  @media(max-width:1300px){ .att-grid{grid-template-columns:repeat(2,1fr)} }
+  @media(max-width:1300px){ .cal-grid{grid-template-columns:184px repeat(3,1fr);row-gap:16px} }
   .minical-dow{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:3px}
   .minical-dow div{text-align:center;font-size:9.5px;font-weight:700;color:var(--muted)}
   .minical-days{display:grid;grid-template-columns:repeat(7,1fr);row-gap:3px}
@@ -495,42 +482,46 @@
   function containsToday(ev){ return containsDay(ev, TODAY_ISO); }
   function startTime(ev){ return (ev.time||"").split("~")[0].trim(); }
   function displayPerson(ev){ return ev.attendees || ev.person || ""; }
-  function attRange(ev){
-    var t=startTime(ev);
-    if(ev.type==="출장") return isMulti(ev)?(fmtMD(ev.start)+" ~ "+fmtMD(ev.end)):fmtMDW(ev.start);
-    if(ev.type==="외출") return fmtMDW(ev.start)+(t?" "+t:"");
-    if(ev.type==="휴가") return (isMulti(ev)?(fmtMD(ev.start)+" ~ "+fmtMD(ev.end)):fmtMDW(ev.start))+" · "+(ev.vacation||"휴가");
-    return isMulti(ev)?(fmtMD(ev.start)+" ~ "+fmtMD(ev.end)):fmtMDW(ev.start); // 재택근무
-  }
-  function attDesc(ev){
-    if(ev.type==="출장") return ev.title + (ev.location ? " ("+ev.location+")" : "");
-    return ev.location || "";
-  }
-  function attWeekByType(){
+  function attTodayByType(dIso){
     var out={출장:[], 외출:[], 휴가:[], 재택근무:[]};
     (DATA.schedule||[]).forEach(function(s){
       var g=ATT_GROUP[s.type];
-      if(g && inThisWeek(s.start||s.date)) out[g].push(s);
+      if(g && containsDay(s, dIso)) out[g].push(s);
     });
     return out;
-  }
-  function attCard(type, evs){
-    var st=ATT_TYPE_STYLE[type];
-    var rows = evs.length ? evs.map(function(ev){
-      var nm=displayPerson(ev);
-      return "<div class=\"att-row\"><span class=\"att-av\" style=\"background:"+st.c+"\">"+esc((nm||"?").slice(0,1))+"</span>"
-        +"<div class=\"att-info\"><div class=\"att-nm\"><b>"+esc(nm||"-")+"</b>"
-        +(containsToday(ev)?"<span class=\"att-today\">오늘</span>":"")+"</div>"
-        +"<div class=\"att-rg\" style=\"color:"+st.c+"\">"+esc(attRange(ev))+"</div>"
-        +(attDesc(ev)?"<div class=\"att-dt\">"+esc(attDesc(ev))+"</div>":"")+"</div></div>";
-    }).join("") : "<div class=\"att-empty\">"+type+" 일정이 없습니다.</div>";
-    return "<div class=\"att-card\"><div class=\"ac-h\"><span class=\"lab\"><span class=\"dot\" style=\"background:"+st.c+"\"></span>"+type+"</span>"
-      +"<span class=\"cnt\" style=\"color:"+st.c+";background:"+st.bg+"\">"+evs.length+"건</span></div>"
-      +"<div class=\"att-list\">"+rows+"</div></div>";
   }
 
   // ===== 미니 캘린더 (이번 달, 오늘 강조, 일정 있는 날 점) =====
   var SELECTED_DAY = null; // null이면 오늘
+  // 날짜(시간) 표기: 시작시간만, 다일이면 범위
+  function dateTimeText(ev){
+    var t=startTime(ev);
+    var d=isMulti(ev) ? (fmtMD(ev.start)+" ~ "+fmtMD(ev.end)) : fmtMDW(ev.start);
+    return d+(t?" "+t:"");
+  }
+  // 목적(장소): 제목 + (장소) — 없으면 빈 문자열(줄 자체 생략)
+  function purposeText(ev){
+    if(!ev.title) return "";
+    return ev.title + (ev.location ? " ("+ev.location+")" : "");
+  }
+  function attLine(ev){
+    var nm=displayPerson(ev)||"-";
+    if(ev.type==="출장" || ev.type==="외출"){
+      var purpose=purposeText(ev);
+      return "<div class=\"cal-col-ev\"><span class=\"nm\">"+esc(nm)+"</span>"
+        +"<span class=\"sub\">"+esc(dateTimeText(ev))+"</span>"
+        +(purpose?"<span class=\"sub\">"+esc(purpose)+"</span>":"")+"</div>";
+    }
+    // 휴가/재택근무: 이름 · 날짜(휴가는 구분도 같은 줄에 표기)
+    var dateLine = isMulti(ev) ? (fmtMD(ev.start)+" ~ "+fmtMD(ev.end)) : fmtMDW(ev.start);
+    if(ev.type==="휴가" && ev.vacation) dateLine += " · "+ev.vacation;
+    return "<div class=\"cal-col-ev\"><span class=\"nm\">"+esc(nm)+"</span>"
+      +"<span class=\"sub\">"+esc(dateLine)+"</span></div>";
+  }
+  function attColumn(label, evs){
+    var body = evs.length ? evs.map(attLine).join("") : "<span class=\"cal-col-empty\">-</span>";
+    return "<div class=\"cal-side-col\"><div class=\"cal-col-lab\">"+label+"</div><div class=\"cal-col-body\">"+body+"</div></div>";
+  }
   function buildCalendarCard(){
     var y=TODAY.getFullYear(), m=TODAY.getMonth();
     var selDay = SELECTED_DAY || TODAY.getDate();
@@ -549,19 +540,28 @@
       cells+="<div class=\"cell\" data-day=\""+d+"\"><div class=\"num"+(isToday?" today":"")+(isSel&&!isToday?" sel":"")+"\">"+d+"</div><div class=\"dot"+(hasEv&&!isToday?"":" none")+"\"></div></div>";
     }
     var selLabel = (selDay===TODAY.getDate()) ? "오늘" : (m+1)+"."+selDay;
+    var ATT_TITLE_EXCLUDE = ["육아휴직","출근"]; // 정식 유형이 없어 "기타"로 분류되지만 일정 목록에선 제외해야 하는 항목
     var upcoming=(DATA.schedule||[]).concat((DATA.meetings||[]).map(function(m2){return {start:m2.date, title:(m2.summary||m2.title)};}))
       .filter(function(e){ return (e.start||e.date)===selIso; })
+      .filter(function(e){
+        if(ATT_GROUP[e.type]) return false; // 휴가/오전반차/오후반차/병가/공가/건강검진/외출/재택근무는 근태 4칸에서 별도 표시
+        if(e.title && ATT_TITLE_EXCLUDE.some(function(k){ return e.title.indexOf(k)>=0; })) return false;
+        return true;
+      })
       .slice(0,6)
-      .map(function(e){ return "<div class=\"cal-col-ev\">"+esc(e.title||e.person||"-")+"</div>"; }).join("");
-    var att=attWeekByType();
+      .map(function(e){
+        var t=startTime(e);
+        var lbl=(t?t+" ":"")+(e.title||e.person||"-");
+        return "<div class=\"cal-col-ev\">"+esc(lbl)+"</div>";
+      }).join("");
+    var att=attTodayByType(selIso);
     return "<div class=\"dcard\"><div class=\"dcard-h\"><div class=\"l\"><span class=\"bar\"></span><h3>캘린더</h3></div>"
       +"<span class=\"r click\" data-nav=\"schedule.html\">"+(m+1)+"월 ›</span></div>"
-      +"<div class=\"cal-top\">"
-      +"<div class=\"minical\"><div class=\"minical-dow\">"+dowHtml+"</div><div class=\"minical-days\">"+cells+"</div></div>"
+      +"<div class=\"cal-grid\">"
+      +"<div><div class=\"minical-dow\">"+dowHtml+"</div><div class=\"minical-days\">"+cells+"</div></div>"
       +"<div class=\"cal-side-col\"><div class=\"cal-col-lab\">"+selLabel+" 일정</div><div class=\"cal-col-body\">"+(upcoming||"<span class=\"cal-col-empty\">없음</span>")+"</div></div>"
-      +"</div>"
-      +"<div class=\"att-grid\">"+attCard("출장",att.출장)+attCard("외출",att.외출)+attCard("휴가",att.휴가)+attCard("재택근무",att.재택근무)+"</div>"
-      +"</div>";
+      +attColumn("출장",att.출장)+attColumn("외출",att.외출)+attColumn("휴가",att.휴가)+attColumn("재택근무",att.재택근무)
+      +"</div></div>";
   }
 
 
