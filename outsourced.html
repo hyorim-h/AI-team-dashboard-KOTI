@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>위탁과제 관리 · AI빅데이터연구팀</title>
+<style>
+  :root{
+    --navy:#16265e; --navy-2:#1a2942; --blue:#2c5fbf; --blue-soft:#e8eefb;
+    --red:#c8273c; --red-soft:#fdeaec; --green:#1f8a5b; --green-soft:#e3f5ec;
+    --orange:#b9770a; --orange-soft:#fff4e0; --purple:#7a4ec2; --purple-soft:#efeafa;
+    --bg:#eef1f6; --surface:#ffffff; --line:#dfe5ef; --line-2:#cdd6ec;
+    --text:#16265e; --text-2:#5a6680; --muted:#9fb0cf;
+    --shadow:0 1px 3px rgba(16,38,94,.06),0 8px 24px rgba(16,38,94,.07);
+    --radius:6px; --maxw:1500px;
+  }
+  html[data-theme="dark"]{
+    --navy:#0d1836; --navy-2:#0a1228; --blue:#5b8def; --blue-soft:#16233f;
+    --red:#ff7a7a; --red-soft:#3a1717; --green:#43c794; --green-soft:#103024;
+    --orange:#e0a94a; --orange-soft:#3a2c17; --purple:#a888e0; --purple-soft:#241a3a;
+    --bg:#0a1020; --surface:#111c33; --line:#1e2d4d; --line-2:#26375c;
+    --text:#e7eef7; --text-2:#a8b6d4; --muted:#6b7ba0;
+    --shadow:0 1px 3px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Pretendard Variable","Pretendard","Apple SD Gothic Neo",-apple-system,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+
+  .utilbar{background:var(--navy-2);color:#cdd6ec;font-size:12.5px}
+  .utilbar .in{max-width:var(--maxw);margin:0 auto;padding:7px 28px;display:flex;justify-content:flex-end;gap:16px;align-items:center}
+  .utilbar a{color:#cdd6ec;text-decoration:none}
+  .utilbar .sep{color:#3a4a72}
+  .util-toggle{background:none;border:none;color:#cdd6ec;cursor:pointer;font-size:12.5px}
+
+  .head{background:var(--surface);border-bottom:1px solid var(--line)}
+  .head .in{max-width:var(--maxw);margin:0 auto;padding:16px 28px;display:flex;align-items:center;gap:16px}
+  .logo{height:44px}
+  .head h1{font-size:20px;font-weight:800;margin:0;color:var(--navy)}
+  .head-actions{margin-left:auto;display:flex;gap:10px}
+  .hbtn{font-size:13.5px;font-weight:700;padding:9px 18px;border-radius:9px;cursor:pointer;border:1px solid var(--line-2);
+    background:var(--surface);color:var(--navy)}
+  .hbtn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .hbtn:hover{filter:brightness(.97)}
+
+  nav.tabs{background:var(--navy)}
+  nav.tabs .in{max-width:var(--maxw);margin:0 auto;padding:0 28px;display:flex;gap:2px;flex-wrap:wrap}
+  nav.tabs a{color:#b9c8e8;text-decoration:none;font-size:14.5px;font-weight:700;padding:14px 20px;border-bottom:3px solid transparent}
+  nav.tabs a:hover{color:#fff}
+  nav.tabs a.cur{color:#fff;background:var(--blue);border-bottom-color:#fff}
+
+  .ptitle{padding:26px 0 18px;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+  .ptitle .crumb{font-size:12.5px;color:var(--text-2);font-weight:600}
+  .ptitle h2{font-size:26px;font-weight:850;margin:2px 0 0;color:var(--navy)}
+  .year-nav{margin-left:auto;display:flex;align-items:center;gap:8px;background:var(--surface);
+    border:1px solid var(--line-2);border-radius:10px;padding:6px 10px;box-shadow:var(--shadow)}
+  .year-nav button{border:none;background:none;color:var(--navy);cursor:pointer;font-size:16px;padding:2px 6px}
+  .year-nav .ylabel{font-size:14px;font-weight:800;color:var(--navy);min-width:80px;text-align:center}
+
+  .filterbar{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:14px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+  .filterbar .flabel{font-size:13px;font-weight:800;color:var(--navy);margin-right:2px}
+  .filterbar select{border:1px solid var(--line-2);border-radius:8px;padding:8px 11px;font-size:13px;
+    background:var(--surface);color:var(--text);font-family:inherit}
+  .filterbar .cnt{margin-left:auto;font-size:13px;color:var(--text-2);font-weight:600}
+  .filterbar .reset{border:1px solid var(--line-2);background:var(--surface);color:var(--navy);border-radius:8px;
+    padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
+
+  /* 요약 카드 */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 22px}
+  .kpi .k-lab{font-size:13px;font-weight:700;color:var(--text-2);margin-bottom:8px}
+  .kpi .k-val{font-size:28px;font-weight:850;color:var(--navy)}
+  .kpi .k-val span{font-size:14px;font-weight:700;color:var(--text-2);margin-left:3px}
+  .kpi.ongoing .k-val{color:var(--blue)}
+  .kpi.done .k-val{color:var(--green)}
+  .kpi.hold .k-val{color:var(--orange)}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px}
+  .card-h{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .card-h .bar{width:4px;height:18px;background:var(--blue);border-radius:2px}
+  .card-h h3{font-size:16px;font-weight:800;margin:0;color:var(--navy)}
+  .card-h .sub{font-size:12.5px;color:var(--text-2);font-weight:600}
+  .card-h .right{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .addbtn{border:1px solid var(--line-2);background:var(--surface);color:var(--navy);border-radius:8px;
+    padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer}
+  .addbtn:hover{background:var(--blue-soft)}
+
+  .tbl{width:100%;border-collapse:collapse;font-size:13.5px;table-layout:fixed}
+  .tbl th{text-align:center;font-size:12px;font-weight:800;color:var(--text-2);padding:11px 14px;border-bottom:2px solid var(--line);white-space:nowrap}
+  .tbl td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:middle;text-align:center;overflow:hidden;text-overflow:ellipsis}
+  .tbl th:nth-child(1),.tbl td:nth-child(1){width:5%}
+  .tbl th:nth-child(2),.tbl td:nth-child(2){width:12%}
+  .tbl th:nth-child(3),.tbl td:nth-child(3){width:23%}
+  .tbl th:nth-child(4),.tbl td:nth-child(4){width:20%}
+  .tbl th:nth-child(5),.tbl td:nth-child(5){width:8%}
+  .tbl th:nth-child(6),.tbl td:nth-child(6){width:11%}
+  .tbl th:nth-child(7),.tbl td:nth-child(7){width:13%}
+  .tbl th:nth-child(8),.tbl td:nth-child(8){width:8%}
+  .tbl tbody tr{cursor:pointer;transition:background .12s}
+  .tbl tbody tr:hover{background:var(--blue-soft)}
+  .tbl .col-no{color:var(--muted);font-weight:700}
+  .tbl .t-title{font-weight:700;color:var(--navy);text-align:center}
+  .tbl .t-sub{color:var(--text-2)}
+  .ptag{display:inline-block;font-size:11px;font-weight:800;padding:3px 9px;border-radius:4px;white-space:nowrap}
+  .badge{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:4px;white-space:nowrap}
+  .empty-row td{text-align:center;color:var(--muted);padding:26px;font-size:13px}
+
+  /* 진행률 바 */
+  .prog{display:flex;align-items:center;gap:8px;justify-content:center}
+  .prog-bar{flex:1;max-width:90px;height:7px;background:var(--line);border-radius:4px;overflow:hidden}
+  .prog-fill{height:100%;background:var(--blue);border-radius:4px}
+  .prog-pct{font-size:12px;font-weight:700;color:var(--text-2);min-width:34px;text-align:right}
+  .badge.done{background:var(--green);color:#fff}
+  .badge.hold{background:var(--orange);color:#fff}
+
+  .state{padding:48px;text-align:center;color:var(--text-2)}
+  /* 모달 */
+  .ov{display:none;position:fixed;inset:0;background:rgba(10,20,45,.5);z-index:300;align-items:center;justify-content:center;padding:20px}
+  .ov.open{display:flex}
+  .modal{background:var(--surface);border-radius:10px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,.3);animation:mpop .16s ease}
+  @keyframes mpop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .modal-head{background:var(--navy);color:#fff;font-size:16px;font-weight:800;padding:16px 22px;
+    display:flex;align-items:center;justify-content:space-between;border-radius:10px 10px 0 0}
+  .modal-head .x{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1}
+  .modal-body{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+  .modal-foot{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;justify-content:flex-end}
+  .mbtn{font-size:13.5px;font-weight:700;padding:9px 18px;border-radius:7px;cursor:pointer;border:1px solid var(--line-2);background:var(--surface);color:var(--navy)}
+  .mbtn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .mbtn.danger{background:var(--surface);color:var(--red);border-color:var(--red)}
+  .mbtn:hover{filter:brightness(.97)}
+  /* 폼 */
+  .fld{display:flex;flex-direction:column;gap:5px}
+  .fld>span{font-size:12.5px;font-weight:700;color:var(--text-2)}
+  .fld>span b{color:var(--red)}
+  .fld input,.fld select,.fld textarea{border:1px solid var(--line-2);border-radius:6px;padding:9px 11px;font-size:13.5px;
+    background:var(--surface);color:var(--text);font-family:inherit;resize:vertical}
+  .fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(44,95,191,.13)}
+  .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .fld-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  /* 체크리스트 */
+  .chk-head{display:flex;align-items:center;justify-content:space-between}
+  .chk-head .chk-lab{font-size:12.5px;font-weight:700;color:var(--text-2)}
+  .chk-head .chk-cnt{font-size:12px;font-weight:700;color:var(--blue)}
+  .chk-list{display:flex;flex-direction:column;gap:7px;margin-top:2px}
+  .chk-item{display:flex;align-items:center;gap:9px}
+  .chk-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--blue);cursor:pointer;flex:none}
+  .chk-item input[type=text]{flex:1;border:1px solid var(--line-2);border-radius:6px;padding:7px 10px;font-size:13px;
+    background:var(--surface);color:var(--text);font-family:inherit}
+  .chk-item .chk-del{border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;flex:none}
+  .chk-item .chk-del:hover{color:var(--red)}
+  .chk-add{border:1px dashed var(--line-2);background:var(--surface);color:var(--blue);border-radius:6px;
+    padding:8px;font-size:12.5px;font-weight:700;cursor:pointer;margin-top:4px}
+  .chk-add:hover{background:var(--blue-soft)}
+  .estatus{margin:0}
+  .status{font-size:13px;padding:9px 13px;border-radius:6px;display:none}
+  .status.show{display:block}
+  .status.info{background:var(--blue-soft);color:var(--blue)}
+  .status.err{background:var(--red-soft);color:var(--red)}
+  .status.ok{background:var(--green-soft);color:var(--green)}
+  /* 상세 보기 */
+  .v-title{font-size:19px;font-weight:850;color:var(--navy);margin-bottom:16px}
+  .v-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px}
+  .v-item .v-lab{font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:2px}
+  .v-item .v-val{font-size:14px;font-weight:600;color:var(--text)}
+  .v-full{grid-column:1/3}
+  .v-chk{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+  .v-chk .vc-item{font-size:13.5px;display:flex;gap:8px;align-items:center;padding:2px 0}
+  .v-chk .vc-item.done{color:var(--muted);text-decoration:line-through}
+  footer{padding:30px 0 48px;color:var(--muted);font-size:13px;text-align:center}
+
+  @media(max-width:760px){ .kpis{grid-template-columns:repeat(2,1fr)} }
+</style>
+<style>
+  /* 과제 탭 */
+  .ptabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+  .ptab{cursor:pointer;font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:8px;
+    border:1px solid var(--line-2);background:var(--surface);color:var(--text-2)}
+  .ptab:hover{background:var(--blue-soft)}
+  .ptab.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+  /* 과제 정보띠 */
+  .info-strip{display:flex;align-items:center;gap:0;flex-wrap:wrap;background:var(--navy);border-radius:8px;
+    padding:14px 20px;margin-bottom:16px;color:#dbe3f4}
+  .info-strip .title{font-size:16px;font-weight:800;color:#fff;margin-right:18px}
+  .info-meta{display:flex;align-items:center;gap:8px;padding:0 16px}
+  .info-meta.first{padding-left:0}
+  .info-lab{font-size:11px;font-weight:700;color:#8fa0c8}
+  .info-val{font-size:12.5px;font-weight:600;color:#fff}
+  .info-sep{width:1px;height:14px;background:#33437a}
+
+  /* 서브탭(회의록/요청자료) */
+  .subtabs{display:flex;gap:4px;border-bottom:2px solid var(--line-2);margin-bottom:16px}
+  .subtab{cursor:pointer;font-size:13.5px;font-weight:700;padding:11px 16px;color:var(--text-2);border-bottom:2px solid transparent;margin-bottom:-2px}
+  .subtab:hover{color:var(--navy)}
+  .subtab.on{color:var(--navy);border-bottom-color:var(--navy)}
+
+  .sec-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .sec-h .sub{font-size:12px;color:var(--muted);font-weight:500}
+  .addbtn{font-size:12px;font-weight:700;color:#fff;background:var(--blue);border:none;border-radius:4px;padding:9px 16px;cursor:pointer}
+  .addbtn:hover{filter:brightness(.95)}
+
+  /* 배지 */
+  .tag{display:inline-block;padding:3px 9px;border-radius:3px;font-size:11px;font-weight:700;white-space:nowrap}
+  .kindb{display:inline-block;padding:3px 9px;border-radius:11px;font-size:11px;font-weight:600;white-space:nowrap}
+
+  /* 회의록 표 */
+  .tbl.cm{table-layout:fixed;background:var(--surface);border:1px solid var(--line)}
+  .tbl.cm th,.tbl.cm td{text-align:center}
+  .tbl.cm th:nth-child(1),.tbl.cm td:nth-child(1){width:4%}
+  .tbl.cm th:nth-child(2),.tbl.cm td:nth-child(2){width:10%}
+  .tbl.cm th:nth-child(3),.tbl.cm td:nth-child(3){width:8%}
+  .tbl.cm th:nth-child(4),.tbl.cm td:nth-child(4){width:7%}
+  .tbl.cm th:nth-child(5),.tbl.cm td:nth-child(5){width:10%}
+  .tbl.cm th:nth-child(6),.tbl.cm td:nth-child(6){width:auto;text-align:left}
+  .tbl.cm th:nth-child(7),.tbl.cm td:nth-child(7){width:20%}
+  .tbl.cm tbody tr{cursor:pointer}
+  .tbl.cm tbody tr:hover{background:var(--blue-soft)}
+
+  /* 요청자료 카드 */
+  .req-card{background:var(--surface);border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-bottom:14px;cursor:pointer}
+  .req-card:hover{border-color:var(--line-2)}
+  .req-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line-2)}
+  .req-h .l{display:flex;align-items:center;gap:10px;min-width:0}
+  .req-h .title{font-size:15px;font-weight:700;color:var(--navy)}
+  .req-h .r{display:flex;align-items:center;gap:12px;flex:none}
+  .req-h .meta{font-size:11.5px;color:var(--muted)}
+  .req-edit{font-size:11.5px;font-weight:600;color:var(--blue)}
+  .req-body{padding:16px 18px}
+  .req-files{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .filechip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:4px;padding:6px 10px}
+  .filechip.req{color:#5a6680;background:var(--subtle);border:1px solid var(--line-2)}
+  .filechip.reply{color:#c8273c;background:#fdecee;border:1px solid #f3d2d7}
+  .qa-item{display:flex;align-items:flex-start;gap:9px;padding:10px 13px;background:var(--subtle);border:1px solid var(--line-2);border-radius:6px;margin-bottom:8px}
+  .qa-n{flex-shrink:0;font-size:10.5px;font-weight:700;color:var(--blue);background:var(--blue-soft);border-radius:4px;padding:4px 8px;margin-top:1px}
+  .qa-q{font-size:13px;font-weight:600;color:var(--navy);line-height:1.55}
+  .qa-empty{font-size:12px;color:var(--muted);padding:14px 2px;text-align:center;border:1px dashed var(--line-2);border-radius:6px}
+
+  /* 상세(회신 답변 포함) 모달 내 QA */
+  .qa-detail{border:1px solid var(--line-2);border-radius:7px;overflow:hidden;margin-bottom:12px}
+  .modal.modal-wide{max-width:920px}
+  .req-view-grid{display:grid;grid-template-columns:280px 1fr;gap:0}
+  .fig-col{border-right:1px solid var(--line-2);padding:18px;background:var(--bg)}
+  .fig-col .fig-lab{font-size:11px;font-weight:800;color:var(--muted);margin-bottom:10px;letter-spacing:.03em}
+  .fig-item{margin-bottom:14px;cursor:zoom-in}
+  .fig-item img{width:100%;border-radius:6px;border:1px solid var(--line-2);display:block}
+  .fig-cap{font-size:10.5px;color:var(--muted);margin-top:5px;text-align:center;line-height:1.4}
+  .fig-empty{font-size:11.5px;color:var(--muted);text-align:center;padding:20px 4px}
+  .qa-col{padding:18px 20px;max-height:64vh;overflow-y:auto}
+  .lightbox{position:fixed;inset:0;background:rgba(8,14,30,.82);display:none;align-items:center;justify-content:center;
+    padding:40px;z-index:200;cursor:zoom-out}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:min(1100px,92vw);max-height:80vh;border-radius:6px}
+  .lightbox .cap{color:#e6ecf7;font-size:13px;font-weight:600;margin-top:12px;text-align:center}
+  .qa-detail .q-row{display:flex;align-items:flex-start;gap:9px;padding:11px 14px;background:var(--subtle);border-bottom:1px solid var(--line-2)}
+  .qa-detail .a-row{padding:12px 14px;display:flex;align-items:flex-start;gap:9px}
+  .qa-a-badge{flex-shrink:0;font-size:10.5px;font-weight:700;color:#fff;background:var(--navy);border-radius:4px;padding:4px 8px;margin-top:1px}
+  .qa-a-text{font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.7}
+  mark.hl{background:#fef08a;color:inherit;padding:1px 2px;border-radius:2px;font-weight:600}
+  [data-theme="dark"] mark.hl{background:#7a6a1f;color:#fff8dc}
+  .qa-detail{border-left:3px solid var(--blue-soft)}
+  .qa-row-actions{display:flex;justify-content:flex-end;margin-top:6px}
+  .qa-remove{font-size:11px;color:var(--muted);cursor:pointer}
+  .qa-remove:hover{text-decoration:underline}
+  .qa-addbtn{font-size:12px;font-weight:600;color:var(--blue);border:1px solid var(--line-2);background:var(--bg);border-radius:4px;padding:7px 13px;cursor:pointer}
+
+  .empty-note{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:28px;text-align:center;font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="utilbar"><div class="in">
+  <a href="https://www.koti.re.kr" target="_blank" rel="noopener">한국교통연구원</a>
+  <span class="sep">|</span><span>모빌리티 빅데이터팀</span>
+  <span class="sep">|</span>
+  <button class="util-toggle" id="themeBtn">🌙 다크모드</button>
+</div></div>
+
+<header class="head"><div class="in">
+  <img class="logo" src="assets/koti-logo.png" alt="KOTI" onerror="this.style.display='none'">
+  <h1>AI빅데이터연구팀 업무포털</h1>
+  <div class="head-actions">
+    <button class="hbtn" id="refreshBtn">↻ 새로고침</button>
+  </div>
+</div></header>
+
+<nav class="tabs"><div class="in">
+  <a href="index.html">대시보드</a>
+  <a href="weekly-work.html">주간업무 작성</a>
+  <a href="weekly-meeting.html">주간회의 자료</a>
+  <a href="performance.html">성과 관리</a>
+  <a href="wbs.html">WBS 관리</a>
+  <a href="schedule.html">일정관리</a>
+  <a class="cur" href="outsourced.html">위탁과제 관리</a>
+</div></nav>
+
+<div class="wrap">
+  <div class="ptitle">
+    <div>
+      <div class="crumb">홈 · 위탁과제 관리</div>
+      <h2>위탁과제 관리</h2>
+    </div>
+    <div class="year-nav">
+      <button id="yearPrev">◀</button>
+      <span class="ylabel" id="yearLabel">2026년</span>
+      <button id="yearNext">▶</button>
+    </div>
+  </div>
+
+  <div class="ptabs" id="ptabs"></div>
+
+  <div id="content"><div class="state">불러오는 중…</div></div>
+</div>
+
+<footer>위탁과제 관리 · 한국교통연구원 교통빅데이터연구본부</footer>
+
+<div class="ov" id="meetOv">
+  <div class="modal">
+    <div class="modal-head"><span id="meetHead">회의 상세</span><button class="x" id="meetX">×</button></div>
+    <div class="modal-body" id="meetBody"></div>
+    <div class="modal-foot" id="meetFoot"></div>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <div>
+    <img id="lightboxImg" src="" alt="">
+    <div class="cap" id="lightboxCap"></div>
+  </div>
+</div>
+
+<div class="ov" id="reqOv">
+  <div class="modal">
+    <div class="modal-head"><span id="reqHead">요청자료 상세</span><button class="x" id="reqX">×</button></div>
+    <div class="modal-body" id="reqBody"></div>
+    <div class="modal-foot" id="reqFoot"></div>
+  </div>
+</div>
+
+<script>
+  var WORKER_URL = "https://notion-proxy.ekqls0458.workers.dev";
+  var KIND_LIST = ["월간회의","실무진회의","보고","기타"];
+  var KIND_STYLE = { "월간회의":{c:"#fff",bg:"#16265e"}, "실무진회의":{c:"#2c5fbf",bg:"#e8eefb"}, "보고":{c:"#8a3fb0",bg:"#f3e8fa"}, "기타":{c:"#5a6680",bg:"#eef1f6"} };
+  var MSTATUS_STYLE = { "완료":{c:"#fff",bg:"#1f8a5b"}, "예정":{c:"#b9770a",bg:"#fff4e0"} };
+  var MODE_STYLE = { "화상":{c:"#3a5bbf",bg:"#eef2fb"}, "대면":{c:"#3f7a5a",bg:"#eef3ef"} };
+  var CAT_LIST = ["연구진행","발표자료","회의자료","기타"];
+  var CAT_STYLE = { "연구진행":{c:"#2c5fbf",bg:"#e8eefb"}, "발표자료":{c:"#7a4ec2",bg:"#efeafa"}, "회의자료":{c:"#1f8a5b",bg:"#eafaf0"}, "기타":{c:"#5a6680",bg:"#eef1f6"} };
+  var RSTATUS_STYLE = { "회신완료":{c:"#fff",bg:"#1f8a5b"}, "검토중":{c:"#b9770a",bg:"#fff4e0"} };
+  var DOW = ["일","월","화","수","목","금","토"];
+
+  var DATA = { consignments:[], meetings:[], requests:[] };
+  var YEAR = new Date().getFullYear();
+  var SEL = null;
+  var VIEW = "meetings";
+  var MFILTER = { search:"", type:"전체", status:"전체" };
+  var RFILTER = { search:"", category:"전체", status:"전체" };
+  var MEDIT = { id:null, mode:"view" };
+  var REDIT = { id:null, mode:"view", qa:[] };
+
+  function esc(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  // 규칙 기반 핵심 문구 강조: [결정]/[요청]/[이슈]/[완료]/[중요] 태그가 붙은 문장 + 숫자·단위(%, 시간, 건, 명, 원 등)
+  function highlightText(raw){
+    if(!raw) return "";
+    var spans=[];
+    var re1=/\[(?:결정|요청|이슈|완료|중요)\][^\n]*/g, m;
+    while((m=re1.exec(raw))){ spans.push([m.index, m.index+m[0].length]); }
+    var re2=/\d+(?:\.\d+)?\s*(?:%|퍼센트|시간|건|명|원|개|배|주|일|개월|km|kg|fps|Hz)/g;
+    while((m=re2.exec(raw))){
+      var s=m.index, e=m.index+m[0].length;
+      if(!spans.some(function(sp){ return s>=sp[0] && e<=sp[1]; })) spans.push([s,e]);
+    }
+    spans.sort(function(a,b){ return a[0]-b[0]; });
+    var merged=[];
+    spans.forEach(function(sp){
+      if(merged.length && sp[0]<=merged[merged.length-1][1]) merged[merged.length-1][1]=Math.max(merged[merged.length-1][1], sp[1]);
+      else merged.push(sp.slice());
+    });
+    var out="", pos=0;
+    merged.forEach(function(sp){
+      out += esc(raw.slice(pos, sp[0]));
+      out += '<mark class="hl">'+esc(raw.slice(sp[0], sp[1]))+'</mark>';
+      pos = sp[1];
+    });
+    out += esc(raw.slice(pos));
+    return out;
+  }
+  function pad2(n){ return (n<10?"0":"")+n; }
+  function parseYMD(s){ if(!s) return null; var p=s.slice(0,10).split("-"); return new Date(+p[0],+p[1]-1,+p[2]); }
+  function fmtMDW(s){ var d=parseYMD(s); return d?pad2(d.getMonth()+1)+"."+pad2(d.getDate())+"("+DOW[d.getDay()]+")":"-"; }
+  function fmtYM(s){ if(!s) return ""; return s.slice(2,4)+"."+s.slice(5,7); }
+  function yearOf(s){ return s?parseInt(s.slice(0,4),10):null; }
+
+  function tagSpan(text, st){ return "<span class=\"tag\" style=\"color:"+st.c+";background:"+st.bg+"\">"+esc(text)+"</span>"; }
+  function kindBadge(k){ var st=KIND_STYLE[k]||KIND_STYLE["기타"]; return "<span class=\"kindb\" style=\"color:"+st.c+";background:"+st.bg+"\">"+esc(k)+"</span>"; }
+  function mstatBadge(s){ var st=MSTATUS_STYLE[s]||MSTATUS_STYLE["예정"]; return "<span class=\"kindb\" style=\"color:"+st.c+";background:"+st.bg+"\">"+esc(s)+"</span>"; }
+  function modeBadge(m){ var st=MODE_STYLE[m]||MODE_STYLE["대면"]; return "<span class=\"kindb\" style=\"color:"+st.c+";background:"+st.bg+"\">"+esc(m)+"</span>"; }
+  function catTag(c){ return tagSpan(c, CAT_STYLE[c]||CAT_STYLE["기타"]); }
+  function rstatBadge(s){ var st=RSTATUS_STYLE[s]||RSTATUS_STYLE["검토중"]; return "<span class=\"kindb\" style=\"color:"+st.c+";background:"+st.bg+"\">"+esc(s)+"</span>"; }
+
+  function periodYears(c){ return [yearOf(c.start), yearOf(c.end)]; }
+  function inYear(c, y){
+    var r=periodYears(c);
+    if(r[0]==null) return true;
+    return y>=r[0] && y<=r[1];
+  }
+  function yearBounds(){
+    var mn=Infinity, mx=-Infinity;
+    DATA.consignments.forEach(function(c){
+      var r=periodYears(c);
+      if(r[0]!=null){ mn=Math.min(mn,r[0]); mx=Math.max(mx,r[1]); }
+    });
+    if(mn===Infinity) return [YEAR,YEAR];
+    return [mn,mx];
+  }
+  function curConsignment(){ return DATA.consignments.filter(function(c){return c.id===SEL;})[0] || null; }
+  function meetingsOf(id){ return DATA.meetings.filter(function(m){return m.project===id;}); }
+  function requestsOf(id){ return DATA.requests.filter(function(r){return r.project===id;}); }
+
+  async function load(){
+    document.getElementById("content").innerHTML="<div class=\"state\">불러오는 중…</div>";
+    try {
+      var res=await fetch(WORKER_URL+"?scope=outsourced",{cache:"no-store"});
+      var data=await res.json();
+      DATA.consignments=data.consignments||[];
+      DATA.meetings=data.consignMeetings||[];
+      DATA.requests=data.consignRequests||[];
+      DATA.errorSrc = data.consignError ? "위탁과제 정보" : (data.consignMeetingError ? "위탁과제 회의록" : (data.consignRequestError ? "위탁과제 요청자료" : ""));
+      DATA.error = data.consignError || data.consignMeetingError || data.consignRequestError || "";
+      var yb=yearBounds();
+      if(YEAR<yb[0]) YEAR=yb[1]; if(YEAR>yb[1]) YEAR=yb[1];
+      var qProject = new URLSearchParams(location.search).get("project");
+      if(qProject && DATA.consignments.some(function(c){return c.id===qProject;})){
+        SEL = qProject;
+        var qc = DATA.consignments.filter(function(c){return c.id===qProject;})[0];
+        var yr=periodYears(qc); if(yr[0]!=null && (YEAR<yr[0]||YEAR>yr[1])) YEAR=yr[0];
+      } else {
+        var avail=DATA.consignments.filter(function(c){return inYear(c,YEAR);});
+        if(!avail.some(function(c){return c.id===SEL;})) SEL = avail.length ? avail[0].id : null;
+      }
+      render();
+    } catch(e){
+      document.getElementById("content").innerHTML="<div class=\"state\">불러오기 실패: "+esc(String(e))+"</div>";
+    }
+  }
+
+  function buildTabs(){
+    var avail=DATA.consignments.filter(function(c){return inYear(c,YEAR);});
+    document.getElementById("ptabs").innerHTML = avail.length ? avail.map(function(c){
+      return "<div class=\"ptab"+(c.id===SEL?" on":"")+"\" data-sel=\""+esc(c.id)+"\">"+esc(c.title)+"</div>";
+    }).join("") : "";
+    document.getElementById("yearLabel").textContent = YEAR+"년";
+  }
+
+  function renderInfoStrip(c){
+    var period = (c.start||c.end) ? (fmtYM(c.start)+" ~ "+fmtYM(c.end)) : "-";
+    return "<div class=\"info-strip\">"
+      +"<span class=\"title\">"+esc(c.title)+"</span>"
+      +"<div class=\"info-meta first\"><span class=\"info-lab\">수행기관</span><span class=\"info-val\">"+esc(c.org||"-")+"</span></div>"
+      +"<span class=\"info-sep\"></span>"
+      +"<div class=\"info-meta\"><span class=\"info-lab\">책임자</span><span class=\"info-val\">"+esc(c.pi||"-")+"</span></div>"
+      +"<span class=\"info-sep\"></span>"
+      +"<div class=\"info-meta\"><span class=\"info-lab\">기간</span><span class=\"info-val\">"+period+"</span></div>"
+      +"<span class=\"info-sep\"></span>"
+      +"<div class=\"info-meta\"><span class=\"info-lab\">위탁금액</span><span class=\"info-val\">"+esc(c.budget||"-")+"</span></div>"
+      +"</div>";
+  }
+
+  function renderSubtabs(){
+    return "<div class=\"subtabs\">"
+      +"<div class=\"subtab"+(VIEW==="meetings"?" on":"")+"\" data-view=\"meetings\">회의록</div>"
+      +"<div class=\"subtab"+(VIEW==="requests"?" on":"")+"\" data-view=\"requests\">요청자료</div>"
+      +"</div>";
+  }
+
+  function meetMatches(m){
+    if(MFILTER.type!=="전체" && m.kind!==MFILTER.type) return false;
+    if(MFILTER.status!=="전체" && m.status!==MFILTER.status) return false;
+    var q=(MFILTER.search||"").trim().toLowerCase();
+    if(q){ var hay=[m.title,m.attendees,m.body].join(" ").toLowerCase(); if(hay.indexOf(q)<0) return false; }
+    return true;
+  }
+  function renderMeetings(){
+    var all=meetingsOf(SEL).sort(function(a,b){return (a.date<b.date)?1:-1;});
+    var list=all.filter(meetMatches);
+    var rows=list.length ? list.map(function(m,i){
+      return "<tr data-id=\""+esc(m.id)+"\">"
+        +"<td>"+(i+1)+"</td>"
+        +"<td>"+kindBadge(m.kind)+"</td>"
+        +"<td>"+mstatBadge(m.status)+"</td>"
+        +"<td>"+modeBadge(m.mode)+"</td>"
+        +"<td>"+fmtMDW(m.date)+"</td>"
+        +"<td style=\"font-weight:600;color:var(--navy)\">"+esc(m.title)+"</td>"
+        +"<td>"+esc(m.attendees||"-")+"</td>"
+        +"</tr>";
+    }).join("") : "<tr class=\"empty-row\"><td colspan=\"7\">"+(all.length?"검색·필터 조건에 맞는 회의가 없습니다.":"등록된 회의가 없습니다.")+"</td></tr>";
+    return "<div class=\"sec-h\"><span class=\"sub\">월간회의·실무진회의·보고 · 총 "+all.length+"건</span>"
+      +"<button class=\"addbtn\" id=\"addMeetBtn\">+ 회의 추가</button></div>"
+      +"<div class=\"filterbar\">"
+        +"<input type=\"text\" id=\"mSearch\" placeholder=\"제목·참석자·안건 검색\" style=\"flex:1;max-width:230px;border:1px solid var(--line-2);border-radius:6px;padding:8px 11px;font-size:12.5px\" value=\""+esc(MFILTER.search)+"\">"
+        +"<select id=\"mType\"></select><select id=\"mStatus\"></select>"
+        +"<span class=\"cnt\">조회 <b>"+list.length+"</b>건</span>"
+        +"<button class=\"reset\" id=\"mReset\">초기화</button>"
+      +"</div>"
+      +"<table class=\"tbl cm\"><thead><tr><th>No</th><th>구분</th><th>상태</th><th>형태</th><th>일시</th><th>주요 안건</th><th>참석</th></tr></thead>"
+      +"<tbody>"+rows+"</tbody></table>";
+  }
+
+  function reqMatches(r){
+    if(RFILTER.category!=="전체" && r.category!==RFILTER.category) return false;
+    if(RFILTER.status!=="전체" && r.status!==RFILTER.status) return false;
+    var q=(RFILTER.search||"").trim().toLowerCase();
+    if(q){
+      var hay=[r.title].concat((r.qa||[]).map(function(x){return x.q;})).join(" ").toLowerCase();
+      if(hay.indexOf(q)<0) return false;
+    }
+    return true;
+  }
+  function renderRequests(){
+    var all=requestsOf(SEL).sort(function(a,b){return (a.reqDate<b.reqDate)?1:-1;});
+    var list=all.filter(reqMatches);
+    var cards=list.length ? list.map(function(r){
+      var qaHtml=(r.qa&&r.qa.length) ? r.qa.map(function(qa,i){
+        return "<div class=\"qa-item\"><span class=\"qa-n\">안건 "+(i+1)+"</span><div class=\"qa-q\">"+esc(qa.q)+"</div></div>";
+      }).join("") : "<div class=\"qa-empty\">아직 정리된 문의·답변이 없습니다.</div>";
+      var files="";
+      if(r.reqFile) files+="<span class=\"filechip req\">📤 요청 · "+esc(r.reqFile)+"</span>";
+      if(r.replyFile) files+="<span class=\"filechip reply\">📥 회신 · "+esc(r.replyFile)+"</span>";
+      return "<div class=\"req-card\" data-id=\""+esc(r.id)+"\">"
+        +"<div class=\"req-h\"><div class=\"l\">"+catTag(r.category)+"<span class=\"title\">"+esc(r.title)+"</span></div>"
+        +"<div class=\"r\"><span class=\"meta\">요청 "+fmtYM(r.reqDate)+" · 회신 "+fmtYM(r.replyDate)+"</span>"+rstatBadge(r.status)
+        +"<span class=\"req-edit\" data-edit=\""+esc(r.id)+"\">편집</span></div></div>"
+        +"<div class=\"req-body\">"+(files?"<div class=\"req-files\">"+files+"</div>":"")+qaHtml+"</div></div>";
+    }).join("") : "<div class=\"empty-note\">"+(all.length?"검색·필터 조건에 맞는 자료가 없습니다.":"등록된 자료가 없습니다.")+"</div>";
+    return "<div class=\"sec-h\"><span class=\"sub\">연구진행·발표자료·회의자료 · 총 "+all.length+"건</span>"
+      +"<button class=\"addbtn\" id=\"addReqBtn\">+ 자료 추가</button></div>"
+      +"<div class=\"filterbar\">"
+        +"<input type=\"text\" id=\"rSearch\" placeholder=\"키워드 검색\" style=\"flex:1;max-width:230px;border:1px solid var(--line-2);border-radius:6px;padding:8px 11px;font-size:12.5px\" value=\""+esc(RFILTER.search)+"\">"
+        +"<select id=\"rCategory\"></select><select id=\"rStatus\"></select>"
+        +"<span class=\"cnt\">조회 <b>"+list.length+"</b>건</span>"
+        +"<button class=\"reset\" id=\"rReset\">초기화</button>"
+      +"</div>"+cards;
+  }
+
+  function render(){
+    buildTabs();
+    var c=curConsignment();
+    var html;
+    if(DATA.error){
+      html="<div class=\"empty-note\">"+esc(DATA.errorSrc||"위탁과제")+" 데이터를 불러오지 못했습니다.<br><br>"
+        +"<span style=\"font-size:11px;color:var(--muted)\">"+esc(DATA.error)+"</span><br><br>"
+        +"<span style=\"font-size:11.5px\">노션에서 '"+esc(DATA.errorSrc||"위탁과제")+"' DB가 연동 인테그레이션(AI-team-dashboard-KOTI)에 연결돼 있는지 확인해 주세요.</span></div>";
+    } else if(!DATA.consignments.length){
+      html="<div class=\"empty-note\">등록된 위탁과제가 없습니다. 노션 '위탁과제 정보' DB에 과제를 추가해 주세요.</div>";
+    } else if(!c){
+      html="<div class=\"empty-note\">"+YEAR+"년에 해당하는 위탁과제가 없습니다.</div>";
+    } else {
+      html = renderInfoStrip(c) + renderSubtabs() + (VIEW==="meetings"?renderMeetings():renderRequests());
+    }
+    document.getElementById("content").innerHTML = html;
+    if(c && !DATA.error){ fillDynamicFilters(); }
+  }
+  function fillDynamicFilters(){
+    function opt(arr,all,cur){ return "<option value=\"전체\""+(cur==="전체"?" selected":"")+">"+all+"</option>"+arr.map(function(x){return "<option value=\""+esc(x)+"\""+(x===cur?" selected":"")+">"+esc(x)+"</option>";}).join(""); }
+    if(VIEW==="meetings"){
+      document.getElementById("mType").innerHTML=opt(KIND_LIST,"종류 전체",MFILTER.type);
+      document.getElementById("mStatus").innerHTML=opt(["예정","완료"],"상태 전체",MFILTER.status);
+    } else {
+      document.getElementById("rCategory").innerHTML=opt(CAT_LIST,"구분 전체",RFILTER.category);
+      document.getElementById("rStatus").innerHTML=opt(["회신완료","검토중"],"상태 전체",RFILTER.status);
+    }
+  }
+
+  // ===== 탭/필터 이벤트 (동적 요소이므로 문서 위임) =====
+  document.getElementById("ptabs").addEventListener("click", function(e){
+    var t=e.target.closest("[data-sel]"); if(!t) return;
+    SEL=t.dataset.sel; VIEW="meetings"; render();
+  });
+  document.getElementById("yearPrev").addEventListener("click", function(){ YEAR--; var avail=DATA.consignments.filter(function(c){return inYear(c,YEAR);}); SEL=avail.length?avail[0].id:null; render(); });
+  document.getElementById("yearNext").addEventListener("click", function(){ YEAR++; var avail=DATA.consignments.filter(function(c){return inYear(c,YEAR);}); SEL=avail.length?avail[0].id:null; render(); });
+  document.getElementById("refreshBtn").addEventListener("click", load);
+
+  document.getElementById("content").addEventListener("click", function(e){
+    var sub=e.target.closest("[data-view]");
+    if(sub){ VIEW=sub.dataset.view; render(); return; }
+    var addM=e.target.closest("#addMeetBtn");
+    if(addM){ openMeetAdd(); return; }
+    var addR=e.target.closest("#addReqBtn");
+    if(addR){ openReqAdd(); return; }
+    var mReset=e.target.closest("#mReset");
+    if(mReset){ MFILTER={search:"",type:"전체",status:"전체"}; render(); return; }
+    var rReset=e.target.closest("#rReset");
+    if(rReset){ RFILTER={search:"",category:"전체",status:"전체"}; render(); return; }
+    var edit=e.target.closest("[data-edit]");
+    if(edit){ openReqEdit(edit.dataset.edit); e.stopPropagation(); return; }
+    var reqCard=e.target.closest(".req-card[data-id]");
+    if(reqCard){ openReqView(reqCard.dataset.id); return; }
+    var mRow=e.target.closest("tr[data-id]");
+    if(mRow){ openMeetView(mRow.dataset.id); return; }
+  });
+  document.getElementById("content").addEventListener("change", function(e){
+    if(e.target.id==="mType"){ MFILTER.type=e.target.value; render(); }
+    if(e.target.id==="mStatus"){ MFILTER.status=e.target.value; render(); }
+    if(e.target.id==="rCategory"){ RFILTER.category=e.target.value; render(); }
+    if(e.target.id==="rStatus"){ RFILTER.status=e.target.value; render(); }
+  });
+  document.getElementById("content").addEventListener("input", function(e){
+    if(e.target.id==="mSearch"){ MFILTER.search=e.target.value; render(); document.getElementById("mSearch").focus(); document.getElementById("mSearch").selectionStart=document.getElementById("mSearch").value.length; }
+    if(e.target.id==="rSearch"){ RFILTER.search=e.target.value; render(); document.getElementById("rSearch").focus(); document.getElementById("rSearch").selectionStart=document.getElementById("rSearch").value.length; }
+  });
+
+  // ===== 회의록 모달 =====
+  function findMeet(id){ return DATA.meetings.filter(function(m){return m.id===id;})[0]; }
+  function meetViewHtml(m){
+    return "<div style=\"display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px\">"+kindBadge(m.kind)+mstatBadge(m.status)+modeBadge(m.mode)
+      +"<span style=\"font-size:12.5px;font-weight:600;color:var(--muted)\">"+fmtMDW(m.date)+" · "+esc(m.attendees||"-")+"</span></div>"
+      +"<div style=\"font-size:17px;font-weight:800;color:var(--navy);margin-bottom:14px\">"+esc(m.title)+"</div>"
+      +"<div style=\"font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:8px\">회의 내용</div>"
+      +"<div style=\"font-size:13.5px;color:var(--text);white-space:pre-wrap;background:var(--bg);border:1px solid var(--line-2);border-radius:6px;padding:14px 16px;line-height:1.8\">"+esc(m.body||"-")+"</div>";
+  }
+  function meetEditHtml(m){
+    function opt(arr,cur){ return arr.map(function(x){return "<option value=\""+esc(x)+"\""+(x===cur?" selected":"")+">"+esc(x)+"</option>";}).join(""); }
+    return "<div class=\"fld-row\">"
+      +"<label class=\"fld\"><span>구분</span><select id=\"mfType\">"+opt(KIND_LIST,m.kind)+"</select></label>"
+      +"<label class=\"fld\"><span>일시</span><input type=\"date\" id=\"mfDate\" value=\""+esc(m.date||"")+"\"></label></div>"
+      +"<div class=\"fld-row\">"
+      +"<label class=\"fld\"><span>상태</span><select id=\"mfStatus\">"+opt(["예정","완료"],m.status)+"</select></label>"
+      +"<label class=\"fld\"><span>형태</span><select id=\"mfMode\">"+opt(["대면","화상"],m.mode)+"</select></label></div>"
+      +"<label class=\"fld\"><span>주요 안건 <b>*</b></span><input type=\"text\" id=\"mfTitle\" value=\""+esc(m.title||"")+"\" placeholder=\"예) 3월 연구진행 점검\"></label>"
+      +"<label class=\"fld\"><span>참석</span><input type=\"text\" id=\"mfAttendees\" value=\""+esc(m.attendees||"")+"\" placeholder=\"예) 이종우, 김OO 교수\"></label>"
+      +"<label class=\"fld\"><span>회의 내용</span><textarea id=\"mfBody\" rows=\"7\" placeholder=\"안건별 논의·결정사항을 정리하세요\">"+esc(m.body||"")+"</textarea></label>"
+      +"<div class=\"estatus status\" id=\"mfStatusMsg\"></div>";
+  }
+  function openMeetView(id){
+    var m=findMeet(id); if(!m) return;
+    MEDIT={id:id, mode:"view"};
+    document.getElementById("meetHead").textContent="회의 상세";
+    document.getElementById("meetBody").innerHTML=meetViewHtml(m);
+    document.getElementById("meetFoot").innerHTML="<button class=\"mbtn danger\" id=\"meetDelBtn\">삭제</button><div style=\"flex:1\"></div>"
+      +"<button class=\"mbtn ghost\" id=\"meetCloseBtn\">닫기</button><button class=\"mbtn primary\" id=\"meetEditBtn\">수정</button>";
+    document.getElementById("meetOv").classList.add("open");
+  }
+  function openMeetAdd(){
+    var blank={kind:"월간회의",status:"예정",mode:"대면",date:"",title:"",attendees:"",body:""};
+    MEDIT={id:null, mode:"edit"};
+    document.getElementById("meetHead").textContent="회의 추가";
+    document.getElementById("meetBody").innerHTML=meetEditHtml(blank);
+    document.getElementById("meetFoot").innerHTML="<div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"meetCancelBtn\">취소</button><button class=\"mbtn primary\" id=\"meetSaveBtn\">저장</button>";
+    document.getElementById("meetOv").classList.add("open");
+  }
+  function switchMeetToEdit(){
+    var m=findMeet(MEDIT.id); if(!m) return;
+    MEDIT.mode="edit";
+    document.getElementById("meetHead").textContent="회의 수정";
+    document.getElementById("meetBody").innerHTML=meetEditHtml(m);
+    document.getElementById("meetFoot").innerHTML="<button class=\"mbtn danger\" id=\"meetDelBtn\">삭제</button><div style=\"flex:1\"></div>"
+      +"<button class=\"mbtn ghost\" id=\"meetCancelBtn\">취소</button><button class=\"mbtn primary\" id=\"meetSaveBtn\">저장</button>";
+  }
+  function closeMeet(){ document.getElementById("meetOv").classList.remove("open"); }
+  document.getElementById("meetX").addEventListener("click", closeMeet);
+  document.getElementById("meetOv").addEventListener("click", function(e){ if(e.target.id==="meetOv") closeMeet(); });
+  document.getElementById("meetFoot").addEventListener("click", async function(e){
+    if(e.target.id==="meetCloseBtn"||e.target.id==="meetCancelBtn"){ closeMeet(); return; }
+    if(e.target.id==="meetEditBtn"){ switchMeetToEdit(); return; }
+    if(e.target.id==="meetDelBtn"){
+      if(!confirm("이 회의를 삭제하시겠어요?")) return;
+      try {
+        var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"consignMeetingDelete",id:MEDIT.id})});
+        var data=await res.json(); if(!data.ok) throw new Error(data.error||"실패");
+        closeMeet(); load();
+      } catch(err){ alert("삭제 실패: "+err.message); }
+      return;
+    }
+    if(e.target.id==="meetSaveBtn"){
+      var title=document.getElementById("mfTitle").value.trim();
+      var st=document.getElementById("mfStatusMsg");
+      if(!title){ st.className="estatus status show err"; st.textContent="주요 안건을 입력하세요."; return; }
+      var item={
+        id:MEDIT.id, project:SEL, kind:document.getElementById("mfType").value, status:document.getElementById("mfStatus").value,
+        mode:document.getElementById("mfMode").value, date:document.getElementById("mfDate").value, title:title,
+        attendees:document.getElementById("mfAttendees").value.trim(), body:document.getElementById("mfBody").value.trim()
+      };
+      st.className="estatus status show info"; st.textContent="저장 중…";
+      try {
+        var action=MEDIT.id?"consignMeetingUpdate":"consignMeetingCreate";
+        var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:action,item:item})});
+        var data=await res.json(); if(!data.ok) throw new Error(data.error||"실패");
+        st.className="estatus status show ok"; st.textContent="저장 완료";
+        setTimeout(function(){ closeMeet(); load(); }, 500);
+      } catch(err){ st.className="estatus status show err"; st.textContent="저장 실패: "+err.message; }
+    }
+  });
+
+  // ===== 요청자료 모달 =====
+  function findReq(id){ return DATA.requests.filter(function(r){return r.id===id;})[0]; }
+  function reqViewHtml(r){
+    var files="";
+    if(r.reqFile) files+="<span class=\"filechip req\">📤 요청 · "+esc(r.reqFile)+"</span>";
+    if(r.replyFile) files+="<span class=\"filechip reply\">📥 회신 · "+esc(r.replyFile)+"</span>";
+    var allFigs=[];
+    (r.qa||[]).forEach(function(qa){ (qa.figures||[]).forEach(function(f){ allFigs.push(f); }); });
+    var figHtml = allFigs.length ? allFigs.map(function(f){
+      return "<div class=\"fig-item\" data-zoom-url=\""+esc(f.url)+"\" data-zoom-cap=\""+esc(f.caption||"")+"\">"
+        +"<img src=\""+esc(f.url)+"\" alt=\""+esc(f.caption||"그림")+"\">"
+        +(f.caption?"<div class=\"fig-cap\">"+esc(f.caption)+"</div>":"")+"</div>";
+    }).join("") : "<div class=\"fig-empty\">첨부된 그림이 없습니다.</div>";
+    var qaHtml=(r.qa&&r.qa.length) ? r.qa.map(function(qa,i){
+      return "<div class=\"qa-detail\"><div class=\"q-row\"><span class=\"qa-n\">안건 "+(i+1)+"</span><div class=\"qa-q\">"+esc(qa.q)+"</div></div>"
+        +"<div class=\"a-row\"><span class=\"qa-a-badge\">답변 "+(i+1)+"</span><div class=\"qa-a-text\">"+highlightText(qa.a||"-")+"</div></div></div>";
+    }).join("") : "<div class=\"qa-empty\">아직 정리된 문의·답변이 없습니다.</div>";
+    return "<div style=\"padding:16px 20px 0\"><div style=\"display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px\">"
+      +"<span style=\"font-size:12px;color:var(--muted)\">요청 "+fmtYM(r.reqDate)+" · 회신 "+fmtYM(r.replyDate)+"</span>"+rstatBadge(r.status)+"</div>"
+      +(files?"<div class=\"req-files\">"+files+"</div>":"")+"</div>"
+      +"<div class=\"req-view-grid\">"
+        +"<div class=\"fig-col\"><div class=\"fig-lab\">FIGURES</div>"+figHtml+"</div>"
+        +"<div class=\"qa-col\">"+qaHtml+"</div>"
+      +"</div>";
+  }
+  function reqEditHtml(r){
+    function opt(arr,cur){ return arr.map(function(x){return "<option value=\""+esc(x)+"\""+(x===cur?" selected":"")+">"+esc(x)+"</option>";}).join(""); }
+    var qaHtml=(REDIT.qa||[]).map(function(qa,i){
+      return "<div style=\"border:1px solid var(--line-2);border-radius:7px;padding:12px 14px;margin-bottom:12px\">"
+        +"<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:8px\">"
+        +"<span class=\"qa-n\">안건 "+(i+1)+"</span><span class=\"qa-remove\" data-qa-del=\""+i+"\">항목 삭제</span></div>"
+        +"<textarea class=\"qa-q-in\" data-qi=\""+i+"\" rows=\"2\" placeholder=\"문의사항\" style=\"width:100%;border:1px solid var(--line-2);border-radius:5px;padding:8px 10px;font-size:13px;margin-bottom:9px;font-family:inherit\">"+esc(qa.q)+"</textarea>"
+        +"<div style=\"font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px\">답변 "+(i+1)+"</div>"
+        +"<textarea class=\"qa-a-in\" data-ai=\""+i+"\" rows=\"3\" placeholder=\"답변\" style=\"width:100%;border:1px solid var(--line-2);border-radius:5px;padding:8px 10px;font-size:13px;font-family:inherit\">"+esc(qa.a)+"</textarea></div>";
+    }).join("");
+    return "<div class=\"fld-row\">"
+      +"<label class=\"fld\"><span>구분</span><select id=\"rfCategory\">"+opt(CAT_LIST,r.category)+"</select></label>"
+      +"<label class=\"fld\"><span>제목 <b>*</b></span><input type=\"text\" id=\"rfTitle\" value=\""+esc(r.title||"")+"\"></label></div>"
+      +"<div class=\"fld-row\">"
+      +"<label class=\"fld\"><span>요청일</span><input type=\"date\" id=\"rfReqDate\" value=\""+esc(r.reqDate||"")+"\"></label>"
+      +"<label class=\"fld\"><span>회신일</span><input type=\"date\" id=\"rfReplyDate\" value=\""+esc(r.replyDate||"")+"\"></label>"
+      +"<label class=\"fld\"><span>상태</span><select id=\"rfStatus\">"+opt(["회신완료","검토중"],r.status)+"</select></label></div>"
+      +"<div class=\"fld-row\">"
+      +"<label class=\"fld\"><span>요청 PDF</span><input type=\"text\" id=\"rfReqFile\" value=\""+esc(r.reqFile||"")+"\"></label>"
+      +"<label class=\"fld\"><span>회신 PDF</span><input type=\"text\" id=\"rfReplyFile\" value=\""+esc(r.replyFile||"")+"\"></label></div>"
+      +"<div style=\"border-top:1px solid var(--line-2);padding-top:12px;margin-top:4px\">"
+      +"<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\">"
+      +"<span style=\"font-size:11.5px;font-weight:700;color:var(--muted)\">안건 · 내용</span>"
+      +"<button class=\"qa-addbtn\" id=\"qaAddBtn\">+ 문의·답변 추가</button></div>"
+      +qaHtml+(REDIT.qa.length?"":"<div class=\"qa-empty\">\"+ 문의·답변 추가\"로 항목을 만드세요.</div>")
+      +"</div><div class=\"estatus status\" id=\"rfStatusMsg\"></div>";
+  }
+  function syncQaFromDom(){
+    document.querySelectorAll(".qa-q-in").forEach(function(el){ REDIT.qa[+el.dataset.qi].q = el.value; });
+    document.querySelectorAll(".qa-a-in").forEach(function(el){ REDIT.qa[+el.dataset.ai].a = el.value; });
+  }
+  function reqModalEl(){ return document.querySelector("#reqOv .modal"); }
+  function openReqView(id){
+    var r=findReq(id); if(!r) return;
+    REDIT={id:id, mode:"view", qa:[]};
+    reqModalEl().classList.add("modal-wide");
+    document.getElementById("reqHead").innerHTML=catTag(r.category)+" &nbsp;"+esc(r.title);
+    document.getElementById("reqBody").innerHTML=reqViewHtml(r);
+    document.getElementById("reqFoot").innerHTML="<div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"reqCloseBtn\">닫기</button><button class=\"mbtn primary\" id=\"reqEditBtn\">편집</button>";
+    document.getElementById("reqOv").classList.add("open");
+  }
+  function openReqAdd(){
+    var blank={category:"연구진행",title:"",reqDate:"",replyDate:"",status:"검토중",reqFile:"",replyFile:""};
+    REDIT={id:null, mode:"edit", qa:[]};
+    reqModalEl().classList.remove("modal-wide");
+    document.getElementById("reqHead").textContent="자료 추가";
+    document.getElementById("reqBody").innerHTML=reqEditHtml(blank);
+    document.getElementById("reqFoot").innerHTML="<div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"reqCancelBtn\">취소</button><button class=\"mbtn primary\" id=\"reqSaveBtn\">저장</button>";
+    document.getElementById("reqOv").classList.add("open");
+  }
+  function openReqEdit(id){
+    var r=findReq(id); if(!r) return;
+    REDIT={id:id, mode:"edit", qa:JSON.parse(JSON.stringify(r.qa||[]))};
+    reqModalEl().classList.remove("modal-wide");
+    document.getElementById("reqHead").textContent="자료 수정";
+    document.getElementById("reqBody").innerHTML=reqEditHtml(r);
+    document.getElementById("reqFoot").innerHTML="<button class=\"mbtn danger\" id=\"reqDelBtn\">삭제</button><div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"reqCancelBtn\">취소</button><button class=\"mbtn primary\" id=\"reqSaveBtn\">저장</button>";
+    document.getElementById("reqOv").classList.add("open");
+  }
+  function rerenderReqEditQa(){
+    var r=findReq(REDIT.id) || {category:"",title:document.getElementById("rfTitle")?document.getElementById("rfTitle").value:"",reqDate:"",replyDate:"",status:"",reqFile:"",replyFile:""};
+    // 현재 입력값 유지한 채 QA 영역만 다시 그림 (간단히 폼 전체를 다시 그리되 현재 값 반영)
+    var snapshot={
+      category:document.getElementById("rfCategory").value, title:document.getElementById("rfTitle").value,
+      reqDate:document.getElementById("rfReqDate").value, replyDate:document.getElementById("rfReplyDate").value,
+      status:document.getElementById("rfStatus").value, reqFile:document.getElementById("rfReqFile").value, replyFile:document.getElementById("rfReplyFile").value
+    };
+    document.getElementById("reqBody").innerHTML=reqEditHtml(snapshot);
+  }
+  function closeReq(){ document.getElementById("reqOv").classList.remove("open"); }
+  document.getElementById("reqX").addEventListener("click", closeReq);
+  document.getElementById("reqOv").addEventListener("click", function(e){ if(e.target.id==="reqOv") closeReq(); });
+  document.getElementById("reqBody").addEventListener("click", function(e){
+    var addQa=e.target.closest("#qaAddBtn");
+    if(addQa){ syncQaFromDom(); REDIT.qa.push({q:"",a:""}); rerenderReqEditQa(); return; }
+    var delQa=e.target.closest("[data-qa-del]");
+    if(delQa){ syncQaFromDom(); REDIT.qa.splice(+delQa.dataset.qaDel,1); rerenderReqEditQa(); return; }
+    var fig=e.target.closest("[data-zoom-url]");
+    if(fig){ openLightbox(fig.dataset.zoomUrl, fig.dataset.zoomCap); return; }
+  });
+  function openLightbox(url, caption){
+    document.getElementById("lightboxImg").src=url;
+    document.getElementById("lightboxCap").textContent=caption||"";
+    document.getElementById("lightbox").classList.add("open");
+  }
+  document.getElementById("lightbox").addEventListener("click", function(){ document.getElementById("lightbox").classList.remove("open"); });
+  document.getElementById("reqFoot").addEventListener("click", async function(e){
+    if(e.target.id==="reqCloseBtn"||e.target.id==="reqCancelBtn"){ closeReq(); return; }
+    if(e.target.id==="reqEditBtn"){ openReqEdit(REDIT.id); return; }
+    if(e.target.id==="reqDelBtn"){
+      if(!confirm("이 자료를 삭제하시겠어요?")) return;
+      try {
+        var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"consignRequestDelete",id:REDIT.id})});
+        var data=await res.json(); if(!data.ok) throw new Error(data.error||"실패");
+        closeReq(); load();
+      } catch(err){ alert("삭제 실패: "+err.message); }
+      return;
+    }
+    if(e.target.id==="reqSaveBtn"){
+      syncQaFromDom();
+      var title=document.getElementById("rfTitle").value.trim();
+      var st=document.getElementById("rfStatusMsg");
+      if(!title){ st.className="estatus status show err"; st.textContent="제목을 입력하세요."; return; }
+      var item={
+        id:REDIT.id, project:SEL, category:document.getElementById("rfCategory").value, title:title,
+        reqDate:document.getElementById("rfReqDate").value, replyDate:document.getElementById("rfReplyDate").value,
+        status:document.getElementById("rfStatus").value, reqFile:document.getElementById("rfReqFile").value.trim(),
+        replyFile:document.getElementById("rfReplyFile").value.trim(),
+        qa:REDIT.qa.filter(function(x){return (x.q||"").trim();})
+      };
+      st.className="estatus status show info"; st.textContent="저장 중…";
+      try {
+        var action=REDIT.id?"consignRequestUpdate":"consignRequestCreate";
+        var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:action,item:item})});
+        var data=await res.json(); if(!data.ok) throw new Error(data.error||"실패");
+        st.className="estatus status show ok"; st.textContent="저장 완료";
+        setTimeout(function(){ closeReq(); load(); }, 500);
+      } catch(err){ st.className="estatus status show err"; st.textContent="저장 실패: "+err.message; }
+    }
+  });
+
+  // 테마
+  (function(){
+    var root=document.documentElement, btn=document.getElementById("themeBtn");
+    function set(t){ root.setAttribute("data-theme",t); btn.textContent=(t==="dark"?"☀️ 라이트모드":"🌙 다크모드"); }
+    btn.addEventListener("click", function(){ set(root.getAttribute("data-theme")==="dark"?"light":"dark"); });
+  })();
+
+  load();
+</script>
+</body>
+</html>
