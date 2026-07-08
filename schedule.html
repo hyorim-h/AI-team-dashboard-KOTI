@@ -361,7 +361,7 @@
   };
   var OWNERS = ["이종우","전준수","이채영","한효림","김예원","정승환","심지윤","정정호"];
   var TYPES = ["과제","출장","외출","휴가","재택근무","기타"];           // 필터용 (기존 출장 데이터도 필터 가능해야 함)
-  var EDIT_TYPES = ["과제","외출","휴가","재택근무","기타"];             // 등록/수정 폼용 (출장은 과제+참석자로 대체)
+  var EDIT_TYPES = ["과제","출장","외출","휴가","재택근무","기타"];             // 출장도 직접 선택 (참석자 자동전환 제거)
   var PERSON_OPTIONS = ["-"].concat(OWNERS);
   var VACATIONS = ["휴가","오전반차","오후반차","공가","병가","건강검진"];
   var ATT_TYPES = VACATIONS.concat(["외출","재택근무"]); // 제목이 "유형(이름)"로 자동 구성되는 유형
@@ -653,7 +653,7 @@
   function syncFields(){
     var t=document.getElementById("edType").value;
     var isAtt=ATT_TYPES.indexOf(t)>=0;
-    document.getElementById("wrapProject").style.display=(t==="과제")?"":"none";
+    document.getElementById("wrapProject").style.display=(t==="과제"||t==="출장")?"":"none";
     document.getElementById("wrapAttendees").style.display=(t==="출장"||t==="과제"||isAtt)?"":"none";
     var attLab=document.querySelector("#wrapAttendees span");
     if(attLab) attLab.textContent = isAtt ? "대상자(여러 명 가능)" : "참석자";
@@ -673,7 +673,7 @@
     EDIT.origVacation=r.vacation||"";
     document.getElementById("editHead").textContent=isNew?"일정 추가":"일정 수정";
     var isMultiPerson = ATT_TYPES.indexOf(r.type)>=0 && r.person && r.person.indexOf(",")>=0;
-    fillSelect(document.getElementById("edType"), EDIT_TYPES, (r.type&&r.type!=="출장")?r.type:"과제");
+    fillSelect(document.getElementById("edType"), EDIT_TYPES, r.type||"과제");
     fillSelect(document.getElementById("edPerson"), PERSON_OPTIONS, isMultiPerson ? "-" : (r.person||"-"));
     fillSelect(document.getElementById("edProject"), PROJECTS, r.project||PROJECTS[0]);
     document.getElementById("edTitle").value=(ATT_TYPES.indexOf(r.type)>=0) ? extractNote(r) : (r.title||"");
@@ -710,7 +710,6 @@
     var isAttType = ATT_TYPES.indexOf(type)>=0;
     var attRaw = document.getElementById("edAttendees").value.trim();
     var attendees = attRaw ? normalizeAttendees(attRaw) : "";
-    if(type==="과제" && attendees) type = "출장"; // 과제로 두고 참석자를 입력해도 출장으로 태깅
     var personVal=document.getElementById("edPerson").value;
     // 휴가/외출/재택근무: 여러 명이면 "대상자"(참석자 필드)에 콤마로, 한 명이면 담당자 드롭다운으로 — 둘 중 하나는 있어야 함(제목에 이름이 들어가야 하므로)
     var personFinal = (personVal==="-") ? "" : personVal;
@@ -724,7 +723,7 @@
     var timeStr = (type==="휴가") ? "" : (t0 + (t1? "~"+t1 : "")); // 휴가는 종일 일정(시간 불필요)
     var item={
       id:EDIT.id, type:type, person:personFinal, title:title,
-      project:(type==="과제")?document.getElementById("edProject").value:"",
+      project:(type==="과제"||type==="출장")?document.getElementById("edProject").value:"",
       vacation:(type==="휴가")?deriveVacationType(title, EDIT.origVacation):"",
       attendees:attendees,
       time:timeStr,

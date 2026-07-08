@@ -500,6 +500,15 @@ function extractAttendeesFromDesc(desc){
   var m = desc.match(/참석자\s*[:：]\s*([^\n\r]+)/);
   return m ? normalizePersonList(m[1].trim()) : "";
 }
+// 설명란에 명시적으로 적힌 "과제: XXX"(드롭다운으로 직접 고른 값) — 제목에 남은 예전 키워드보다 이걸 우선해야 함
+var SCHED_PROJECT_NAMES = SCHED_PROJECT_KEYWORDS.map(function(x){ return x.name; }).filter(function(v,i,a){ return a.indexOf(v)===i; });
+function extractExplicitProject(desc){
+  if(!desc) return "";
+  var m = desc.match(/과제\s*[:：]\s*([^\n\r]+)/);
+  if(!m) return "";
+  var val = m[1].trim();
+  return (SCHED_PROJECT_NAMES.indexOf(val) >= 0) ? val : "";
+}
 function classifySchedule(ev){
   var title = (ev.title || "").trim();
   var desc = ev.desc || "";
@@ -520,10 +529,15 @@ function classifySchedule(ev){
   } else if(desc.indexOf("출장") >= 0){
     type = "출장";
     person = extractPersonFromDesc(desc);
+    project = extractExplicitProject(desc);
   } else {
-    var matched = SCHED_PROJECT_KEYWORDS.filter(function(x){ return title.indexOf(x.kw) >= 0 || desc.indexOf(x.kw) >= 0; })[0];
-    if(matched){ type = "과제"; project = matched.name; person = extractPersonFromDesc(desc); }
-    else { type = "기타"; person = extractPersonFromDesc(desc); }
+    var explicitProj = extractExplicitProject(desc);
+    if(explicitProj){ type = "과제"; project = explicitProj; person = extractPersonFromDesc(desc); }
+    else {
+      var matched = SCHED_PROJECT_KEYWORDS.filter(function(x){ return title.indexOf(x.kw) >= 0 || desc.indexOf(x.kw) >= 0; })[0];
+      if(matched){ type = "과제"; project = matched.name; person = extractPersonFromDesc(desc); }
+      else { type = "기타"; person = extractPersonFromDesc(desc); }
+    }
   }
   var attendees = extractAttendeesFromDesc(desc);
   return { type: type, person: person, vacation: vacation, project: project, attendees: attendees };
@@ -1156,7 +1170,7 @@ function schedSummary(item){
 function schedDescription(item){
   var lines = [];
   if(item.type === "출장") lines.push("출장"); // 필수 키워드
-  if(item.type === "과제" && item.project) lines.push("과제: " + item.project);
+  if((item.type === "과제" || item.type === "출장") && item.project) lines.push("과제: " + item.project);
   // 휴가/외출/재택근무 등은 제목의 "유형(이름)"이 담당자의 유일한 출처 → 설명란에 중복 기록하지 않음
   if(item.person && SCHED_ATT_TYPES.indexOf(item.type) < 0) lines.push("담당자: " + item.person);
   if(item.attendees) lines.push("참석자: " + item.attendees);
