@@ -198,25 +198,30 @@
   .team-legend{display:flex;align-items:center;gap:14px}
   .team-legend .lg{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--muted)}
   .team-legend .dot{width:9px;height:9px;border-radius:2px}
-  .team-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
-  .team-col .tagbox{text-align:center;padding:7px 6px;border-radius:5px;font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:10px}
-  .team-col .pm-row{display:flex;flex-direction:column;gap:8px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line-2)}
-  .team-col .pm-chip{display:inline-block;font-size:11.5px;font-weight:700;color:#fff;background:var(--navy);border-radius:4px;padding:4px 8px}
-  .team-col .res-wrap{display:flex;flex-wrap:wrap;gap:6px}
-  .team-col .res-chip{font-size:11.5px;font-weight:600;color:var(--text);background:var(--bg);border-radius:4px;padding:4px 8px}
-  .team-col .mtg-list{display:flex;flex-direction:column;gap:6px}
-  .team-col .mtg-item{display:flex;flex-direction:column;gap:2px}
-  .team-col .mtg-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
-  .team-col .mtg-l{display:flex;align-items:center;gap:4px;min-width:0}
-  .team-col .mtg-review{flex-shrink:0;font-size:9.5px;font-weight:700;color:#c8273c;background:#fbe7ea;border-radius:8px;padding:2px 6px;white-space:nowrap}
-  .team-col .mtg-sum{font-size:11.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .team-col .mtg-stat{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap}
-  .team-col .mtg-date{font-size:10.5px;font-weight:500;color:var(--muted)}
-  .team-col .mtg-empty{font-size:11px;font-weight:500;color:var(--muted)}
-  .team-col .sch-list{display:flex;flex-direction:column;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line-2)}
-  .team-col .sch-item{display:flex;align-items:baseline;gap:6px;font-size:11px;font-weight:500}
-  .team-col .sch-item .d{color:var(--muted);flex-shrink:0}
-  .team-col .sch-item .l{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .team-grid{display:grid;grid-template-columns:1fr 1fr 1fr 0.6fr 0.6fr;column-gap:14px;row-gap:0}
+  .team-grid .tagbox{text-align:center;padding:7px 6px;border-radius:5px;font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:10px}
+  .team-grid .pm-row{display:flex;flex-direction:column;gap:6px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line-2)}
+  .team-grid .pi-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .team-grid .pi-chip{display:inline-block;font-size:11.5px;font-weight:700;color:#fff;background:var(--navy);border-radius:4px;padding:4px 8px}
+  .team-grid .pm-chip{display:inline-block;font-size:11.5px;font-weight:700;color:var(--navy);background:var(--blue-soft);border-radius:4px;padding:4px 8px}
+  .team-grid .res-wrap{display:flex;flex-wrap:wrap;gap:6px}
+  .team-grid .res-chip{font-size:11.5px;font-weight:600;color:var(--text);background:var(--bg);border-radius:4px;padding:4px 8px}
+  .team-grid .mtg-list{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .team-grid .mtg-item{display:flex;flex-direction:column;gap:2px}
+  .team-grid .mtg-item.click{cursor:pointer;border-radius:5px;margin:-4px -6px;padding:4px 6px}
+  .team-grid .mtg-item.click:hover{background:var(--blue-soft)}
+  .team-grid .mtg-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
+  .team-grid .mtg-l{display:flex;align-items:flex-start;gap:4px;min-width:0;flex-wrap:wrap}
+  .team-grid .mtg-review{flex-shrink:0;font-size:9.5px;font-weight:700;color:#c8273c;background:#fbe7ea;border-radius:8px;padding:2px 6px;white-space:nowrap;margin-top:1px}
+  .team-grid .mtg-sum{font-size:11.5px;font-weight:600;color:var(--text);white-space:normal;word-break:break-word;line-height:1.45}
+  .team-grid .mtg-stat{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0}
+  .team-grid .mtg-date{font-size:10.5px;font-weight:500;color:var(--muted)}
+  .team-grid .mtg-empty{font-size:11px;font-weight:500;color:var(--muted)}
+  .team-grid .sch-list{display:flex;flex-direction:column;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line-2)}
+  .team-grid .sch-item{display:flex;align-items:baseline;gap:6px;font-size:11px;font-weight:500}
+  .team-grid .sch-item .d{color:var(--muted);flex-shrink:0}
+  .team-grid .sch-item .l{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .team-grid .sch-empty{font-size:11px;color:var(--muted)}
 
   /* 위젯 2열 그리드 */
   .widget-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
@@ -280,7 +285,7 @@
 
   .minical-none{font-size:11.5px;color:var(--muted)}
 
-  @media(max-width:1100px){ .kpi-strip{grid-template-columns:repeat(3,1fr)} .team-grid{grid-template-columns:repeat(3,1fr)} .widget-grid{grid-template-columns:1fr} }
+  @media(max-width:1100px){ .widget-grid{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -389,7 +394,7 @@
       .map(function(m){
         var done = m.date < TODAY_ISO;
         return {
-          dateText: fmtMDW(m.date), summary: (m.summary&&m.summary.trim())?m.summary:(m.headingList||m.title),
+          id:m.id, dateText: fmtMDW(m.date), summary: (m.summary&&m.summary.trim())?m.summary:(m.headingList||m.title),
           needsReview: !!m.needsReview, done: done
         };
       })
@@ -397,20 +402,21 @@
   }
   function schedulesOfProject(name){
     return (DATA.schedule||[]).filter(function(s){
-      return s.type==="과제" && s.project===name && inThisWeek(s.start);
+      return (s.type==="과제"||s.type==="출장") && s.project===name && inThisWeek(s.start);
     }).sort(function(a,b){ return a.start<b.start?-1:1; })
       .map(function(s){ return { dateText: fmtMDW(s.start)+(s.time?" "+s.time.split("~")[0]:""), label: s.title }; });
   }
   function buildTeamCard(){
     var info=(DATA.projectInfo||[]).slice().sort(function(a,b){return (a.order||999)-(b.order||999);});
     if(!info.length) return "";
-    var cols=info.map(function(p){
+    var tagboxes=[], pmrows=[], mtglists=[], schlists=[];
+    info.forEach(function(p){
       var st=projStyle(p.name);
       var main=(p.main&&p.main.length)?p.main.join(", "):"-";
       var sub=(p.sub||[]).map(function(n){return "<span class=\"res-chip\">"+esc(n)+"</span>";}).join("");
       var mtgs=meetingsOfProject(p.name);
       var mtgHtml = mtgs.length ? mtgs.map(function(m){
-        return "<div class=\"mtg-item\"><div class=\"mtg-top\"><span class=\"mtg-l\">"
+        return "<div class=\"mtg-item click\" data-nav=\"weekly-meeting.html?meeting="+encodeURIComponent(m.id)+"\"><div class=\"mtg-top\"><span class=\"mtg-l\">"
           +(m.needsReview?"<span class=\"mtg-review\">검토 필요</span>":"")
           +"<span class=\"mtg-sum\">"+esc(m.summary)+"</span></span>"
           +"<span class=\"mtg-stat\" style=\""+(m.done?"background:var(--bg);color:var(--muted)":"background:var(--blue-soft);color:var(--blue)")+"\">"+(m.done?"완료":"예정")+"</span></div>"
@@ -419,16 +425,23 @@
       var scheds=schedulesOfProject(p.name);
       var schHtml = scheds.length ? scheds.map(function(s){
         return "<div class=\"sch-item\"><span class=\"d\">"+s.dateText+"</span><span class=\"l\">"+esc(s.label)+"</span></div>";
-      }).join("") : "";
-      return "<div class=\"team-col\"><div class=\"tagbox\" style=\"background:"+st.bg+";color:"+st.c+"\">"+esc(PROJ_SHORT[p.name]||p.name)+"</div>"
-        +"<div class=\"pm-row\"><div><span class=\"pm-chip\">"+esc(main)+"</span></div><div class=\"res-wrap\">"+sub+"</div></div>"
-        +"<div class=\"mtg-list\">"+mtgHtml+"</div>"
-        +(schHtml?"<div class=\"sch-list\">"+schHtml+"</div>":"")
-        +"</div>";
-    }).join("");
+      }).join("") : "<div class=\"sch-empty\">일정 없음</div>";
+
+      tagboxes.push("<div class=\"tagbox\" style=\"background:"+st.bg+";color:"+st.c+"\">"+esc(PROJ_SHORT[p.name]||p.name)+"</div>");
+      pmrows.push("<div class=\"pm-row\">"
+        +"<div class=\"pi-row\"><span class=\"pi-chip\">"+esc(p.pi||"-")+"</span></div>"
+        +"<div class=\"pi-row\"><span class=\"pm-chip\">"+esc(main)+"</span></div>"
+        +"<div class=\"res-wrap\">"+sub+"</div></div>");
+      mtglists.push("<div class=\"mtg-list\">"+mtgHtml+"</div>");
+      schlists.push("<div class=\"sch-list\">"+schHtml+"</div>");
+    });
+    // 순서대로(태그박스 5개 → pm-row 5개 → mtg-list 5개 → sch-list 5개) 나열하면
+    // 그리드가 자동으로 4행×5열로 배치하고, 각 행의 높이는 그 행에서 제일 큰 셀 기준으로 통일됨(진짜 정렬 보장)
+    var cols = tagboxes.join("") + pmrows.join("") + mtglists.join("") + schlists.join("");
     return "<div class=\"dcard\"><div class=\"dcard-h\"><div class=\"l\"><span class=\"bar\"></span><h3>과제 현황</h3></div>"
-      +"<div class=\"team-legend\"><span class=\"lg\"><span class=\"dot\" style=\"background:var(--navy)\"></span>Main</span>"
-      +"<span class=\"lg\"><span class=\"dot\" style=\"background:var(--bg)\"></span>Sub</span></div></div>"
+      +"<div class=\"team-legend\"><span class=\"lg\"><span class=\"dot\" style=\"background:var(--navy)\"></span>연구책임자</span>"
+      +"<span class=\"lg\"><span class=\"dot\" style=\"background:var(--blue-soft)\"></span>실무연구진</span>"
+      +"<span class=\"lg\"><span class=\"dot\" style=\"background:var(--bg);border:1px solid var(--line-2)\"></span>연구진</span></div></div>"
       +"<div class=\"team-grid\">"+cols+"</div></div>";
   }
 

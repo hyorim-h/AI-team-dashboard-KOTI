@@ -449,10 +449,12 @@ function parseProjectInfo(page){
   }
   const main = msNames(p["Main"]);
   const sub = msNames(p["Sub"]);
+  const piRt = (p["연구책임자"] && p["연구책임자"].rich_text) || [];
+  const pi = piRt.map(function(t){return t.plain_text;}).join("");
   const start = (p["시작"] && p["시작"].date && p["시작"].date.start) || "";
   const end = (p["종료"] && p["종료"].date && p["종료"].date.start) || "";
   const order = (p["정렬순서"] && typeof p["정렬순서"].number === "number") ? p["정렬순서"].number : 999;
-  return { id: page.id, name: name, main: main, sub: sub, start: start, end: end, order: order };
+  return { id: page.id, name: name, pi: pi, main: main, sub: sub, start: start, end: end, order: order };
 }
 
 // ===== 일정관리(구글 캘린더 기반) 분류 =====
@@ -498,6 +500,15 @@ function extractAttendeesFromDesc(desc){
   var m = desc.match(/참석자\s*[:：]\s*([^\n\r]+)/);
   return m ? normalizePersonList(m[1].trim()) : "";
 }
+// 설명란에 명시적으로 적힌 "과제: XXX"(드롭다운으로 직접 고른 값) — 제목에 남은 예전 키워드보다 이걸 우선해야 함
+var SCHED_PROJECT_NAMES = SCHED_PROJECT_KEYWORDS.map(function(x){ return x.name; }).filter(function(v,i,a){ return a.indexOf(v)===i; });
+function extractExplicitProject(desc){
+  if(!desc) return "";
+  var m = desc.match(/과제\s*[:：]\s*([^\n\r]+)/);
+  if(!m) return "";
+  var val = m[1].trim();
+  return (SCHED_PROJECT_NAMES.indexOf(val) >= 0) ? val : "";
+}
 function classifySchedule(ev){
   var title = (ev.title || "").trim();
   var desc = ev.desc || "";
@@ -518,10 +529,15 @@ function classifySchedule(ev){
   } else if(desc.indexOf("출장") >= 0){
     type = "출장";
     person = extractPersonFromDesc(desc);
+    project = extractExplicitProject(desc);
   } else {
-    var matched = SCHED_PROJECT_KEYWORDS.filter(function(x){ return title.indexOf(x.kw) >= 0 || desc.indexOf(x.kw) >= 0; })[0];
-    if(matched){ type = "과제"; project = matched.name; person = extractPersonFromDesc(desc); }
-    else { type = "기타"; person = extractPersonFromDesc(desc); }
+    var explicitProj = extractExplicitProject(desc);
+    if(explicitProj){ type = "과제"; project = explicitProj; person = extractPersonFromDesc(desc); }
+    else {
+      var matched = SCHED_PROJECT_KEYWORDS.filter(function(x){ return title.indexOf(x.kw) >= 0 || desc.indexOf(x.kw) >= 0; })[0];
+      if(matched){ type = "과제"; project = matched.name; person = extractPersonFromDesc(desc); }
+      else { type = "기타"; person = extractPersonFromDesc(desc); }
+    }
   }
   var attendees = extractAttendeesFromDesc(desc);
   return { type: type, person: person, vacation: vacation, project: project, attendees: attendees };
@@ -1154,7 +1170,7 @@ function schedSummary(item){
 function schedDescription(item){
   var lines = [];
   if(item.type === "출장") lines.push("출장"); // 필수 키워드
-  if(item.type === "과제" && item.project) lines.push("과제: " + item.project);
+  if((item.type === "과제" || item.type === "출장") && item.project) lines.push("과제: " + item.project);
   // 휴가/외출/재택근무 등은 제목의 "유형(이름)"이 담당자의 유일한 출처 → 설명란에 중복 기록하지 않음
   if(item.person && SCHED_ATT_TYPES.indexOf(item.type) < 0) lines.push("담당자: " + item.person);
   if(item.attendees) lines.push("참석자: " + item.attendees);
@@ -1319,6 +1335,86 @@ async function updateMeetingSummary(env, payload){
   return { updated: true };
 }
 
+// 회의 기본 정보(과제/구분/일시/장소/참석자) 수정 — 요약·내용 수정과는 별개
+async function updateMeetingInfo(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  if(!item.id) throw new Error("회의자료 id 누락");
+  const props = {
+    "구분": { select: { name: item.kind || "주간회의" } },
+    "시간": { rich_text: rt(item.time || "") },
+    "장소": { rich_text: rt(item.place || "") },
+    "참석자": { rich_text: rt(item.attendees || "") },
+  };
+  if(item.date) props["회의날짜"] = { date: { start: item.date } };
+  props["과제"] = item.project ? { select: { name: item.project } } : { select: null };
+  await notionFetch("/pages/" + item.id, token, "PATCH", { properties: props });
+  return { updated: true };
+}
+
+// 회의자료 삭제 — 딸린 코멘트도 같이 정리(휴지통으로)
+async function deleteMeeting(env, payload){
+  const token = env.NOTION_TOKEN;
+  const meetingId = payload.meetingId;
+  if(!meetingId) throw new Error("회의자료 id 누락");
+  try {
+    const comments = await getComments(meetingId, token);
+    for(const c of comments){ try { await notionFetch("/pages/" + c.id, token, "PATCH", { archived: true }); } catch(e){} }
+  } catch(e){}
+  await notionFetch("/pages/" + meetingId, token, "PATCH", { archived: true });
+  return { deleted: true };
+}
+
+// 페이지 안에서 새 회의 등록 (기존엔 PDF 업로드 skill로만 생성 가능했음)
+function weekLabelForDate(dateStr){
+  var d = new Date(dateStr+"T00:00:00");
+  var dow = d.getDay();
+  var monOffset = (dow===0)?-6:(1-dow);
+  var mon = new Date(d); mon.setDate(d.getDate()+monOffset);
+  var fri = new Date(mon); fri.setDate(mon.getDate()+4);
+  var aStart = ymdOf(mon), aEnd = ymdOf(fri);
+  var wn = isoWeekNumSrv(aStart)-1;
+  return aStart+" ~ "+aEnd.slice(5)+" ("+wn+"주차)";
+}
+async function createMeeting(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  if(!item.title) throw new Error("제목을 입력하세요");
+  if(!item.date) throw new Error("회의날짜를 입력하세요");
+  var week = "";
+  try { week = weekLabelForDate(item.date); } catch(e){}
+  const props = {
+    "제목": { title: rt(item.title) },
+    "구분": { select: { name: item.kind || "주간회의" } },
+    "회의날짜": { date: { start: item.date } },
+    "주차": { rich_text: rt(week) },
+    "작성자": { rich_text: rt(item.writer || "") },
+    "시간": { rich_text: rt(item.time || "") },
+    "장소": { rich_text: rt(item.place || "") },
+    "참석자": { rich_text: rt(item.attendees || "") },
+    "회의요약": { rich_text: rt(item.summary || "") },
+  };
+  props["과제"] = item.project ? { select: { name: item.project } } : { select: null };
+
+  const sections = item.sections || [];
+  const children = [];
+  sections.forEach(function(s){
+    children.push({ object:"block", type:"heading_3", heading_3:{ rich_text: rt(s.heading||"") } });
+    children.push({ object:"block", type:"paragraph", paragraph:{ rich_text: rt(s.body||"") } });
+  });
+  const body = { parent: { database_id: MEETING_DB_ID }, properties: props };
+  if(children.length) body.children = children;
+  const res = await notionFetch("/pages", token, "POST", body);
+
+  if(sections.length){
+    try {
+      const summaryText = sections.map(function(s){ return s.heading; }).filter(Boolean).join(" / ");
+      await notionFetch("/pages/" + res.id, token, "PATCH", { properties: { "요약": { rich_text: rt(summaryText) } } });
+    } catch(e){}
+  }
+  return { created: true, id: res.id };
+}
+
 // 회의자료 꼭지(본문) 수정 — 본문 전체를 새 섹션으로 교체
 async function updateMeeting(env, payload){
   const token = env.NOTION_TOKEN;
@@ -1399,13 +1495,18 @@ function consignRequestProps(item){
 async function getOrderedQaSections(pageId, token){
   const data = await notionFetch("/blocks/" + pageId + "/children?page_size=100", token);
   const sections = []; let cur = null;
+  const BODY_TYPES = ["paragraph","bulleted_list_item","numbered_list_item","quote","callout"];
   for(const b of (data.results || [])){
     const t = b.type;
     if(t && t.startsWith("heading")){
-      cur = { headingId: b.id, paragraphId: null, imageIds: [] };
+      cur = { headingId: b.id, headingType: t, paragraphId: null, paragraphType: "paragraph", extraBodyIds: [], imageIds: [] };
       sections.push(cur);
     } else if(cur){
-      if(t === "paragraph" && cur.paragraphId === null) cur.paragraphId = b.id;
+      if(BODY_TYPES.indexOf(t) >= 0){
+        // 답변이 노션에서 여러 문단(블록)으로 나뉘어 있을 수 있음(Enter로 줄바꿈한 경우) — 전부 추적해야 저장 시 안 남고 지워짐
+        if(cur.paragraphId === null){ cur.paragraphId = b.id; cur.paragraphType = t; }
+        else cur.extraBodyIds.push(b.id);
+      }
       else if(t === "image") cur.imageIds.push(b.id);
     }
   }
@@ -1413,6 +1514,7 @@ async function getOrderedQaSections(pageId, token){
 }
 
 // Q&A 저장: 기존 꼭지(질문/답변)는 그 블록을 "그 자리에서" 내용만 교체 → 사이에 있는 이미지 블록은 절대 안 건드림.
+// 답변이 여러 문단(블록)으로 나뉘어 있었으면 첫 블록에 전체 내용을 담고 나머지 옛 블록은 삭제(안 그러면 옛 내용이 남아서 뒤섞임).
 // 새로 추가된 항목은 맨 뒤에 덧붙이고, 삭제된 항목은 그 항목의 블록만 지움(이미지 포함).
 async function writeRequestQaBlocks(pageId, token, qa){
   const list = qa || [];
@@ -1420,18 +1522,24 @@ async function writeRequestQaBlocks(pageId, token, qa){
   const n = Math.min(sections.length, list.length);
   for(let i=0;i<n;i++){
     const sec = sections[i], item = list[i];
-    await notionFetch("/blocks/" + sec.headingId, token, "PATCH", { heading_3: { rich_text: rt(item.q||"") } });
+    // 실제 블록 타입(heading_1/2/3 등)에 맞춰 패치해야 함 — 타입을 강제로 바꾸는 건 노션이 거부함
+    var headingPatch = {}; headingPatch[sec.headingType] = { rich_text: rt(item.q||"") };
+    await notionFetch("/blocks/" + sec.headingId, token, "PATCH", headingPatch);
     if(sec.paragraphId){
-      await notionFetch("/blocks/" + sec.paragraphId, token, "PATCH", { paragraph: { rich_text: rt(item.a||"") } });
+      var bodyPatch = {}; bodyPatch[sec.paragraphType] = { rich_text: rt(item.a||"") };
+      await notionFetch("/blocks/" + sec.paragraphId, token, "PATCH", bodyPatch);
     } else {
       await notionFetch("/blocks/" + pageId + "/children", token, "PATCH", { children: [{ object:"block", type:"paragraph", paragraph:{ rich_text: rt(item.a||"") } }], after: sec.headingId });
     }
+    // 답변이 여러 블록으로 나뉘어 있었다면, 첫 블록에 전체 내용을 넣었으니 나머지는 삭제(안 그러면 옛 내용이 중복으로 남음)
+    for(const extraId of (sec.extraBodyIds||[])){ try { await notionFetch("/blocks/" + extraId, token, "DELETE"); } catch(e){} }
   }
   // 삭제된 항목(뒤쪽 남는 기존 섹션) 제거 — 이미지도 그 섹션 것만 같이 지움
   for(let i=list.length; i<sections.length; i++){
     const sec = sections[i];
     try { await notionFetch("/blocks/" + sec.headingId, token, "DELETE"); } catch(e){}
     if(sec.paragraphId){ try { await notionFetch("/blocks/" + sec.paragraphId, token, "DELETE"); } catch(e){} }
+    for(const extraId of (sec.extraBodyIds||[])){ try { await notionFetch("/blocks/" + extraId, token, "DELETE"); } catch(e){} }
     for(const imgId of sec.imageIds){ try { await notionFetch("/blocks/" + imgId, token, "DELETE"); } catch(e){} }
   }
   // 새로 추가된 항목(기존보다 많아진 만큼) — 맨 뒤에 덧붙임
@@ -1506,10 +1614,16 @@ export default {
           result = await addComment(env, payload);
         } else if(payload.action === "deleteComment"){
           result = await deleteComment(env, payload);
+        } else if(payload.action === "meetingCreate"){
+          result = await createMeeting(env, payload);
         } else if(payload.action === "updateMeeting"){
           result = await updateMeeting(env, payload);
         } else if(payload.action === "updateMeetingSummary"){
           result = await updateMeetingSummary(env, payload);
+        } else if(payload.action === "updateMeetingInfo"){
+          result = await updateMeetingInfo(env, payload);
+        } else if(payload.action === "meetingDelete"){
+          result = await deleteMeeting(env, payload);
         } else if(payload.action === "consignMeetingCreate"){
           result = await createConsignMeeting(env, payload);
         } else if(payload.action === "consignMeetingUpdate"){
@@ -1543,13 +1657,29 @@ export default {
 
       if(scope === "dashboard"){
         // 대시보드 전용: 필요한 것만, 전부 병렬로 (개별 실패해도 나머지는 계속 진행)
+        var wkR0 = currentWeekRange();
+        // 회의 목록 + (이번주 회의 한정) 코멘트 조회를 하나의 체인으로 묶음
+        // → 아래 Promise.allSettled 안에서 다른 6개 fetch와 "진짜" 동시에 돎 (예전엔 이게 밖에서 순차로 붙어서 시간이 그냥 더해졌었음)
+        var meetingsPromise = getAllPages(MEETING_DB_ID, token).then(async function(pages){
+          var lite = pages.map(parseMeetingLite).filter(function(m){ return m.title; });
+          var thisWeek = lite.filter(function(m){ return m.date >= wkR0.start && m.date <= wkR0.end; });
+          try {
+            var commentResults = await Promise.allSettled(thisWeek.map(function(m){ return getComments(m.id, token); }));
+            thisWeek.forEach(function(m, i){
+              var comments = (commentResults[i].status==="fulfilled") ? commentResults[i].value : [];
+              m.needsReview = !comments.some(function(c){ return c.author === "이숭봉"; });
+            });
+          } catch(e){}
+          return lite;
+        });
+
         const results = await Promise.allSettled([
           getAllPages(PROJECT_DB_ID, token),                 // 0: 과제 정보
           getAllPages(WBS_DB_ID, token),                     // 1: WBS
           getAllPages(PERF_DB_ID, token),                    // 2: 성과
           getAllPages(ACHIEVE_DB_ID, token),                 // 3: 업무실적
           getAllPages(PLAN_DB_ID, token),                    // 4: 업무계획
-          getAllPages(MEETING_DB_ID, token),                 // 5: 회의자료(속성만 사용, 본문/코멘트 조회 안 함)
+          meetingsPromise,                                   // 5: 회의자료 + 이번주 코멘트(체인됨, 이제 진짜 병렬)
           getAllPages(CONSIGN_DB_ID, token),                 // 6: 위탁과제 정보만(회의록/요청자료는 대시보드에 안 씀)
           gcalList(env, "2026-06-01T00:00:00+09:00"),        // 7: 일정(구글 캘린더)
         ]);
@@ -1566,21 +1696,12 @@ export default {
 
         var aAll = ok(3, function(pages){ return pages.map(parseWorkPageLite); });
         var pAll = ok(4, function(pages){ return pages.map(parseWorkPageLite); });
-        var wkR = currentWeekRange();
+        var wkR = wkR0;
         var achievements = aAll.filter(function(x){return x.week===wkR.label;});
         var plans = pAll.filter(function(x){return x.week===wkR.planLabel;});
         body.work = { week: wkR.label, planWeek: wkR.planLabel, achievements: achievements, plans: plans };
 
-        body.meetings = ok(5, function(pages){ return pages.map(parseMeetingLite).filter(function(m){return m.title;}); });
-        // 이번주 회의에 한해서만 코멘트 확인(적은 수라 병렬로 가져와도 빠름) → "이숭봉" 코멘트 있으면 검토완료, 없으면 검토필요
-        try {
-          var thisWeekMeetings = body.meetings.filter(function(m){ return m.date >= wkR.start && m.date <= wkR.end; });
-          var commentResults = await Promise.allSettled(thisWeekMeetings.map(function(m){ return getComments(m.id, token); }));
-          thisWeekMeetings.forEach(function(m, i){
-            var comments = (commentResults[i].status==="fulfilled") ? commentResults[i].value : [];
-            m.needsReview = !comments.some(function(c){ return c.author === "이숭봉"; });
-          });
-        } catch(e){}
+        body.meetings = results[5].status==="fulfilled" ? results[5].value : [];
 
         var consignments = ok(6, function(pages){ return pages.map(parseConsignment).filter(function(c){return c.title;}); });
         consignments.sort(function(a,b){ return a.order - b.order; });
@@ -1600,17 +1721,18 @@ export default {
       }
 
       if(want("wbs")){
-        try {
-          const wbsPages = await getAllPages(WBS_DB_ID, token);
-          body.wbs = wbsPages.map(parseWbs).filter(function(w){ return w.task; });
-        } catch(e){ body.wbs = []; }
-        // 과제 정보(그룹 헤더용). ID가 틀리면 빈 배열 → 프론트가 fallback 사용.
-        try {
-          const projPages = await getAllPages(PROJECT_DB_ID, token);
-          var pinfo = projPages.map(parseProjectInfo).filter(function(x){ return x.name; });
+        const [wbsRes, projRes] = await Promise.allSettled([
+          getAllPages(WBS_DB_ID, token),
+          getAllPages(PROJECT_DB_ID, token),
+        ]);
+        if(wbsRes.status==="fulfilled"){
+          body.wbs = wbsRes.value.map(parseWbs).filter(function(w){ return w.task; });
+        } else { body.wbs = []; }
+        if(projRes.status==="fulfilled"){
+          var pinfo = projRes.value.map(parseProjectInfo).filter(function(x){ return x.name; });
           pinfo.sort(function(a,b){ return a.order - b.order; });
           body.projectInfo = pinfo;
-        } catch(e){ body.projectInfo = []; body.projectInfoError = String(e); }
+        } else { body.projectInfo = []; body.projectInfoError = String(projRes.reason); }
       }
 
       if(want("perf")){
@@ -1636,12 +1758,14 @@ export default {
         const weekOffset = parseInt(url.searchParams.get("weekOffset") || "0", 10) || 0;
         const wkR = currentWeekRange(weekOffset);
         try {
-          const aPages = await getAllPages(ACHIEVE_DB_ID, token);
-          const pPages = await getAllPages(PLAN_DB_ID, token);
-          const aAll = [];
-          for(const pg of aPages){ aAll.push(await parseWorkPage(pg, token, false)); }
-          const pAll = [];
-          for(const pg of pPages){ pAll.push(await parseWorkPage(pg, token, true)); }
+          const [aPages, pPages] = await Promise.all([
+            getAllPages(ACHIEVE_DB_ID, token),
+            getAllPages(PLAN_DB_ID, token),
+          ]);
+          const [aAll, pAll] = await Promise.all([
+            Promise.all(aPages.map(function(pg){ return parseWorkPage(pg, token, false); })),
+            Promise.all(pPages.map(function(pg){ return parseWorkPage(pg, token, true); })),
+          ]);
           achievements = aAll.filter(function(x){ return x.week === wkR.label; });
           plans = pAll.filter(function(x){ return x.week === wkR.planLabel; });
           function srt(a,b){ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.time||"")<(b.time||"")?-1:1; }
@@ -1654,32 +1778,36 @@ export default {
         let meetings = [];
         try {
           const mPages = await getAllPages(MEETING_DB_ID, token);
-          const parsed = [];
-          for(const pg of mPages){ parsed.push(await parseMeeting(pg, token)); }
+          const parsed = await Promise.all(mPages.map(function(pg){ return parseMeeting(pg, token); }));
           parsed.sort(function(a,b){ return (a.date<b.date?1:-1); });
-          for(const m of parsed){ m.comments = await getComments(m.id, token); }
+          const commentResults = await Promise.all(parsed.map(function(m){ return getComments(m.id, token); }));
+          parsed.forEach(function(m, i){ m.comments = commentResults[i]; });
           meetings = parsed;
         } catch(e){ body.meetingError = String(e); }
         body.meetings = meetings;
       }
 
       if(want("outsourced")){
-        try {
-          const cPages = await getAllPages(CONSIGN_DB_ID, token);
-          var consignments = cPages.map(parseConsignment).filter(function(c){ return c.title; });
+        const [cRes, cmRes, crRes] = await Promise.allSettled([
+          getAllPages(CONSIGN_DB_ID, token),
+          getAllPages(CONSIGN_MEETING_DB_ID, token),
+          getAllPages(CONSIGN_REQUEST_DB_ID, token),
+        ]);
+        if(cRes.status==="fulfilled"){
+          var consignments = cRes.value.map(parseConsignment).filter(function(c){ return c.title; });
           consignments.sort(function(a,b){ return a.order - b.order; });
           body.consignments = consignments;
-        } catch(e){ body.consignments = []; body.consignError = String(e); }
-        try {
-          const cmPages = await getAllPages(CONSIGN_MEETING_DB_ID, token);
-          body.consignMeetings = cmPages.map(parseConsignMeeting).filter(function(m){ return m.title; });
-        } catch(e){ body.consignMeetings = []; body.consignMeetingError = String(e); }
-        try {
-          const crPages = await getAllPages(CONSIGN_REQUEST_DB_ID, token);
-          const parsedReq = [];
-          for(const pg of crPages){ parsedReq.push(await parseConsignRequest(pg, token)); }
-          body.consignRequests = parsedReq;
-        } catch(e){ body.consignRequests = []; body.consignRequestError = String(e); }
+        } else { body.consignments = []; body.consignError = String(cRes.reason); }
+
+        if(cmRes.status==="fulfilled"){
+          body.consignMeetings = cmRes.value.map(parseConsignMeeting).filter(function(m){ return m.title; });
+        } else { body.consignMeetings = []; body.consignMeetingError = String(cmRes.reason); }
+
+        if(crRes.status==="fulfilled"){
+          try {
+            body.consignRequests = await Promise.all(crRes.value.map(function(pg){ return parseConsignRequest(pg, token); }));
+          } catch(e){ body.consignRequests = []; body.consignRequestError = String(e); }
+        } else { body.consignRequests = []; body.consignRequestError = String(crRes.reason); }
       }
 
       return new Response(JSON.stringify(body), { headers: corsHeaders() });

@@ -230,12 +230,14 @@
   .req-edit{font-size:11.5px;font-weight:600;color:var(--blue)}
   .req-body{padding:16px 18px}
   .req-files{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
-  .filechip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:4px;padding:6px 10px}
+  .filechip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:4px;padding:6px 10px;text-decoration:none}
+  a.filechip{cursor:pointer}
+  a.filechip:hover{filter:brightness(.95)}
   .filechip.req{color:#5a6680;background:var(--subtle);border:1px solid var(--line-2)}
   .filechip.reply{color:#c8273c;background:#fdecee;border:1px solid #f3d2d7}
   .qa-item{display:flex;align-items:flex-start;gap:9px;padding:10px 13px;background:var(--subtle);border:1px solid var(--line-2);border-radius:6px;margin-bottom:8px}
   .qa-n{flex-shrink:0;font-size:10.5px;font-weight:700;color:var(--blue);background:var(--blue-soft);border-radius:4px;padding:4px 8px;margin-top:1px}
-  .qa-q{font-size:13px;font-weight:600;color:var(--navy);line-height:1.55}
+  .qa-q{font-size:13px;font-weight:600;color:var(--navy);line-height:1.55;white-space:pre-wrap}
   .qa-empty{font-size:12px;color:var(--muted);padding:14px 2px;text-align:center;border:1px dashed var(--line-2);border-radius:6px}
 
   /* 상세(회신 답변 포함) 모달 내 QA */
@@ -248,6 +250,15 @@
   .fig-item img{width:100%;border-radius:6px;border:1px solid var(--line-2);display:block}
   .fig-cap{font-size:10.5px;color:var(--muted);margin-top:5px;text-align:center;line-height:1.4}
   .fig-empty{font-size:11.5px;color:var(--muted);text-align:center;padding:20px 4px}
+  .fig-broken,.fig-broken-msg{font-size:10.5px;color:var(--red);text-align:center;padding:14px 8px;border:1px dashed var(--red);border-radius:6px;margin-bottom:14px;background:#fdf0ef}
+  .fig-broken-url{display:block;font-size:9px;word-break:break-all;opacity:.8;margin-top:4px}
+  .file-pick-row{display:flex;gap:6px}
+  .file-pick-row input[type=text]{flex:1}
+  .file-pick-btn{flex:none;font-size:12px;font-weight:600;color:var(--blue);border:1px solid var(--line-2);background:var(--bg);border-radius:6px;padding:0 12px;cursor:pointer}
+  .file-pick-status{font-size:10.5px;margin-top:4px}
+  .file-pick-status.up{color:var(--blue);font-weight:600}
+  .file-pick-status.ok{color:#1f8a5b;font-weight:600}
+  .file-pick-status.err{color:var(--red);font-weight:600}
   .qa-col{padding:18px 20px;max-height:64vh;overflow-y:auto}
   .lightbox{position:fixed;inset:0;background:rgba(8,14,30,.82);display:none;align-items:center;justify-content:center;
     padding:40px;z-index:200;cursor:zoom-out}
@@ -265,6 +276,15 @@
   .qa-remove{font-size:11px;color:var(--muted);cursor:pointer}
   .qa-remove:hover{text-decoration:underline}
   .qa-addbtn{font-size:12px;font-weight:600;color:var(--blue);border:1px solid var(--line-2);background:var(--bg);border-radius:4px;padding:7px 13px;cursor:pointer}
+  .qa-img-hint{font-size:10.5px;color:var(--muted);margin-top:5px}
+  .qa-img-hint.up{color:var(--blue);font-weight:600}
+  .qa-img-hint.ok{color:#1f8a5b;font-weight:600}
+  .qa-img-hint.err{color:var(--red);font-weight:600}
+  .qa-pend-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .qa-pend{position:relative;width:64px;height:64px;border-radius:5px;overflow:hidden;border:1px solid var(--line-2)}
+  .qa-pend img{width:100%;height:100%;object-fit:cover;display:block}
+  .qa-pend-x{position:absolute;top:2px;right:2px;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;
+    background:rgba(0,0,0,.6);color:#fff;font-size:11px;cursor:pointer}
 
   .empty-note{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:28px;text-align:center;font-size:12.5px;color:var(--muted)}
 </style>
@@ -694,15 +714,25 @@
 
   // ===== 요청자료 모달 =====
   function findReq(id){ return DATA.requests.filter(function(r){return r.id===id;})[0]; }
+  function fileChip(url, cls, icon, label, name){
+    if(!name) return "";
+    var content = icon+" "+label+" · "+esc(name);
+    return url ? "<a class=\"filechip "+cls+"\" href=\""+esc(url)+"\" target=\"_blank\" rel=\"noopener\">"+content+"</a>"
+                : "<span class=\"filechip "+cls+"\">"+content+"</span>";
+  }
   function reqViewHtml(r){
     var files="";
-    if(r.reqFile) files+="<span class=\"filechip req\">📤 요청 · "+esc(r.reqFile)+"</span>";
-    if(r.replyFile) files+="<span class=\"filechip reply\">📥 회신 · "+esc(r.replyFile)+"</span>";
+    files += fileChip(r.reqFileUrl, "req", "📤", "요청", r.reqFile);
+    files += fileChip(r.replyFileUrl, "reply", "📥", "회신", r.replyFile);
     var allFigs=[];
     (r.qa||[]).forEach(function(qa){ (qa.figures||[]).forEach(function(f){ allFigs.push(f); }); });
     var figHtml = allFigs.length ? allFigs.map(function(f){
-      return "<div class=\"fig-item\" data-zoom-url=\""+esc(f.url)+"\" data-zoom-cap=\""+esc(f.caption||"")+"\">"
-        +"<img src=\""+esc(f.url)+"\" alt=\""+esc(f.caption||"그림")+"\">"
+      if(!f.url){
+        return "<div class=\"fig-item fig-broken\">그림 감지됨(형식: "+esc(f._rawType||"알수없음")+")<br>URL을 못 가져왔어요</div>";
+      }
+      var urlPreview = esc(f.url.length>70 ? f.url.slice(0,70)+"…" : f.url);
+      return "<div class=\"fig-item\" data-zoom-url=\""+esc(f.url)+"\" data-zoom-cap=\""+esc(f.caption||"")+"\" data-url-preview=\""+urlPreview+"\">"
+        +"<img src=\""+esc(f.url)+"\" alt=\""+esc(f.caption||"그림")+"\" onerror=\"var p=this.closest('.fig-item'); var u=p.dataset.urlPreview; p.classList.add('fig-broken'); var d=document.createElement('div'); d.className='fig-broken-msg'; d.innerHTML='이미지를 불러올 수 없어요<br><span class=&quot;fig-broken-url&quot;></span>'; d.querySelector('.fig-broken-url').textContent=u; this.replaceWith(d);\">"
         +(f.caption?"<div class=\"fig-cap\">"+esc(f.caption)+"</div>":"")+"</div>";
     }).join("") : "<div class=\"fig-empty\">첨부된 그림이 없습니다.</div>";
     var qaHtml=(r.qa&&r.qa.length) ? r.qa.map(function(qa,i){
@@ -720,12 +750,17 @@
   function reqEditHtml(r){
     function opt(arr,cur){ return arr.map(function(x){return "<option value=\""+esc(x)+"\""+(x===cur?" selected":"")+">"+esc(x)+"</option>";}).join(""); }
     var qaHtml=(REDIT.qa||[]).map(function(qa,i){
+      var pendHtml = (qa.images&&qa.images.length) ? "<div class=\"qa-pend-wrap\">"+qa.images.map(function(img,pi){
+        return "<div class=\"qa-pend\"><img src=\"data:"+esc(img.mimeType)+";base64,"+img.base64+"\"><span class=\"qa-pend-x\" data-pend-del=\""+i+"\" data-pend-idx=\""+pi+"\">×</span></div>";
+      }).join("")+"</div>" : "";
       return "<div style=\"border:1px solid var(--line-2);border-radius:7px;padding:12px 14px;margin-bottom:12px\">"
         +"<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:8px\">"
         +"<span class=\"qa-n\">안건 "+(i+1)+"</span><span class=\"qa-remove\" data-qa-del=\""+i+"\">항목 삭제</span></div>"
         +"<textarea class=\"qa-q-in\" data-qi=\""+i+"\" rows=\"2\" placeholder=\"문의사항\" style=\"width:100%;border:1px solid var(--line-2);border-radius:5px;padding:8px 10px;font-size:13px;margin-bottom:9px;font-family:inherit\">"+esc(qa.q)+"</textarea>"
         +"<div style=\"font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px\">답변 "+(i+1)+"</div>"
-        +"<textarea class=\"qa-a-in\" data-ai=\""+i+"\" rows=\"3\" placeholder=\"답변\" style=\"width:100%;border:1px solid var(--line-2);border-radius:5px;padding:8px 10px;font-size:13px;font-family:inherit\">"+esc(qa.a)+"</textarea></div>";
+        +"<textarea class=\"qa-a-in\" data-ai=\""+i+"\" rows=\"3\" placeholder=\"답변 (이미지는 Ctrl+V로 붙여넣기 가능)\" style=\"width:100%;border:1px solid var(--line-2);border-radius:5px;padding:8px 10px;font-size:13px;font-family:inherit\">"+esc(qa.a)+"</textarea>"
+        +pendHtml
+        +"<div class=\"qa-img-hint\" data-hi=\""+i+"\">그림을 복사한 뒤 답변란 안에서 Ctrl+V로 붙여넣으세요. (저장 버튼을 눌러야 실제로 반영됩니다)</div></div>";
     }).join("");
     return "<div class=\"fld-row\">"
       +"<label class=\"fld\"><span>구분</span><select id=\"rfCategory\">"+opt(CAT_LIST,r.category)+"</select></label>"
@@ -735,8 +770,16 @@
       +"<label class=\"fld\"><span>회신일</span><input type=\"date\" id=\"rfReplyDate\" value=\""+esc(r.replyDate||"")+"\"></label>"
       +"<label class=\"fld\"><span>상태</span><select id=\"rfStatus\">"+opt(["회신완료","검토중"],r.status)+"</select></label></div>"
       +"<div class=\"fld-row\">"
-      +"<label class=\"fld\"><span>요청 PDF</span><input type=\"text\" id=\"rfReqFile\" value=\""+esc(r.reqFile||"")+"\"></label>"
-      +"<label class=\"fld\"><span>회신 PDF</span><input type=\"text\" id=\"rfReplyFile\" value=\""+esc(r.replyFile||"")+"\"></label></div>"
+      +"<label class=\"fld\"><span>요청 PDF</span><div class=\"file-pick-row\">"
+        +"<input type=\"text\" id=\"rfReqFile\" value=\""+esc(r.reqFile||"")+"\" placeholder=\"파일명 또는 아래에서 선택\">"
+        +"<button type=\"button\" class=\"file-pick-btn\" id=\"reqFilePickBtn\">파일 선택</button>"
+        +"<input type=\"file\" id=\"reqFilePick\" accept=\"application/pdf\" style=\"display:none\"></div>"
+        +"<div class=\"file-pick-status\" id=\"reqFileStatus\"></div></label>"
+      +"<label class=\"fld\"><span>회신 PDF</span><div class=\"file-pick-row\">"
+        +"<input type=\"text\" id=\"rfReplyFile\" value=\""+esc(r.replyFile||"")+"\" placeholder=\"파일명 또는 아래에서 선택\">"
+        +"<button type=\"button\" class=\"file-pick-btn\" id=\"replyFilePickBtn\">파일 선택</button>"
+        +"<input type=\"file\" id=\"replyFilePick\" accept=\"application/pdf\" style=\"display:none\"></div>"
+        +"<div class=\"file-pick-status\" id=\"replyFileStatus\"></div></label></div>"
       +"<div style=\"border-top:1px solid var(--line-2);padding-top:12px;margin-top:4px\">"
       +"<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\">"
       +"<span style=\"font-size:11.5px;font-weight:700;color:var(--muted)\">안건 · 내용</span>"
@@ -749,32 +792,52 @@
     document.querySelectorAll(".qa-a-in").forEach(function(el){ REDIT.qa[+el.dataset.ai].a = el.value; });
   }
   function reqModalEl(){ return document.querySelector("#reqOv .modal"); }
-  function openReqView(id){
+  async function openReqView(id){
     var r=findReq(id); if(!r) return;
     REDIT={id:id, mode:"view", qa:[]};
     reqModalEl().classList.add("modal-wide");
     document.getElementById("reqHead").innerHTML=catTag(r.category)+" &nbsp;"+esc(r.title);
-    document.getElementById("reqBody").innerHTML=reqViewHtml(r);
+    document.getElementById("reqBody").innerHTML="<div class=\"state\">불러오는 중…</div>";
     document.getElementById("reqFoot").innerHTML="<div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"reqCloseBtn\">닫기</button><button class=\"mbtn primary\" id=\"reqEditBtn\">편집</button>";
     document.getElementById("reqOv").classList.add("open");
+    try {
+      var res=await fetch(WORKER_URL+"?scope=consignRequestDetail&id="+encodeURIComponent(id), {cache:"no-store"});
+      var data=await res.json();
+      if(!data.request) throw new Error(data.error||"불러오기 실패");
+      if(REDIT.id!==id || REDIT.mode!=="view") return; // 그 사이 다른 걸 열었으면 무시
+      document.getElementById("reqBody").innerHTML=reqViewHtml(data.request);
+    } catch(err){
+      if(REDIT.id===id && REDIT.mode==="view") document.getElementById("reqBody").innerHTML="<div class=\"state\">불러오기 실패: "+esc(String(err.message||err))+"</div>";
+    }
   }
   function openReqAdd(){
     var blank={category:"연구진행",title:"",reqDate:"",replyDate:"",status:"검토중",reqFile:"",replyFile:""};
-    REDIT={id:null, mode:"edit", qa:[]};
+    REDIT={id:null, mode:"edit", qa:[], pendingReqFile:null, pendingReplyFile:null};
     reqModalEl().classList.remove("modal-wide");
     document.getElementById("reqHead").textContent="자료 추가";
     document.getElementById("reqBody").innerHTML=reqEditHtml(blank);
     document.getElementById("reqFoot").innerHTML="<div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"reqCancelBtn\">취소</button><button class=\"mbtn primary\" id=\"reqSaveBtn\">저장</button>";
     document.getElementById("reqOv").classList.add("open");
   }
-  function openReqEdit(id){
+  async function openReqEdit(id){
     var r=findReq(id); if(!r) return;
-    REDIT={id:id, mode:"edit", qa:JSON.parse(JSON.stringify(r.qa||[]))};
+    REDIT={id:id, mode:"edit", qa:[], pendingReqFile:null, pendingReplyFile:null};
     reqModalEl().classList.remove("modal-wide");
     document.getElementById("reqHead").textContent="자료 수정";
-    document.getElementById("reqBody").innerHTML=reqEditHtml(r);
-    document.getElementById("reqFoot").innerHTML="<button class=\"mbtn danger\" id=\"reqDelBtn\">삭제</button><div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"reqCancelBtn\">취소</button><button class=\"mbtn primary\" id=\"reqSaveBtn\">저장</button>";
+    document.getElementById("reqBody").innerHTML="<div class=\"state\">불러오는 중…</div>";
+    document.getElementById("reqFoot").innerHTML="";
     document.getElementById("reqOv").classList.add("open");
+    try {
+      var res=await fetch(WORKER_URL+"?scope=consignRequestDetail&id="+encodeURIComponent(id), {cache:"no-store"});
+      var data=await res.json();
+      if(!data.request) throw new Error(data.error||"불러오기 실패");
+      if(REDIT.id!==id || REDIT.mode!=="edit") return; // 그 사이 다른 걸 열었으면 무시
+      REDIT.qa = JSON.parse(JSON.stringify(data.request.qa||[]));
+      document.getElementById("reqBody").innerHTML=reqEditHtml(data.request);
+      document.getElementById("reqFoot").innerHTML="<button class=\"mbtn danger\" id=\"reqDelBtn\">삭제</button><div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"reqCancelBtn\">취소</button><button class=\"mbtn primary\" id=\"reqSaveBtn\">저장</button>";
+    } catch(err){
+      if(REDIT.id===id && REDIT.mode==="edit") document.getElementById("reqBody").innerHTML="<div class=\"state\">불러오기 실패: "+esc(String(err.message||err))+"</div>";
+    }
   }
   function rerenderReqEditQa(){
     var r=findReq(REDIT.id) || {category:"",title:document.getElementById("rfTitle")?document.getElementById("rfTitle").value:"",reqDate:"",replyDate:"",status:"",reqFile:"",replyFile:""};
@@ -796,6 +859,55 @@
     if(delQa){ syncQaFromDom(); REDIT.qa.splice(+delQa.dataset.qaDel,1); rerenderReqEditQa(); return; }
     var fig=e.target.closest("[data-zoom-url]");
     if(fig){ openLightbox(fig.dataset.zoomUrl, fig.dataset.zoomCap); return; }
+  });
+  document.getElementById("reqBody").addEventListener("paste", function(e){
+    var ta = e.target.closest(".qa-a-in");
+    if(!ta) return; // 답변칸이 아니면 평소처럼 텍스트 붙여넣기
+    var items = (e.clipboardData || window.clipboardData).items || [];
+    var imgItem = null;
+    for(var i=0;i<items.length;i++){ if(items[i].type && items[i].type.indexOf("image/")===0){ imgItem=items[i]; break; } }
+    if(!imgItem) return; // 이미지가 아니면 평소처럼 텍스트 붙여넣기
+    e.preventDefault();
+    var qaIndex = +ta.dataset.ai;
+    var file = imgItem.getAsFile();
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var base64 = String(reader.result).split(",")[1];
+      syncQaFromDom(); // 지금까지 입력한 텍스트 먼저 보존
+      if(!REDIT.qa[qaIndex].images) REDIT.qa[qaIndex].images = [];
+      REDIT.qa[qaIndex].images.push({ base64: base64, filename: file.name||"pasted.png", mimeType: file.type||"image/png" });
+      rerenderReqEditQa(); // 미리보기로 바로 반영 (실제 노션 반영은 '저장' 눌러야 됨)
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById("reqBody").addEventListener("click", function(e){
+    var pendDel=e.target.closest("[data-pend-del]");
+    if(pendDel){
+      syncQaFromDom();
+      REDIT.qa[+pendDel.dataset.pendDel].images.splice(+pendDel.dataset.pendIdx, 1);
+      rerenderReqEditQa();
+    }
+    if(e.target.id==="reqFilePickBtn"){ document.getElementById("reqFilePick").click(); return; }
+    if(e.target.id==="replyFilePickBtn"){ document.getElementById("replyFilePick").click(); return; }
+  });
+  document.getElementById("reqBody").addEventListener("change", function(e){
+    if(e.target.id!=="reqFilePick" && e.target.id!=="replyFilePick") return;
+    var which = e.target.id==="reqFilePick" ? "req" : "reply";
+    var file = e.target.files && e.target.files[0];
+    if(!file) return;
+    var statusEl = document.getElementById(which==="req"?"reqFileStatus":"replyFileStatus");
+    var textEl = document.getElementById(which==="req"?"rfReqFile":"rfReplyFile");
+    var reader = new FileReader();
+    reader.onload = function(){
+      var base64 = String(reader.result).split(",")[1];
+      var pend = { base64:base64, filename:file.name, mimeType:file.type||"application/pdf" };
+      if(which==="req") REDIT.pendingReqFile = pend; else REDIT.pendingReplyFile = pend;
+      textEl.value = file.name;
+      statusEl.className = "file-pick-status up";
+      statusEl.textContent = "선택됨(저장 시 노션에 업로드됩니다): " + file.name;
+    };
+    reader.readAsDataURL(file);
   });
   function openLightbox(url, caption){
     document.getElementById("lightboxImg").src=url;
@@ -832,6 +944,35 @@
         var action=REDIT.id?"consignRequestUpdate":"consignRequestCreate";
         var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:action,item:item})});
         var data=await res.json(); if(!data.ok) throw new Error(data.error||"실패");
+        // item.qa의 인덱스가 실제 저장된 안건 순서와 그대로 일치하므로, 붙여넣어둔 이미지들을 그 인덱스로 업로드
+        var pageId = REDIT.id || (data.result && data.result.id);
+        var pendingCount = item.qa.reduce(function(n,qa){ return n + ((qa.images&&qa.images.length)||0); }, 0);
+        if(pageId && pendingCount){
+          st.textContent="저장 완료 — 이미지 업로드 중…";
+          for(var qi=0; qi<item.qa.length; qi++){
+            var imgs = item.qa[qi].images || [];
+            for(var ii=0; ii<imgs.length; ii++){
+              try {
+                await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
+                  body: JSON.stringify({ action:"consignRequestAddImage", pageId:pageId, qaIndex:qi,
+                    imageBase64: imgs[ii].base64, filename: imgs[ii].filename, mimeType: imgs[ii].mimeType })});
+              } catch(e){}
+            }
+          }
+        }
+        if(pageId && (REDIT.pendingReqFile || REDIT.pendingReplyFile)){
+          st.textContent="저장 완료 — PDF 업로드 중…";
+          if(REDIT.pendingReqFile){
+            try { await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
+              body: JSON.stringify({ action:"consignRequestAttachFile", pageId:pageId, which:"req",
+                fileBase64:REDIT.pendingReqFile.base64, filename:REDIT.pendingReqFile.filename, mimeType:REDIT.pendingReqFile.mimeType })}); } catch(e){}
+          }
+          if(REDIT.pendingReplyFile){
+            try { await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
+              body: JSON.stringify({ action:"consignRequestAttachFile", pageId:pageId, which:"reply",
+                fileBase64:REDIT.pendingReplyFile.base64, filename:REDIT.pendingReplyFile.filename, mimeType:REDIT.pendingReplyFile.mimeType })}); } catch(e){}
+          }
+        }
         st.className="estatus status show ok"; st.textContent="저장 완료";
         setTimeout(function(){ closeReq(); load(); }, 500);
       } catch(err){ st.className="estatus status show err"; st.textContent="저장 실패: "+err.message; }
