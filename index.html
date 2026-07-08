@@ -389,10 +389,23 @@
 
   // 회의요약이 비어있으면 "검토 필요"로 간주 (weekly-meeting.html의 "아직 요약이 작성되지 않았습니다" 상태와 동일 기준)
   // 검토필요: 회의 데이터가 들어온 뒤 기본 "검토필요"이며, "이숭봉"이 코멘트를 달면 해제됨 (worker.js scope=dashboard에서 계산해서 내려줌)
+  function meetingIsDone(m){
+    if(m.date < TODAY_ISO) return true;
+    if(m.date > TODAY_ISO) return false;
+    // 오늘인 경우: 시간까지 지났으면 완료 (시간 정보 없으면 날짜만으로 판단 - 아직 예정으로 봄)
+    var t = (m.time||"").split("~")[0].trim();
+    if(!t) return false;
+    var mm = t.match(/^(\d{1,2}):(\d{2})/);
+    if(!mm) return false;
+    var meetingMinutes = (+mm[1])*60 + (+mm[2]);
+    var now = new Date();
+    var nowMinutes = now.getHours()*60 + now.getMinutes();
+    return nowMinutes >= meetingMinutes;
+  }
   function meetingsOfProject(name){
     return (DATA.meetings||[]).filter(function(m){ return m.project===name && inThisWeek(m.date); })
       .map(function(m){
-        var done = m.date < TODAY_ISO;
+        var done = meetingIsDone(m);
         return {
           id:m.id, dateText: fmtMDW(m.date), summary: (m.summary&&m.summary.trim())?m.summary:(m.headingList||m.title),
           needsReview: !!m.needsReview, done: done
@@ -413,6 +426,7 @@
     info.forEach(function(p){
       var st=projStyle(p.name);
       var main=(p.main&&p.main.length)?p.main.join(", "):"-";
+      var pi=(p.pi||[]).map(function(n){return "<span class=\"pi-chip\">"+esc(n)+"</span>";}).join("");
       var sub=(p.sub||[]).map(function(n){return "<span class=\"res-chip\">"+esc(n)+"</span>";}).join("");
       var mtgs=meetingsOfProject(p.name);
       var mtgHtml = mtgs.length ? mtgs.map(function(m){
@@ -429,7 +443,7 @@
 
       tagboxes.push("<div class=\"tagbox\" style=\"background:"+st.bg+";color:"+st.c+"\">"+esc(PROJ_SHORT[p.name]||p.name)+"</div>");
       pmrows.push("<div class=\"pm-row\">"
-        +"<div class=\"pi-row\"><span class=\"pi-chip\">"+esc(p.pi||"-")+"</span></div>"
+        +"<div class=\"pi-row\">"+(pi||"<span class=\"pi-chip\">-</span>")+"</div>"
         +"<div class=\"pi-row\"><span class=\"pm-chip\">"+esc(main)+"</span></div>"
         +"<div class=\"res-wrap\">"+sub+"</div></div>");
       mtglists.push("<div class=\"mtg-list\">"+mtgHtml+"</div>");
