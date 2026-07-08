@@ -508,7 +508,12 @@
       var res=await fetch(WORKER_URL+"?scope=meetings",{cache:"no-store"});
       var data=await res.json();
       DATA.meetings=(data.meetings||[]).map(mapMeeting);
-      render();
+      var qMeeting = new URLSearchParams(location.search).get("meeting");
+      if(qMeeting && DATA.meetings.some(function(m){return m.id===qMeeting;})){
+        selectMeeting(qMeeting);
+      } else {
+        render();
+      }
     } catch(e){
       document.getElementById("content").innerHTML='<div class="state">불러오기 실패: '+esc(String(e))+'</div>';
     }
