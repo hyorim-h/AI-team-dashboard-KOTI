@@ -1449,14 +1449,17 @@ function consignRequestProps(item){
 async function getOrderedQaSections(pageId, token){
   const data = await notionFetch("/blocks/" + pageId + "/children?page_size=100", token);
   const sections = []; let cur = null;
+  const BODY_TYPES = ["paragraph","bulleted_list_item","numbered_list_item","quote","callout"];
   for(const b of (data.results || [])){
     const t = b.type;
     if(t && t.startsWith("heading")){
-      cur = { headingId: b.id, headingType: t, paragraphId: null, paragraphType: "paragraph", imageIds: [] };
+      cur = { headingId: b.id, headingType: t, paragraphId: null, paragraphType: "paragraph", extraBodyIds: [], imageIds: [] };
       sections.push(cur);
     } else if(cur){
-      if((t === "paragraph" || t === "bulleted_list_item" || t === "numbered_list_item" || t === "quote" || t === "callout") && cur.paragraphId === null){
-        cur.paragraphId = b.id; cur.paragraphType = t;
+      if(BODY_TYPES.indexOf(t) >= 0){
+        // 답변이 노션에서 여러 문단(블록)으로 나뉘어 있을 수 있음(Enter로 줄바꿈한 경우) — 전부 추적해야 저장 시 안 남고 지워짐
+        if(cur.paragraphId === null){ cur.paragraphId = b.id; cur.paragraphType = t; }
+        else cur.extraBodyIds.push(b.id);
       }
       else if(t === "image") cur.imageIds.push(b.id);
     }
@@ -1465,6 +1468,7 @@ async function getOrderedQaSections(pageId, token){
 }
 
 // Q&A 저장: 기존 꼭지(질문/답변)는 그 블록을 "그 자리에서" 내용만 교체 → 사이에 있는 이미지 블록은 절대 안 건드림.
+// 답변이 여러 문단(블록)으로 나뉘어 있었으면 첫 블록에 전체 내용을 담고 나머지 옛 블록은 삭제(안 그러면 옛 내용이 남아서 뒤섞임).
 // 새로 추가된 항목은 맨 뒤에 덧붙이고, 삭제된 항목은 그 항목의 블록만 지움(이미지 포함).
 async function writeRequestQaBlocks(pageId, token, qa){
   const list = qa || [];
@@ -1481,12 +1485,15 @@ async function writeRequestQaBlocks(pageId, token, qa){
     } else {
       await notionFetch("/blocks/" + pageId + "/children", token, "PATCH", { children: [{ object:"block", type:"paragraph", paragraph:{ rich_text: rt(item.a||"") } }], after: sec.headingId });
     }
+    // 답변이 여러 블록으로 나뉘어 있었다면, 첫 블록에 전체 내용을 넣었으니 나머지는 삭제(안 그러면 옛 내용이 중복으로 남음)
+    for(const extraId of (sec.extraBodyIds||[])){ try { await notionFetch("/blocks/" + extraId, token, "DELETE"); } catch(e){} }
   }
   // 삭제된 항목(뒤쪽 남는 기존 섹션) 제거 — 이미지도 그 섹션 것만 같이 지움
   for(let i=list.length; i<sections.length; i++){
     const sec = sections[i];
     try { await notionFetch("/blocks/" + sec.headingId, token, "DELETE"); } catch(e){}
     if(sec.paragraphId){ try { await notionFetch("/blocks/" + sec.paragraphId, token, "DELETE"); } catch(e){} }
+    for(const extraId of (sec.extraBodyIds||[])){ try { await notionFetch("/blocks/" + extraId, token, "DELETE"); } catch(e){} }
     for(const imgId of sec.imageIds){ try { await notionFetch("/blocks/" + imgId, token, "DELETE"); } catch(e){} }
   }
   // 새로 추가된 항목(기존보다 많아진 만큼) — 맨 뒤에 덧붙임
