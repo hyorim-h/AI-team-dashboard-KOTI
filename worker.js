@@ -1319,6 +1319,56 @@ async function updateMeetingSummary(env, payload){
   return { updated: true };
 }
 
+// 페이지 안에서 새 회의 등록 (기존엔 PDF 업로드 skill로만 생성 가능했음)
+function weekLabelForDate(dateStr){
+  var d = new Date(dateStr+"T00:00:00");
+  var dow = d.getDay();
+  var monOffset = (dow===0)?-6:(1-dow);
+  var mon = new Date(d); mon.setDate(d.getDate()+monOffset);
+  var fri = new Date(mon); fri.setDate(mon.getDate()+4);
+  var aStart = ymdOf(mon), aEnd = ymdOf(fri);
+  var wn = isoWeekNumSrv(aStart)-1;
+  return aStart+" ~ "+aEnd.slice(5)+" ("+wn+"주차)";
+}
+async function createMeeting(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  if(!item.title) throw new Error("제목을 입력하세요");
+  if(!item.date) throw new Error("회의날짜를 입력하세요");
+  var week = "";
+  try { week = weekLabelForDate(item.date); } catch(e){}
+  const props = {
+    "제목": { title: rt(item.title) },
+    "구분": { select: { name: item.kind || "주간회의" } },
+    "회의날짜": { date: { start: item.date } },
+    "주차": { rich_text: rt(week) },
+    "작성자": { rich_text: rt(item.writer || "") },
+    "시간": { rich_text: rt(item.time || "") },
+    "장소": { rich_text: rt(item.place || "") },
+    "참석자": { rich_text: rt(item.attendees || "") },
+    "회의요약": { rich_text: rt(item.summary || "") },
+  };
+  props["과제"] = item.project ? { select: { name: item.project } } : { select: null };
+
+  const sections = item.sections || [];
+  const children = [];
+  sections.forEach(function(s){
+    children.push({ object:"block", type:"heading_3", heading_3:{ rich_text: rt(s.heading||"") } });
+    children.push({ object:"block", type:"paragraph", paragraph:{ rich_text: rt(s.body||"") } });
+  });
+  const body = { parent: { database_id: MEETING_DB_ID }, properties: props };
+  if(children.length) body.children = children;
+  const res = await notionFetch("/pages", token, "POST", body);
+
+  if(sections.length){
+    try {
+      const summaryText = sections.map(function(s){ return s.heading; }).filter(Boolean).join(" / ");
+      await notionFetch("/pages/" + res.id, token, "PATCH", { properties: { "요약": { rich_text: rt(summaryText) } } });
+    } catch(e){}
+  }
+  return { created: true, id: res.id };
+}
+
 // 회의자료 꼭지(본문) 수정 — 본문 전체를 새 섹션으로 교체
 async function updateMeeting(env, payload){
   const token = env.NOTION_TOKEN;
@@ -1402,10 +1452,12 @@ async function getOrderedQaSections(pageId, token){
   for(const b of (data.results || [])){
     const t = b.type;
     if(t && t.startsWith("heading")){
-      cur = { headingId: b.id, paragraphId: null, imageIds: [] };
+      cur = { headingId: b.id, headingType: t, paragraphId: null, paragraphType: "paragraph", imageIds: [] };
       sections.push(cur);
     } else if(cur){
-      if(t === "paragraph" && cur.paragraphId === null) cur.paragraphId = b.id;
+      if((t === "paragraph" || t === "bulleted_list_item" || t === "numbered_list_item" || t === "quote" || t === "callout") && cur.paragraphId === null){
+        cur.paragraphId = b.id; cur.paragraphType = t;
+      }
       else if(t === "image") cur.imageIds.push(b.id);
     }
   }
@@ -1420,9 +1472,12 @@ async function writeRequestQaBlocks(pageId, token, qa){
   const n = Math.min(sections.length, list.length);
   for(let i=0;i<n;i++){
     const sec = sections[i], item = list[i];
-    await notionFetch("/blocks/" + sec.headingId, token, "PATCH", { heading_3: { rich_text: rt(item.q||"") } });
+    // 실제 블록 타입(heading_1/2/3 등)에 맞춰 패치해야 함 — 타입을 강제로 바꾸는 건 노션이 거부함
+    var headingPatch = {}; headingPatch[sec.headingType] = { rich_text: rt(item.q||"") };
+    await notionFetch("/blocks/" + sec.headingId, token, "PATCH", headingPatch);
     if(sec.paragraphId){
-      await notionFetch("/blocks/" + sec.paragraphId, token, "PATCH", { paragraph: { rich_text: rt(item.a||"") } });
+      var bodyPatch = {}; bodyPatch[sec.paragraphType] = { rich_text: rt(item.a||"") };
+      await notionFetch("/blocks/" + sec.paragraphId, token, "PATCH", bodyPatch);
     } else {
       await notionFetch("/blocks/" + pageId + "/children", token, "PATCH", { children: [{ object:"block", type:"paragraph", paragraph:{ rich_text: rt(item.a||"") } }], after: sec.headingId });
     }
@@ -1506,6 +1561,8 @@ export default {
           result = await addComment(env, payload);
         } else if(payload.action === "deleteComment"){
           result = await deleteComment(env, payload);
+        } else if(payload.action === "meetingCreate"){
+          result = await createMeeting(env, payload);
         } else if(payload.action === "updateMeeting"){
           result = await updateMeeting(env, payload);
         } else if(payload.action === "updateMeetingSummary"){

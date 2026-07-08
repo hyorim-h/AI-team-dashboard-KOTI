@@ -368,6 +368,42 @@
   </div>
 </div>
 
+<!-- 회의 신규 등록 모달 -->
+<div class="ov" id="createOv">
+  <div class="modal">
+    <div class="modal-head"><span>회의 추가</span><button class="x" id="createX">×</button></div>
+    <div class="modal-body">
+      <div class="fld-row">
+        <label class="fld"><span>과제</span><select id="crProject"></select></label>
+        <label class="fld"><span>구분</span><select id="crKind"></select></label>
+      </div>
+      <div class="fld-row">
+        <label class="fld"><span>회의날짜 <b>*</b></span><input type="date" id="crDate"></label>
+        <label class="fld"><span>시간</span><input type="time" id="crTime"></label>
+      </div>
+      <label class="fld"><span>제목 <b>*</b></span><input type="text" id="crTitle" placeholder="예) 자율주행R&D 주간회의"></label>
+      <div class="fld-row">
+        <label class="fld"><span>장소</span><input type="text" id="crPlace" placeholder="장소 또는 회의 방식(화상 등)"></label>
+        <label class="fld"><span>작성자</span><select id="crWriter"></select></label>
+      </div>
+      <label class="fld"><span>참석자</span><input type="text" id="crAttendees" placeholder="예) 이종우, 전준수"></label>
+      <label class="fld"><span>회의 요약</span><textarea id="crSummary" rows="2" placeholder="한 줄~짧은 요약(나중에 수정 가능)"></textarea></label>
+      <div class="edit-hint" style="margin-top:6px">회의 내용(선택) — 아젠다 제목과 세부 내용을 빈 줄로 구분해 입력하세요.</div>
+      <textarea class="agenda-edit" id="crAgenda" placeholder="아젠다 제목
+- 세부 내용
+
+다음 아젠다 제목
+- 세부 내용"></textarea>
+      <div class="estatus status" id="createStatus"></div>
+    </div>
+    <div class="modal-foot">
+      <div style="flex:1"></div>
+      <button class="mbtn ghost" id="createCancel">취소</button>
+      <button class="mbtn primary" id="createSave">저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- 회의요약 수정 모달 -->
 <div class="ov" id="summaryOv">
   <div class="modal">
@@ -411,6 +447,7 @@
 
   function esc(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function pad2(n){ return (n<10?"0":"")+n; }
+  function iso(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
   function iso(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
   function parseYMD(s){ if(!s) return null; var p=s.slice(0,10).split("-"); return new Date(+p[0],+p[1]-1,+p[2]); }
   function fmtMD(s){ var d=parseYMD(s); return d?pad2(d.getMonth()+1)+"."+pad2(d.getDate()):""; }
@@ -557,7 +594,10 @@
     }).join("") : '<tr class="empty-row"><td colspan="8">이번 주 회의가 없습니다.</td></tr>';
     return '<div class="ov-h"><div class="l"><span class="bar"></span><h3>이번 주 회의 안건</h3>'
       +'<span class="sub">각 과제별 회의 · '+list.length+'건</span></div>'
-      +'<span class="hint">행을 클릭하면 회의 상세로 이동합니다</span></div>'
+      +'<div style="display:flex;align-items:center;gap:14px">'
+      +'<span class="hint">행을 클릭하면 회의 상세로 이동합니다</span>'
+      +'<button class="hbtn primary" id="addMeetBtn" style="padding:7px 14px;font-size:12.5px">+ 회의 추가</button>'
+      +'</div></div>'
       +'<table class="tbl meet"><thead><tr>'
       +'<th>No</th><th>과제</th><th>구분</th><th>회의 요약</th><th>일시</th><th>장소</th><th>참석</th><th>코멘트</th>'
       +'</tr></thead><tbody>'+rows+'</tbody></table>';
@@ -664,6 +704,8 @@
     if(chip){ selectMeeting(chip.dataset.id); return; }
     var cell=e.target.closest(".cal-cell[data-date]");
     if(cell){ goToWeekOf(cell.dataset.date); return; }
+    var addMeet=e.target.closest("#addMeetBtn");
+    if(addMeet){ openCreateModal(); return; }
   });
   // 날짜 클릭 → 그 날짜가 속한 주로 이동 (overview로, 상세를 보고 있었어도 해당 주 개요로 전환)
   function goToWeekOf(dateIso){
@@ -689,6 +731,54 @@
       return { head:head, body:body };
     }).filter(function(a){ return a.head; });
   }
+
+  // ===== 회의 신규 등록 =====
+  function openCreateModal(){
+    fillSelect(document.getElementById("crProject"), [""].concat(PROJECTS), "");
+    fillSelect(document.getElementById("crKind"), KIND_LIST, "주간회의");
+    fillSelect(document.getElementById("crWriter"), OWNERS, "한효림");
+    document.getElementById("crDate").value = iso(WEEK_START);
+    document.getElementById("crTime").value = "";
+    document.getElementById("crTitle").value = "";
+    document.getElementById("crPlace").value = "";
+    document.getElementById("crAttendees").value = "";
+    document.getElementById("crSummary").value = "";
+    document.getElementById("crAgenda").value = "";
+    var st=document.getElementById("createStatus"); st.className="estatus status"; st.textContent="";
+    document.getElementById("createOv").classList.add("open");
+  }
+  function fillSelect(sel, opts, val){
+    sel.innerHTML = opts.map(function(o){ return '<option value="'+esc(o)+'"'+(o===val?" selected":"")+'>'+(o===""?"선택 안 함":esc(o))+'</option>'; }).join("");
+  }
+  function closeCreateModal(){ document.getElementById("createOv").classList.remove("open"); }
+  document.getElementById("createX").addEventListener("click", closeCreateModal);
+  document.getElementById("createCancel").addEventListener("click", closeCreateModal);
+  document.getElementById("createOv").addEventListener("click", function(e){ if(e.target.id==="createOv") closeCreateModal(); });
+  document.getElementById("createSave").addEventListener("click", async function(){
+    var st=document.getElementById("createStatus");
+    var title=document.getElementById("crTitle").value.trim();
+    var date=document.getElementById("crDate").value;
+    if(!title){ st.className="estatus status show err"; st.textContent="제목을 입력하세요."; return; }
+    if(!date){ st.className="estatus status show err"; st.textContent="회의날짜를 입력하세요."; return; }
+    var agendaParsed = parseAgenda(document.getElementById("crAgenda").value);
+    var sections = agendaParsed.map(function(a){ return { heading:a.head, body:a.body }; });
+    var item = {
+      title:title, date:date, project:document.getElementById("crProject").value,
+      kind:document.getElementById("crKind").value, time:document.getElementById("crTime").value,
+      place:document.getElementById("crPlace").value.trim(), writer:document.getElementById("crWriter").value,
+      attendees:document.getElementById("crAttendees").value.trim(),
+      summary:document.getElementById("crSummary").value.trim(), sections:sections
+    };
+    st.className="estatus status show info"; st.textContent="저장 중…";
+    try {
+      var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"meetingCreate",item:item})});
+      var data=await res.json();
+      if(!data.ok) throw new Error(data.error||"실패");
+      st.className="estatus status show ok"; st.textContent="저장 완료";
+      setTimeout(function(){ closeCreateModal(); load(); }, 550);
+    } catch(err){ st.className="estatus status show err"; st.textContent="저장 실패: "+err.message; }
+  });
+
   function openAgendaModal(id){
     var m=findById(id); if(!m) return;
     EDIT_ID=id;
