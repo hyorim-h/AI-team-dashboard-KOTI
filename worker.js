@@ -449,10 +449,12 @@ function parseProjectInfo(page){
   }
   const main = msNames(p["Main"]);
   const sub = msNames(p["Sub"]);
+  const piRt = (p["연구책임자"] && p["연구책임자"].rich_text) || [];
+  const pi = piRt.map(function(t){return t.plain_text;}).join("");
   const start = (p["시작"] && p["시작"].date && p["시작"].date.start) || "";
   const end = (p["종료"] && p["종료"].date && p["종료"].date.start) || "";
   const order = (p["정렬순서"] && typeof p["정렬순서"].number === "number") ? p["정렬순서"].number : 999;
-  return { id: page.id, name: name, main: main, sub: sub, start: start, end: end, order: order };
+  return { id: page.id, name: name, pi: pi, main: main, sub: sub, start: start, end: end, order: order };
 }
 
 // ===== 일정관리(구글 캘린더 기반) 분류 =====
@@ -1319,6 +1321,23 @@ async function updateMeetingSummary(env, payload){
   return { updated: true };
 }
 
+// 회의 기본 정보(과제/구분/일시/장소/참석자) 수정 — 요약·내용 수정과는 별개
+async function updateMeetingInfo(env, payload){
+  const token = env.NOTION_TOKEN;
+  const item = payload.item || {};
+  if(!item.id) throw new Error("회의자료 id 누락");
+  const props = {
+    "구분": { select: { name: item.kind || "주간회의" } },
+    "시간": { rich_text: rt(item.time || "") },
+    "장소": { rich_text: rt(item.place || "") },
+    "참석자": { rich_text: rt(item.attendees || "") },
+  };
+  if(item.date) props["회의날짜"] = { date: { start: item.date } };
+  props["과제"] = item.project ? { select: { name: item.project } } : { select: null };
+  await notionFetch("/pages/" + item.id, token, "PATCH", { properties: props });
+  return { updated: true };
+}
+
 // 페이지 안에서 새 회의 등록 (기존엔 PDF 업로드 skill로만 생성 가능했음)
 function weekLabelForDate(dateStr){
   var d = new Date(dateStr+"T00:00:00");
@@ -1574,6 +1593,8 @@ export default {
           result = await updateMeeting(env, payload);
         } else if(payload.action === "updateMeetingSummary"){
           result = await updateMeetingSummary(env, payload);
+        } else if(payload.action === "updateMeetingInfo"){
+          result = await updateMeetingInfo(env, payload);
         } else if(payload.action === "consignMeetingCreate"){
           result = await createConsignMeeting(env, payload);
         } else if(payload.action === "consignMeetingUpdate"){
