@@ -249,8 +249,11 @@
   .fig-item{margin-bottom:14px;cursor:zoom-in}
   .fig-item img{width:100%;border-radius:6px;border:1px solid var(--line-2);display:block}
   .fig-cap{font-size:10.5px;color:var(--muted);margin-top:5px;text-align:center;line-height:1.4}
+  .fig-label{font-size:10px;font-weight:700;color:var(--blue);background:var(--blue-soft);border-radius:8px;
+    padding:2px 8px;display:inline-block;margin-bottom:6px}
   .fig-empty{font-size:11.5px;color:var(--muted);text-align:center;padding:20px 4px}
   .fig-broken,.fig-broken-msg{font-size:10.5px;color:var(--red);text-align:center;padding:14px 8px;border:1px dashed var(--red);border-radius:6px;margin-bottom:14px;background:#fdf0ef}
+  .fig-loading{font-size:11px;color:var(--muted);text-align:center;padding:20px 8px;border:1px solid var(--line-2);border-radius:6px;margin-bottom:14px;background:var(--bg)}
   .fig-broken-url{display:block;font-size:9px;word-break:break-all;opacity:.8;margin-top:4px}
   .file-pick-row{display:flex;gap:6px}
   .file-pick-row input[type=text]{flex:1}
@@ -261,7 +264,7 @@
   .file-pick-status.err{color:var(--red);font-weight:600}
   .qa-col{padding:18px 20px;max-height:64vh;overflow-y:auto}
   .lightbox{position:fixed;inset:0;background:rgba(8,14,30,.82);display:none;align-items:center;justify-content:center;
-    padding:40px;z-index:200;cursor:zoom-out}
+    padding:40px;z-index:500;cursor:zoom-out}
   .lightbox.open{display:flex}
   .lightbox img{max-width:min(1100px,92vw);max-height:80vh;border-radius:6px}
   .lightbox .cap{color:#e6ecf7;font-size:13px;font-weight:600;margin-top:12px;text-align:center}
@@ -725,14 +728,16 @@
     files += fileChip(r.reqFileUrl, "req", "📤", "요청", r.reqFile);
     files += fileChip(r.replyFileUrl, "reply", "📥", "회신", r.replyFile);
     var allFigs=[];
-    (r.qa||[]).forEach(function(qa){ (qa.figures||[]).forEach(function(f){ allFigs.push(f); }); });
-    var figHtml = allFigs.length ? allFigs.map(function(f){
+    (r.qa||[]).forEach(function(qa,qi){ (qa.figures||[]).forEach(function(f,gi){ allFigs.push(Object.assign({},f,{qaNo:qi+1, figNo:gi+1})); }); });
+    var figHtml = allFigs.length ? allFigs.map(function(f, fi){
+      var label = "답변 "+f.qaNo+"-"+f.figNo;
       if(!f.url){
-        return "<div class=\"fig-item fig-broken\">그림 감지됨(형식: "+esc(f._rawType||"알수없음")+")<br>URL을 못 가져왔어요</div>";
+        return "<div class=\"fig-item fig-broken\"><div class=\"fig-label\">"+esc(label)+"</div>그림 감지됨(형식: "+esc(f._rawType||"알수없음")+")<br>URL을 못 가져왔어요</div>";
       }
       var urlPreview = esc(f.url.length>70 ? f.url.slice(0,70)+"…" : f.url);
-      return "<div class=\"fig-item\" data-zoom-url=\""+esc(f.url)+"\" data-zoom-cap=\""+esc(f.caption||"")+"\" data-url-preview=\""+urlPreview+"\">"
-        +"<img src=\""+esc(f.url)+"\" alt=\""+esc(f.caption||"그림")+"\" onerror=\"var p=this.closest('.fig-item'); var u=p.dataset.urlPreview; p.classList.add('fig-broken'); var d=document.createElement('div'); d.className='fig-broken-msg'; d.innerHTML='이미지를 불러올 수 없어요<br><span class=&quot;fig-broken-url&quot;></span>'; d.querySelector('.fig-broken-url').textContent=u; this.replaceWith(d);\">"
+      return "<div class=\"fig-item\" id=\"figItem"+fi+"\" data-fig-url=\""+esc(f.url)+"\" data-fig-cap=\""+esc(f.caption||"")+"\" data-url-preview=\""+urlPreview+"\">"
+        +"<div class=\"fig-label\">"+esc(label)+"</div>"
+        +"<div class=\"fig-loading\">불러오는 중…</div>"
         +(f.caption?"<div class=\"fig-cap\">"+esc(f.caption)+"</div>":"")+"</div>";
     }).join("") : "<div class=\"fig-empty\">첨부된 그림이 없습니다.</div>";
     var qaHtml=(r.qa&&r.qa.length) ? r.qa.map(function(qa,i){
@@ -806,9 +811,50 @@
       if(!data.request) throw new Error(data.error||"불러오기 실패");
       if(REDIT.id!==id || REDIT.mode!=="view") return; // 그 사이 다른 걸 열었으면 무시
       document.getElementById("reqBody").innerHTML=reqViewHtml(data.request);
+      loadFigures(data.request);
     } catch(err){
       if(REDIT.id===id && REDIT.mode==="view") document.getElementById("reqBody").innerHTML="<div class=\"state\">불러오기 실패: "+esc(String(err.message||err))+"</div>";
     }
+  }
+  // img 태그에만 맡기면 실패 시 브라우저가 아주 오래(수십 초~분 단위) 붙잡고 있을 수 있어서,
+  // fetch+8초 타임아웃으로 직접 불러와서 빠르게 성공/실패를 판단
+  function loadFigures(r){
+    var allFigs=[];
+    (r.qa||[]).forEach(function(qa){ (qa.figures||[]).forEach(function(f){ allFigs.push(f); }); });
+    allFigs.forEach(function(f, fi){
+      if(!f.url) return;
+      var el = document.getElementById("figItem"+fi);
+      if(!el) return;
+      var loadingEl = el.querySelector(".fig-loading");
+      var startedAt = Date.now();
+      var controller = new AbortController();
+      var timeoutId = setTimeout(function(){ controller.abort(); }, 12000);
+      var proxyUrl = WORKER_URL + "?scope=imageProxy&url=" + encodeURIComponent(f.url);
+      fetch(proxyUrl, { signal: controller.signal })
+        .then(function(res){
+          clearTimeout(timeoutId);
+          if(!res.ok) throw new Error("HTTP " + res.status);
+          return res.blob();
+        })
+        .then(function(blob){
+          var objUrl = URL.createObjectURL(blob);
+          var img = document.createElement("img");
+          img.src = objUrl; img.alt = f.caption || "그림";
+          img.style.cursor = "zoom-in";
+          img.addEventListener("click", function(){ openLightbox(objUrl, f.caption||""); });
+          if(loadingEl) loadingEl.replaceWith(img);
+        })
+        .catch(function(err){
+          clearTimeout(timeoutId);
+          var elapsed = ((Date.now()-startedAt)/1000).toFixed(1);
+          var reason = (err && err.name==="AbortError") ? "12초 내에 응답 없음(Worker 경유인데도 실패 — 다른 원인일 수 있음)" : String(err.message||err);
+          el.classList.add("fig-broken");
+          if(loadingEl){
+            loadingEl.innerHTML = "이미지를 불러올 수 없어요("+elapsed+"초 소요)<br><span class=\"fig-broken-url\"></span>";
+            loadingEl.querySelector(".fig-broken-url").textContent = reason + " — " + el.dataset.urlPreview;
+          }
+        });
+    });
   }
   function openReqAdd(){
     var blank={category:"연구진행",title:"",reqDate:"",replyDate:"",status:"검토중",reqFile:"",replyFile:""};
