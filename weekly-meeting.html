@@ -439,6 +439,7 @@
       <div class="estatus status" id="infoStatus"></div>
     </div>
     <div class="modal-foot">
+      <button class="mbtn danger" id="infoDelete">삭제</button>
       <div style="flex:1"></div>
       <button class="mbtn ghost" id="infoCancel">취소</button>
       <button class="mbtn primary" id="infoSave">저장</button>
@@ -896,6 +897,19 @@
       st.className="estatus status show ok"; st.textContent="저장 완료";
       setTimeout(function(){ closeInfoModal(); load(); }, 500);
     } catch(err){ st.className="estatus status show err"; st.textContent="저장 실패: "+err.message; }
+  });
+  document.getElementById("infoDelete").addEventListener("click", async function(){
+    if(!confirm("이 회의를 삭제하시겠어요? 딸린 코멘트도 함께 삭제됩니다.")) return;
+    var st=document.getElementById("infoStatus");
+    st.className="estatus status show info"; st.textContent="삭제 중…";
+    try {
+      var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"meetingDelete",meetingId:EDIT_ID})});
+      var data=await res.json();
+      if(!data.ok) throw new Error(data.error||"실패");
+      closeInfoModal();
+      VIEW="overview";
+      load();
+    } catch(err){ st.className="estatus status show err"; st.textContent="삭제 실패: "+err.message; }
   });
 
   // ===== 코멘트 추가/삭제 =====
