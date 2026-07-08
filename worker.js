@@ -1352,6 +1352,19 @@ async function updateMeetingInfo(env, payload){
   return { updated: true };
 }
 
+// 회의자료 삭제 — 딸린 코멘트도 같이 정리(휴지통으로)
+async function deleteMeeting(env, payload){
+  const token = env.NOTION_TOKEN;
+  const meetingId = payload.meetingId;
+  if(!meetingId) throw new Error("회의자료 id 누락");
+  try {
+    const comments = await getComments(meetingId, token);
+    for(const c of comments){ try { await notionFetch("/pages/" + c.id, token, "PATCH", { archived: true }); } catch(e){} }
+  } catch(e){}
+  await notionFetch("/pages/" + meetingId, token, "PATCH", { archived: true });
+  return { deleted: true };
+}
+
 // 페이지 안에서 새 회의 등록 (기존엔 PDF 업로드 skill로만 생성 가능했음)
 function weekLabelForDate(dateStr){
   var d = new Date(dateStr+"T00:00:00");
@@ -1609,6 +1622,8 @@ export default {
           result = await updateMeetingSummary(env, payload);
         } else if(payload.action === "updateMeetingInfo"){
           result = await updateMeetingInfo(env, payload);
+        } else if(payload.action === "meetingDelete"){
+          result = await deleteMeeting(env, payload);
         } else if(payload.action === "consignMeetingCreate"){
           result = await createConsignMeeting(env, payload);
         } else if(payload.action === "consignMeetingUpdate"){
@@ -1642,13 +1657,29 @@ export default {
 
       if(scope === "dashboard"){
         // 대시보드 전용: 필요한 것만, 전부 병렬로 (개별 실패해도 나머지는 계속 진행)
+        var wkR0 = currentWeekRange();
+        // 회의 목록 + (이번주 회의 한정) 코멘트 조회를 하나의 체인으로 묶음
+        // → 아래 Promise.allSettled 안에서 다른 6개 fetch와 "진짜" 동시에 돎 (예전엔 이게 밖에서 순차로 붙어서 시간이 그냥 더해졌었음)
+        var meetingsPromise = getAllPages(MEETING_DB_ID, token).then(async function(pages){
+          var lite = pages.map(parseMeetingLite).filter(function(m){ return m.title; });
+          var thisWeek = lite.filter(function(m){ return m.date >= wkR0.start && m.date <= wkR0.end; });
+          try {
+            var commentResults = await Promise.allSettled(thisWeek.map(function(m){ return getComments(m.id, token); }));
+            thisWeek.forEach(function(m, i){
+              var comments = (commentResults[i].status==="fulfilled") ? commentResults[i].value : [];
+              m.needsReview = !comments.some(function(c){ return c.author === "이숭봉"; });
+            });
+          } catch(e){}
+          return lite;
+        });
+
         const results = await Promise.allSettled([
           getAllPages(PROJECT_DB_ID, token),                 // 0: 과제 정보
           getAllPages(WBS_DB_ID, token),                     // 1: WBS
           getAllPages(PERF_DB_ID, token),                    // 2: 성과
           getAllPages(ACHIEVE_DB_ID, token),                 // 3: 업무실적
           getAllPages(PLAN_DB_ID, token),                    // 4: 업무계획
-          getAllPages(MEETING_DB_ID, token),                 // 5: 회의자료(속성만 사용, 본문/코멘트 조회 안 함)
+          meetingsPromise,                                   // 5: 회의자료 + 이번주 코멘트(체인됨, 이제 진짜 병렬)
           getAllPages(CONSIGN_DB_ID, token),                 // 6: 위탁과제 정보만(회의록/요청자료는 대시보드에 안 씀)
           gcalList(env, "2026-06-01T00:00:00+09:00"),        // 7: 일정(구글 캘린더)
         ]);
@@ -1665,21 +1696,12 @@ export default {
 
         var aAll = ok(3, function(pages){ return pages.map(parseWorkPageLite); });
         var pAll = ok(4, function(pages){ return pages.map(parseWorkPageLite); });
-        var wkR = currentWeekRange();
+        var wkR = wkR0;
         var achievements = aAll.filter(function(x){return x.week===wkR.label;});
         var plans = pAll.filter(function(x){return x.week===wkR.planLabel;});
         body.work = { week: wkR.label, planWeek: wkR.planLabel, achievements: achievements, plans: plans };
 
-        body.meetings = ok(5, function(pages){ return pages.map(parseMeetingLite).filter(function(m){return m.title;}); });
-        // 이번주 회의에 한해서만 코멘트 확인(적은 수라 병렬로 가져와도 빠름) → "이숭봉" 코멘트 있으면 검토완료, 없으면 검토필요
-        try {
-          var thisWeekMeetings = body.meetings.filter(function(m){ return m.date >= wkR.start && m.date <= wkR.end; });
-          var commentResults = await Promise.allSettled(thisWeekMeetings.map(function(m){ return getComments(m.id, token); }));
-          thisWeekMeetings.forEach(function(m, i){
-            var comments = (commentResults[i].status==="fulfilled") ? commentResults[i].value : [];
-            m.needsReview = !comments.some(function(c){ return c.author === "이숭봉"; });
-          });
-        } catch(e){}
+        body.meetings = results[5].status==="fulfilled" ? results[5].value : [];
 
         var consignments = ok(6, function(pages){ return pages.map(parseConsignment).filter(function(c){return c.title;}); });
         consignments.sort(function(a,b){ return a.order - b.order; });
@@ -1699,17 +1721,18 @@ export default {
       }
 
       if(want("wbs")){
-        try {
-          const wbsPages = await getAllPages(WBS_DB_ID, token);
-          body.wbs = wbsPages.map(parseWbs).filter(function(w){ return w.task; });
-        } catch(e){ body.wbs = []; }
-        // 과제 정보(그룹 헤더용). ID가 틀리면 빈 배열 → 프론트가 fallback 사용.
-        try {
-          const projPages = await getAllPages(PROJECT_DB_ID, token);
-          var pinfo = projPages.map(parseProjectInfo).filter(function(x){ return x.name; });
+        const [wbsRes, projRes] = await Promise.allSettled([
+          getAllPages(WBS_DB_ID, token),
+          getAllPages(PROJECT_DB_ID, token),
+        ]);
+        if(wbsRes.status==="fulfilled"){
+          body.wbs = wbsRes.value.map(parseWbs).filter(function(w){ return w.task; });
+        } else { body.wbs = []; }
+        if(projRes.status==="fulfilled"){
+          var pinfo = projRes.value.map(parseProjectInfo).filter(function(x){ return x.name; });
           pinfo.sort(function(a,b){ return a.order - b.order; });
           body.projectInfo = pinfo;
-        } catch(e){ body.projectInfo = []; body.projectInfoError = String(e); }
+        } else { body.projectInfo = []; body.projectInfoError = String(projRes.reason); }
       }
 
       if(want("perf")){
@@ -1735,12 +1758,14 @@ export default {
         const weekOffset = parseInt(url.searchParams.get("weekOffset") || "0", 10) || 0;
         const wkR = currentWeekRange(weekOffset);
         try {
-          const aPages = await getAllPages(ACHIEVE_DB_ID, token);
-          const pPages = await getAllPages(PLAN_DB_ID, token);
-          const aAll = [];
-          for(const pg of aPages){ aAll.push(await parseWorkPage(pg, token, false)); }
-          const pAll = [];
-          for(const pg of pPages){ pAll.push(await parseWorkPage(pg, token, true)); }
+          const [aPages, pPages] = await Promise.all([
+            getAllPages(ACHIEVE_DB_ID, token),
+            getAllPages(PLAN_DB_ID, token),
+          ]);
+          const [aAll, pAll] = await Promise.all([
+            Promise.all(aPages.map(function(pg){ return parseWorkPage(pg, token, false); })),
+            Promise.all(pPages.map(function(pg){ return parseWorkPage(pg, token, true); })),
+          ]);
           achievements = aAll.filter(function(x){ return x.week === wkR.label; });
           plans = pAll.filter(function(x){ return x.week === wkR.planLabel; });
           function srt(a,b){ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.time||"")<(b.time||"")?-1:1; }
@@ -1753,32 +1778,36 @@ export default {
         let meetings = [];
         try {
           const mPages = await getAllPages(MEETING_DB_ID, token);
-          const parsed = [];
-          for(const pg of mPages){ parsed.push(await parseMeeting(pg, token)); }
+          const parsed = await Promise.all(mPages.map(function(pg){ return parseMeeting(pg, token); }));
           parsed.sort(function(a,b){ return (a.date<b.date?1:-1); });
-          for(const m of parsed){ m.comments = await getComments(m.id, token); }
+          const commentResults = await Promise.all(parsed.map(function(m){ return getComments(m.id, token); }));
+          parsed.forEach(function(m, i){ m.comments = commentResults[i]; });
           meetings = parsed;
         } catch(e){ body.meetingError = String(e); }
         body.meetings = meetings;
       }
 
       if(want("outsourced")){
-        try {
-          const cPages = await getAllPages(CONSIGN_DB_ID, token);
-          var consignments = cPages.map(parseConsignment).filter(function(c){ return c.title; });
+        const [cRes, cmRes, crRes] = await Promise.allSettled([
+          getAllPages(CONSIGN_DB_ID, token),
+          getAllPages(CONSIGN_MEETING_DB_ID, token),
+          getAllPages(CONSIGN_REQUEST_DB_ID, token),
+        ]);
+        if(cRes.status==="fulfilled"){
+          var consignments = cRes.value.map(parseConsignment).filter(function(c){ return c.title; });
           consignments.sort(function(a,b){ return a.order - b.order; });
           body.consignments = consignments;
-        } catch(e){ body.consignments = []; body.consignError = String(e); }
-        try {
-          const cmPages = await getAllPages(CONSIGN_MEETING_DB_ID, token);
-          body.consignMeetings = cmPages.map(parseConsignMeeting).filter(function(m){ return m.title; });
-        } catch(e){ body.consignMeetings = []; body.consignMeetingError = String(e); }
-        try {
-          const crPages = await getAllPages(CONSIGN_REQUEST_DB_ID, token);
-          const parsedReq = [];
-          for(const pg of crPages){ parsedReq.push(await parseConsignRequest(pg, token)); }
-          body.consignRequests = parsedReq;
-        } catch(e){ body.consignRequests = []; body.consignRequestError = String(e); }
+        } else { body.consignments = []; body.consignError = String(cRes.reason); }
+
+        if(cmRes.status==="fulfilled"){
+          body.consignMeetings = cmRes.value.map(parseConsignMeeting).filter(function(m){ return m.title; });
+        } else { body.consignMeetings = []; body.consignMeetingError = String(cmRes.reason); }
+
+        if(crRes.status==="fulfilled"){
+          try {
+            body.consignRequests = await Promise.all(crRes.value.map(function(pg){ return parseConsignRequest(pg, token); }));
+          } catch(e){ body.consignRequests = []; body.consignRequestError = String(e); }
+        } else { body.consignRequests = []; body.consignRequestError = String(crRes.reason); }
       }
 
       return new Response(JSON.stringify(body), { headers: corsHeaders() });
