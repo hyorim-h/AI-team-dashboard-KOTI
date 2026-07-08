@@ -1,0 +1,40 @@
+<!DOCTYPE html><html lang="ko"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>남도산 · 데이터 분석 · KOTI TALK</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="agent.css"><style>body{--accent:#f2749b}</style></head><body>
+<nav><div class="wrap"><a class="brand" href="../index.html"><span class="dot">K</span> KOTI TALK</a><a class="back" href="../index.html#agents">← 팀 전체</a><a href="analyst-light.html" style="color:var(--mut);font-size:13px;font-weight:600;margin-left:14px">☀ 라이트</a></div></nav>
+<header class="hero"><div class="wrap"><div class="hrow">
+  <div class="av" style="background:#f2749b">남</div>
+  <div><div class="hname">남도산</div><div class="hrole">④ 데이터 분석</div></div></div>
+  <p class="oneliner">수집·정제부터 EDA·통계·모델링·검증까지 분석 파이프라인 전체를 책임진다. 규모가 크면 하위 워커를 운용.</p>
+  <div class="tags"><span class="tag">pandas·scikit-learn</span><span class="tag">통계·가설검정</span><span class="tag hi">하위 워커</span><span class="tag">재현성 검증</span></div>
+</div></header>
+<section><div class="wrap"><span class="eyebrow">Identity</span><h3 class="sec">이 에이전트는</h3>
+<p style="color:var(--mut);font-size:15px">수집부터 검증까지 분석 파이프라인 전체를 책임진다. 규모가 크거나 병렬화 이득이 분명하면 <b>eda·model·viz 하위 워커 서브에이전트</b>를 분기해 부분 작업을 위임하고 결과를 통합·검증한다.</p></div></section>
+<section><div class="wrap"><span class="eyebrow">Role</span><h3 class="sec">핵심 역할</h3><ul class="rlist">
+<li><b>수집·정제</b> <span>— CSV/Excel/DB 로딩, 결측·이상치·중복 처리, 파생변수</span></li>
+<li><b>EDA</b> <span>— 분포·상관·시계열·세그먼트 패턴</span></li>
+<li><b>통계·가설검정</b> <span>— t-test/ANOVA/회귀·상관, 유의성 해석</span></li>
+<li><b>모델링·예측</b> <span>— 회귀/분류/시계열, 성능 평가</span></li>
+<li><b>시각화·해석·검증</b> <span>— 차트·대시보드 + 재현성·로직 검증</span></li></ul></div></section>
+<section><div class="wrap"><span class="eyebrow">Flow</span><h3 class="sec">동작 플로우</h3><div class="steps">
+<div class="step"><h4>질문·데이터</h4><p>목표·경로 확인</p></div>
+<div class="step"><h4>탐색</h4><p>변수·크기·기초통계</p></div>
+<div class="step"><h4>정제</h4><p>결측·이상치·파생</p></div>
+<div class="step"><h4>분석</h4><p>EDA→검정→모델링</p></div>
+<div class="step"><h4>시각화</h4><p>차트/대시보드</p></div>
+<div class="step"><h4>해석·검증</h4><p>재실행 재현성 확인</p></div></div>
+<div class="note">검증(필수): 코드 재실행으로 결과 재현, 통계 가정 점검, 상관≠인과·과적합·데이터 누수 주의, 왜곡 없는 시각화.</div></div></section>
+<section><div class="wrap"><span class="eyebrow">I/O</span><h3 class="sec">입력 · 출력</h3><div class="io">
+<div class="box"><h4>입력</h4><ul><li>분석 목표(질문/가설)</li><li>데이터 경로</li><li>산출 형식(리포트/차트/대시보드)</li></ul></div>
+<div class="box"><h4>출력 · <span class="mono">workspace/analysis/</span></h4><ul><li><span class="mono">code/</span> — 재현 가능한 분석 코드</li><li><span class="mono">report_</span> — 방법·결과·해석</li><li><span class="mono">figures/</span> · <span class="mono">dashboard_</span></li></ul></div></div></div></section>
+<section><div class="wrap"><span class="eyebrow">Usage</span><h3 class="sec">이렇게 사용하세요</h3>
+<div class="usebox"><b>서달미</b>에게 이렇게 지시하면 남도산으로 라우팅됩니다:<br>
+<span class="quote">이 데이터로 수단분담 추세 분석하고 차트까지 만들어줘</span><span class="quote">이 변수들 상관·유의성 검정해줘</span></div>
+<p style="color:var(--dim);font-size:13px;margin-top:8px">채널: <span class="mono">#analysis</span></p></div></section>
+<section><div class="wrap"><span class="eyebrow">Collab</span><h3 class="sec">협업 (핸드오프)</h3><div class="hand">
+<div class="box recv"><div class="lbl">← 받는다</div><p>②동향(외부 데이터 출처)·①문헌(지표 정의) 참조 · 팀장 지시</p></div>
+<div class="box supply"><div class="lbl">→ 넘긴다</div><p>수치 근거를 ③대정부·⑧보고서에, 차트 원본을 ⑤디자인에</p></div></div></div></section>
+<footer><div class="wrap">KOTI TALK · <a href="../index.html">← 팀 전체 보기</a> · <a href="https://github.com/yewon918/KOTI_multi-agent" target="_blank">GitHub ↗</a></div></footer>
+</body></html>

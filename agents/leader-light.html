@@ -1,0 +1,36 @@
+<!DOCTYPE html><html lang="ko"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서달미 · 팀장 · KOTI TALK</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="agent-light.css"><style>body{--accent:#3b6ef5}</style></head><body>
+<nav><div class="wrap"><a class="brand" href="../index-light.html"><span class="dot">K</span> KOTI TALK</a><a class="back" href="../index-light.html#agents">← 팀 전체</a><a href="leader.html" style="color:var(--mut);font-size:13px;font-weight:600;margin-left:14px">🌙 다크</a></div></nav>
+<header class="hero"><div class="wrap"><div class="hrow">
+  <div class="av" style="background:linear-gradient(135deg,#3b6ef5,#7c5cf0)">서</div>
+  <div><div class="hname">서달미</div><div class="hrole">팀장 · Orchestrator</div></div></div>
+  <p class="oneliner">연구책임자의 오더를 받아 태스크를 분해하고, 9명의 전문 에이전트에게 병렬로 분배·검증하는 지휘자.</p>
+  <div class="tags"><span class="tag hi">오케스트레이터</span><span class="tag">라우팅</span><span class="tag">품질검증</span><span class="tag">태스크 보드</span><span class="tag">CLAUDE.md</span></div>
+</div></header>
+<section><div class="wrap"><span class="eyebrow">Identity</span><h3 class="sec">이 에이전트는</h3>
+<p style="color:var(--mut);font-size:15px">레포 루트에서 켠 <b>Claude Code 세션</b>이 곧 서달미다. 오더를 실행 단위 태스크로 쪼개 담당·순서를 정해 배정하고, 산출물의 근거·일관성을 검증해 다음 단계로 라우팅한 뒤 연구책임자에게 보고한다. 에이전트들은 서로 직접 호출하지 않고 — <b>서달미가 공유 레지스트리를 통해 중재</b>한다.</p></div></section>
+<section><div class="wrap"><span class="eyebrow">Role</span><h3 class="sec">핵심 역할</h3><ul class="rlist">
+<li><b>오더 수신·맥락 수집</b> <span>— $KOTI_DESKTOP_DIR·$KOTI_DATA_DIR 스캔으로 관련 파일 파악</span></li>
+<li><b>태스크 분해</b> <span>— 오더를 병렬·순차 실행 단위로 분할</span></li>
+<li><b>배정·기록</b> <span>— create_task·post_message로 담당 배정과 진행 기록</span></li>
+<li><b>결과 종합·검증</b> <span>— 근거·일관성·할루시네이션 점검 후 라우팅</span></li>
+<li><b>보고·에스컬레이션</b> <span>— 최종 결과를 연구책임자에게 보고</span></li></ul></div></section>
+<section><div class="wrap"><span class="eyebrow">Flow</span><h3 class="sec">동작 플로우</h3><div class="steps">
+<div class="step"><h4>오더 수신</h4><p>#directives에서 연구책임자 지시 확인</p></div>
+<div class="step"><h4>맥락 스캔</h4><p>관련 파일·선행 산출물 파악</p></div>
+<div class="step"><h4>태스크 분해</h4><p>담당·순서 결정</p></div>
+<div class="step"><h4>배정</h4><p>에이전트 병렬/순차 실행</p></div>
+<div class="step"><h4>검증</h4><p>품질·근거 점검, 재지시</p></div>
+<div class="step"><h4>보고</h4><p>연구책임자에게 종합 보고</p></div></div></div></section>
+<section><div class="wrap"><span class="eyebrow">Usage</span><h3 class="sec">이렇게 사용하세요</h3>
+<div class="usebox">KOTI TALK 하단 <b>오더 입력창</b>에 자연어로 지시하면, 서달미가 알아서 담당 에이전트로 쪼개 배정합니다:<br>
+<span class="quote">탄소중립 교통정책 보고서 만들어줘</span><span class="quote">이 주제 국내외 사례 조사해서 발표자료까지</span></div>
+<p style="color:var(--dim);font-size:13px;margin-top:8px">채널: <span class="mono">#general</span> · <span class="mono">#directives</span></p></div></section>
+<section><div class="wrap"><span class="eyebrow">Collab</span><h3 class="sec">협업 (핸드오프)</h3><div class="hand">
+<div class="box recv"><div class="lbl">← 받는다</div><p>연구책임자의 오더(#directives)</p></div>
+<div class="box supply"><div class="lbl">→ 넘긴다</div><p>9개 전문 에이전트에 태스크 배정 · 산출물 검증·중재·라우팅</p></div></div></div></section>
+<footer><div class="wrap">KOTI TALK · <a href="../index-light.html">← 팀 전체 보기</a> · <a href="https://github.com/yewon918/KOTI_multi-agent" target="_blank">GitHub ↗</a></div></footer>
+</body></html>

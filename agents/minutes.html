@@ -1,0 +1,40 @@
+<!DOCTYPE html><html lang="ko"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서인재 · 회의록 · KOTI TALK</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="agent.css"><style>body{--accent:#3ddc97}</style></head><body>
+<nav><div class="wrap"><a class="brand" href="../index.html"><span class="dot">K</span> KOTI TALK</a><a class="back" href="../index.html#agents">← 팀 전체</a><a href="minutes-light.html" style="color:var(--mut);font-size:13px;font-weight:600;margin-left:14px">☀ 라이트</a></div></nav>
+<header class="hero"><div class="wrap"><div class="hrow">
+  <div class="av" style="background:#3ddc97">서</div>
+  <div><div class="hname">서인재</div><div class="hrole">⑦ 회의록</div></div></div>
+  <p class="oneliner">회의 녹음·공지를 로컬 Whisper로 전사해 공무원 보고형식의 공식 HWPX 회의록으로 만든다.</p>
+  <div class="tags"><span class="tag hi">meeting-minutes-koti 스킬</span><span class="tag">로컬 Whisper</span><span class="tag">HWPX</span><span class="tag">액션아이템</span></div>
+</div></header>
+<section><div class="wrap"><span class="eyebrow">Identity</span><h3 class="sec">이 에이전트는</h3>
+<p style="color:var(--mut);font-size:15px">회의 녹음과 공지 메일을 <b>공식 회의록(HWPX)</b>으로 만든다. 핵심 엔진은 설치된 <b>meeting-minutes-koti 스킬</b>이며, 서인재는 이 스킬을 호출·운용하고 산출물을 검증한다. 전사는 로컬 Whisper로 처리(음성 외부 전송 없음), 전사 불가 시 지어내지 않고 원인을 보고한다.</p></div></section>
+<section><div class="wrap"><span class="eyebrow">Role</span><h3 class="sec">핵심 역할</h3><ul class="rlist">
+<li><b>회의 요약</b> <span>— 잡담 제외, 안건별 논의 결과 중심</span></li>
+<li><b>결정사항 추출</b> <span>— 합의·결정·승인 사항 분리</span></li>
+<li><b>액션아이템</b> <span>— 후속 조치를 담당·기한과 함께</span></li>
+<li><b>후속 과제·다음 안건</b> <span>— 진행/미결 점검, 차기 안건 도출</span></li>
+<li><b>공식 HWPX 산출</b> <span>— 양식 스타일 유지</span></li></ul></div></section>
+<section><div class="wrap"><span class="eyebrow">Flow</span><h3 class="sec">동작 플로우</h3><div class="steps">
+<div class="step"><h4>입력 확인</h4><p>녹음·eml·양식 탐색</p></div>
+<div class="step"><h4>전사</h4><p>로컬 Whisper</p></div>
+<div class="step"><h4>공지 파싱</h4><p>.eml → 맥락</p></div>
+<div class="step"><h4>MD 초안</h4><p>결정·요청·일정 보존</p></div>
+<div class="step"><h4>HWPX</h4><p>양식 채우기·파일명</p></div>
+<div class="step"><h4>검증·후속관리</h4><p>임시파일 정리·대장 누적</p></div></div>
+<div class="note">보안: 회의 녹음·전사엔 개인정보가 포함될 수 있음. 공유 범위에 유의. 원본 .mp3/.eml은 보존, 임시파일은 검증 후 삭제.</div></div></section>
+<section><div class="wrap"><span class="eyebrow">I/O</span><h3 class="sec">입력 · 출력</h3><div class="io">
+<div class="box"><h4>입력</h4><ul><li>회의 폴더(녹음 .mp3/.m4a 등)</li><li>회의공지 .eml (선택)</li><li>회의록 양식 .hwpx (선택)</li></ul></div>
+<div class="box"><h4>출력 · <span class="mono">workspace/minutes/</span></h4><ul><li><span class="mono">회의공지_참고정보.md</span></li><li><span class="mono">YYMMDD - 회의제목 회의록.hwpx</span></li><li>후속관리 대장(MD)</li></ul></div></div></div></section>
+<section><div class="wrap"><span class="eyebrow">Usage</span><h3 class="sec">이렇게 사용하세요</h3>
+<div class="usebox"><b>서달미</b>에게 이렇게 지시하면 서인재로 라우팅됩니다:<br>
+<span class="quote">이 회의 녹음으로 회의록 만들어줘</span><span class="quote">이 폴더 회의 녹음·공지로 HWPX 회의록</span></div>
+<p style="color:var(--dim);font-size:13px;margin-top:8px">채널: <span class="mono">#minutes</span></p></div></section>
+<section><div class="wrap"><span class="eyebrow">Collab</span><h3 class="sec">협업 (핸드오프)</h3><div class="hand">
+<div class="box recv"><div class="lbl">← 받는다</div><p>팀장에게 회의 폴더 경로·맥락</p></div>
+<div class="box supply"><div class="lbl">→ 넘긴다</div><p>결정사항·액션아이템(담당·기한)을 팀장·⑧보고서에, 후속과제는 차기 태스크로</p></div></div></div></section>
+<footer><div class="wrap">KOTI TALK · <a href="../index.html">← 팀 전체 보기</a> · <a href="https://github.com/yewon918/KOTI_multi-agent" target="_blank">GitHub ↗</a></div></footer>
+</body></html>
