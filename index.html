@@ -276,18 +276,20 @@
   .mt-row .t{flex:1;min-width:0;font-size:12.5px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mt-row .d{flex-shrink:0;font-size:11.5px;font-weight:500;color:var(--muted);width:66px;text-align:right}
 
-  /* 도넛 위젯(성과/WBS) */
-  .donut-row{display:flex;align-items:stretch;justify-content:center;flex-wrap:wrap}
-  .donut-sep{width:1px;background:var(--line-2);margin:0 12px}
-  .donut-unit{text-align:center}
-  .donut-unit .short{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px}
-  .donut-pair{display:flex;gap:14px;justify-content:center}
-  .donut{position:relative;width:82px;height:82px}
-  .donut.big{width:98px;height:98px}
+  /* 도넛 위젯(성과) */
+  .perf-card{display:flex;flex-direction:column}
+  .perf-card .donut-row,.perf-card .wk-empty{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+  .donut-row{display:flex;align-items:center;justify-content:center;flex-wrap:nowrap}
+  .donut-sep{align-self:stretch;width:1px;background:var(--line-2);margin:0 16px;flex:none}
+  .donut-unit{text-align:center;flex:none}
+  .donut-unit .short{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;white-space:nowrap}
+  .donut-pair{display:flex;gap:18px;justify-content:center}
+  /* 크기는 JS(adjustPerfDonuts)가 카드의 실제 렌더 크기를 측정해 --donut-sz로 지정 (줄바꿈 없이 항상 한 줄에 맞도록 계산) */
+  .donut{position:relative;width:var(--donut-sz, 82px);height:var(--donut-sz, 82px);flex:none}
   .donut-fill{width:100%;height:100%;border-radius:50%}
-  .donut-hole{position:absolute;inset:10px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--navy)}
-  .donut.big .donut-hole{inset:11px;font-size:19px}
-  .donut-lab{margin-top:5px;font-size:10.5px;font-weight:600;color:var(--muted)}
+  .donut-hole{position:absolute;inset:12%;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;
+    font-size:var(--donut-hole-font, 16px);font-weight:700;color:var(--navy)}
+  .donut-lab{margin-top:8px;font-size:10.5px;font-weight:600;color:var(--muted)}
 
   /* 위탁과제 카드 */
   .consign-item{border:1px solid var(--line-2);border-radius:5px;padding:10px 12px;cursor:pointer;margin-bottom:11px}
@@ -652,7 +654,7 @@
         +"</div></div>";
     });
     var body = donuts.length ? "<div class=\"donut-row\">"+donuts.join("<div class=\"donut-sep\"></div>")+"</div>" : "<div class=\"wk-empty\">등록된 성과 목표가 없습니다.</div>";
-    return "<div class=\"dcard click\" data-nav=\"performance.html\"><div class=\"dcard-h\"><div class=\"l\"><span class=\"bar\"></span><h3>성과 현황</h3></div>"
+    return "<div class=\"dcard perf-card click\" data-nav=\"performance.html\"><div class=\"dcard-h\"><div class=\"l\"><span class=\"bar\"></span><h3>성과 현황</h3></div>"
       +"<span class=\"r\">진행중 "+doing+"건 ›</span></div>"+body+"</div>";
   }
 
@@ -769,7 +771,38 @@
       + "</div>"
       + buildCalendarCard();
     document.getElementById("content").innerHTML = html;
+    requestAnimationFrame(adjustPerfDonuts);
   }
+
+  // 성과 현황 도넛 크기를 카드의 실제 렌더링 크기에 맞춰 계산(과제 개수·카드 높이에 따라 유동적) — 줄바꿈/넘침 없이 항상 한 줄에 딱 맞도록
+  function adjustPerfDonuts(){
+    var card = document.querySelector(".perf-card");
+    if(!card) return;
+    var row = card.querySelector(".donut-row");
+    if(!row) return;
+    var units = row.querySelectorAll(".donut-unit");
+    var n = units.length;
+    if(!n){ return; }
+
+    var cardInnerW = card.clientWidth - 40; // 좌우 padding(20px*2) 제외
+    var sepW = (n-1) * 33; // 구분선(1px)+양쪽 마진(16px*2) * 구분선 개수
+    var perUnitW = (cardInnerW - sepW) / n;
+    var wFit = (perUnitW - 18) / 2; // donut-pair gap(18px) 제외 후 2개 도넛으로 분배
+
+    var rowH = row.clientHeight;
+    var hFit = rowH - 56; // 위 라벨(과제명)+아래 라벨(정량/정성) + 여백 몫 제외
+
+    var size = Math.floor(Math.min(wFit, hFit));
+    size = Math.max(64, Math.min(size, 200)); // 너무 작아지거나 과하게 커지지 않도록 안전 범위
+
+    card.style.setProperty("--donut-sz", size+"px");
+    card.style.setProperty("--donut-hole-font", Math.round(size*0.21)+"px");
+  }
+  var perfResizeTimer=null;
+  window.addEventListener("resize", function(){
+    clearTimeout(perfResizeTimer);
+    perfResizeTimer=setTimeout(adjustPerfDonuts, 150);
+  });
 
   document.getElementById("content").addEventListener("click", function(e){
     var day=e.target.closest("[data-day]");
@@ -795,7 +828,7 @@
     var ae=document.activeElement;
     if(ae && (ae.tagName==="INPUT" || ae.tagName==="TEXTAREA" || ae.tagName==="SELECT")) return;
     load();
-  }, 60000);
+  }, 30000);
 </script>
 </body>
 </html>
