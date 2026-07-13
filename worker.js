@@ -4,7 +4,7 @@
 const REPORT_DB_ID = "383ce6a25dc6801c874bc6bb96dc83c1"; // 주간 리포트 DB
 const WBS_DB_ID    = "f1a718244eb54c399b70eb216067804d"; // WBS DB
 const PROJECT_DB_ID = "5a75146603614e489364b66e5eab2e1c"; // 과제 정보 DB (노션 확인 database_id)
-// 일정관리 페이지는 노션 DB가 아니라 구글 캘린더를 소스로 사용 (아래 GCAL_ID 참조)
+// 일정관리 페이지는 노션 DB가 아니라 두레이(Dooray) 캘린더를 소스로 사용 (아래 DOORAY_TEAM_CALENDAR_ID 참조)
 const PERF_DB_ID   = "2f590aa04b1243f09255ca3850833038"; // 성과 DB
 const ACHIEVE_DB_ID = "34ab53ea4afb4b1481c8c5358cd67b29"; // 업무실적 DB
 const PLAN_DB_ID    = "d104d01ba9b140e6a83ceaea36e86b48"; // 업무계획 DB
@@ -35,86 +35,6 @@ function corsHeaders(){
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
   };
-}
-
-// ===== iCal 파싱 =====
-function unfoldICS(text){
-  // 접힌 줄(다음 줄이 공백/탭으로 시작) 합치기
-  return text.replace(/\r\n/g, "\n").replace(/\n[ \t]/g, "");
-}
-
-function icsUnescape(s){
-  return (s || "").replace(/\\n/gi, " ").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\");
-}
-
-function parseICSDate(val){
-  // DTSTART 형태: 20260616T140000 (로컬/TZID) / 20260616T050000Z (UTC) / 20260616 (종일)
-  var m = val.match(/(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?/);
-  if(!m) return null;
-  var y=+m[1], mo=+m[2], d=+m[3], hh=m[4]?+m[4]:0, mm=m[5]?+m[5]:0, isUTC=!!m[7], allday=!m[4];
-  if(isUTC){
-    // UTC → 한국시간(KST, +9h) 변환 후 KST 기준 연·월·일·시·분 재추출
-    var utc = new Date(Date.UTC(y,mo-1,d,hh,mm,0));
-    var kst = new Date(utc.getTime() + 9*3600*1000);
-    y = kst.getUTCFullYear(); mo = kst.getUTCMonth()+1; d = kst.getUTCDate();
-    hh = kst.getUTCHours(); mm = kst.getUTCMinutes();
-  }
-  // 이미 KST 로컬값(TZID Asia/Seoul 또는 floating)인 경우 그대로 사용
-  var dateObj = new Date(Date.UTC(y,mo-1,d,hh,mm,0));
-  return { date: dateObj, allday: allday, y:y, mo:mo, d:d, hh:hh, mm:mm };
-}
-
-function parseICS(text){
-  text = unfoldICS(text);
-  var lines = text.split("\n");
-  var events = [], cur = null;
-  for(var i=0;i<lines.length;i++){
-    var line = lines[i];
-    if(line === "BEGIN:VEVENT"){ cur = {}; continue; }
-    if(line === "END:VEVENT"){ if(cur) events.push(cur); cur = null; continue; }
-    if(!cur) continue;
-    var ci = line.indexOf(":");
-    if(ci < 0) continue;
-    var key = line.substring(0, ci);
-    var val = line.substring(ci+1);
-    var keyName = key.split(";")[0];
-    if(keyName === "SUMMARY") cur.title = icsUnescape(val);
-    else if(keyName === "DTSTART") cur.start = parseICSDate(val);
-    else if(keyName === "DTEND") cur.end = parseICSDate(val);
-    else if(keyName === "DESCRIPTION") cur.desc = icsUnescape(val);
-    else if(keyName === "LOCATION") cur.location = icsUnescape(val);
-  }
-  return events;
-}
-
-function fmtDate(p){ // p = parseICSDate 결과
-  function z(n){ return (n<10?"0":"")+n; }
-  return p.y + "-" + z(p.mo) + "-" + z(p.d);
-}
-function fmtTime(p){
-  function z(n){ return (n<10?"0":"")+n; }
-  return p.allday ? "" : (z(p.hh) + ":" + z(p.mm));
-}
-
-async function getCalendarEvents(icsUrl){
-  if(!icsUrl) return [];
-  var res = await fetch(icsUrl, { headers: { "User-Agent": "Mozilla/5.0 (dashboard-worker)" } });
-  if(!res.ok) throw new Error("iCal " + res.status);
-  var text = await res.text();
-  var raw = parseICS(text);
-  var out = [];
-  raw.forEach(function(e){
-    if(!e.start) return;
-    out.push({
-      title: e.title || "(제목 없음)",
-      date: fmtDate(e.start),
-      time: fmtTime(e.start),
-      desc: e.desc || "",
-      location: e.location || "",
-      _ts: e.start.date.getTime(),
-    });
-  });
-  return out;
 }
 
 async function notionFetch(path, token, method, body){
@@ -542,57 +462,6 @@ function classifySchedule(ev){
   return { type: type, person: person, vacation: vacation, project: project, attendees: attendees };
 }
 
-// Google Calendar event(list API 결과) → 대시보드 표시용 객체로 변환
-function parseGcalEvent(ev){
-  if(ev.status === "cancelled") return null;
-  var title = ev.summary || "(제목 없음)";
-  var desc = ev.description || "";
-  var location = ev.location || "";
-  var startAllDay = ev.start && ev.start.date;   // "YYYY-MM-DD" (종일)
-  var endAllDay = ev.end && ev.end.date;
-  var start = "", end = "", time = "", timeEnd = "";
-  if(startAllDay){
-    start = startAllDay;
-    // 구글 종일 일정은 end가 다음날(배타적) → 하루 빼서 실제 마지막 날로
-    if(endAllDay){
-      var d = new Date(endAllDay + "T00:00:00"); d.setDate(d.getDate()-1);
-      function z(n){ return (n<10?"0":"")+n; }
-      end = d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate());
-      if(end < start) end = start;
-    } else end = start;
-  } else if(ev.start && ev.start.dateTime){
-    start = ev.start.dateTime.slice(0,10);
-    var m1 = ev.start.dateTime.match(/T(\d{2}):(\d{2})/); if(m1) time = m1[1]+":"+m1[2];
-    end = (ev.end && ev.end.dateTime) ? ev.end.dateTime.slice(0,10) : start;
-    var m2 = (ev.end && ev.end.dateTime) ? ev.end.dateTime.match(/T(\d{2}):(\d{2})/) : null; if(m2) timeEnd = m2[1]+":"+m2[2];
-  } else return null;
-
-  var cls = classifySchedule({ title: title, desc: desc });
-  var timeStr = time ? (time + (timeEnd && timeEnd!==time ? "~"+timeEnd : "")) : "";
-  return {
-    id: ev.id, title: title, type: cls.type, person: cls.person, project: cls.project,
-    vacation: cls.vacation, attendees: cls.attendees, start: start, end: end, time: timeStr, location: location,
-    raw_desc: desc
-  };
-}
-
-async function gcalList(env, timeMinISO){
-  var token = await getGcalToken(env);
-  var out = [], pageToken = "";
-  for(var i=0;i<8;i++){ // 최대 8페이지(=최대 약 2000건) 안전장치
-    var url = "https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_ID) + "/events"
-      + "?singleEvents=true&orderBy=startTime&maxResults=250&timeMin=" + encodeURIComponent(timeMinISO)
-      + (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : "");
-    var res = await fetch(url, { headers: { "Authorization": "Bearer " + token } });
-    var data = await res.json();
-    if(data.error) throw new Error("캘린더 조회 실패: " + JSON.stringify(data.error));
-    (data.items || []).forEach(function(ev){ var p = parseGcalEvent(ev); if(p) out.push(p); });
-    if(!data.nextPageToken) break;
-    pageToken = data.nextPageToken;
-  }
-  return out;
-}
-
 // ===== 두레이(Dooray!) 캘린더 연동 (공공기관용 gov-dooray.com, 개인 API 토큰) =====
 // "교통빅데이터팀" 캘린더 - 아이폰 캘린더에도 같이 연동해둔 팀 공유 캘린더를 대시보드/일정관리에 병합
 const DOORAY_API_BASE = "https://api.gov-dooray.com";
@@ -843,177 +712,6 @@ function parsePerf(page){
 
 // ===== 노션 쓰기 (업무실적/업무계획 저장) =====
 function rt(text){ return [{ type:"text", text:{ content: String(text||"") } }]; }
-
-// ===== Google Calendar 연동 (서비스 계정, WebCrypto로 JWT 서명) =====
-const GCAL_ID = "vhulqta766un5182bit092vo90@group.calendar.google.com";
-let _gcalToken = { value:"", exp:0 };
-
-function b64url(buf){
-  var bytes = new Uint8Array(buf);
-  var bin = "";
-  for(var i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
-}
-function b64urlStr(str){
-  return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
-}
-function pemToArrayBuffer(pem){
-  var b64 = pem.replace(/-----BEGIN PRIVATE KEY-----/,"").replace(/-----END PRIVATE KEY-----/,"").replace(/\s+/g,"");
-  var bin = atob(b64);
-  var buf = new ArrayBuffer(bin.length);
-  var view = new Uint8Array(buf);
-  for(var i=0;i<bin.length;i++) view[i] = bin.charCodeAt(i);
-  return buf;
-}
-
-async function getGcalToken(env){
-  var now = Math.floor(Date.now()/1000);
-  if(_gcalToken.value && _gcalToken.exp > now + 30) return _gcalToken.value;
-
-  var email = env.GCAL_SA_EMAIL;
-  var key = env.GCAL_SA_KEY;
-  if(!email || !key) throw new Error("서비스 계정 정보 미설정 (GCAL_SA_EMAIL/GCAL_SA_KEY)");
-  // Secret 붙여넣을 때 \n이 literal로 들어간 경우 복원
-  key = key.replace(/\\n/g, "\n");
-
-  var header = { alg:"RS256", typ:"JWT" };
-  var claim = {
-    iss: email,
-    scope: "https://www.googleapis.com/auth/calendar",
-    aud: "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now
-  };
-  var unsigned = b64urlStr(JSON.stringify(header)) + "." + b64urlStr(JSON.stringify(claim));
-
-  var cryptoKey = await crypto.subtle.importKey(
-    "pkcs8", pemToArrayBuffer(key),
-    { name:"RSASSA-PKCS1-v1_5", hash:"SHA-256" },
-    false, ["sign"]
-  );
-  var sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, new TextEncoder().encode(unsigned));
-  var jwt = unsigned + "." + b64url(sig);
-
-  var res = await fetch("https://oauth2.googleapis.com/token", {
-    method:"POST",
-    headers:{ "Content-Type":"application/x-www-form-urlencoded" },
-    body: "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=" + encodeURIComponent(jwt)
-  });
-  var data = await res.json();
-  if(!data.access_token) throw new Error("토큰 발급 실패: " + JSON.stringify(data));
-  _gcalToken = { value: data.access_token, exp: now + (data.expires_in || 3600) };
-  return _gcalToken.value;
-}
-
-// 캘린더에 일정 등록 → event id 반환 (실패해도 노션 저장은 유지되도록 호출측에서 try)
-async function gcalInsert(env, item){
-  var token = await getGcalToken(env);
-  if(!item.date) return null;
-  var summary = (item.title || "제목 없음");
-  // 시간 있으면 dateTime, 없으면 all-day
-  var body;
-  if(item.time && /^\d{1,2}:\d{2}$/.test(item.time)){
-    var hh = ("0"+item.time.split(":")[0]).slice(-2);
-    var mm = item.time.split(":")[1];
-    var startISO = item.date + "T" + hh + ":" + mm + ":00+09:00";
-    // 종료는 +1시간
-    var endH = (parseInt(hh,10)+1)%24;
-    var endISO = item.date + "T" + ("0"+endH).slice(-2) + ":" + mm + ":00+09:00";
-    body = { summary: summary, start:{ dateTime:startISO, timeZone:"Asia/Seoul" }, end:{ dateTime:endISO, timeZone:"Asia/Seoul" } };
-  } else {
-    // 종일 일정 (end는 다음날)
-    var d = new Date(item.date + "T00:00:00"); d.setDate(d.getDate()+1);
-    function z(n){ return (n<10?"0":"")+n; }
-    var nextDay = d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate());
-    body = { summary: summary, start:{ date:item.date }, end:{ date:nextDay } };
-  }
-  if(item.location) body.location = item.location;
-  var desc = [];
-  if(item.project) desc.push("과제: " + item.project);
-  if(item.content) desc.push(item.content);
-  if(item.attendees) desc.push("참석자: " + item.attendees);
-  if(desc.length) body.description = desc.join("\n");
-
-  var res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_ID) + "/events", {
-    method:"POST",
-    headers:{ "Authorization":"Bearer "+token, "Content-Type":"application/json" },
-    body: JSON.stringify(body)
-  });
-  var data = await res.json();
-  if(data.error) throw new Error("캘린더 등록 실패: " + JSON.stringify(data.error));
-  return data.id || null;
-}
-
-// 캘린더 일정 수정 (event id로 patch). id 없으면 새로 등록해서 id 반환.
-async function gcalUpdate(env, eventId, item){
-  var token = await getGcalToken(env);
-  if(!item.date) return eventId || null;
-  // 새 body 구성 (insert와 동일 규칙)
-  var body = { summary: (item.title || "제목 없음") };
-  if(item.time && /^\d{1,2}:\d{2}$/.test(item.time)){
-    var hh = ("0"+item.time.split(":")[0]).slice(-2);
-    var mm = item.time.split(":")[1];
-    var endH = (parseInt(hh,10)+1)%24;
-    body.start = { dateTime: item.date+"T"+hh+":"+mm+":00+09:00", timeZone:"Asia/Seoul" };
-    body.end = { dateTime: item.date+"T"+("0"+endH).slice(-2)+":"+mm+":00+09:00", timeZone:"Asia/Seoul" };
-  } else {
-    var d = new Date(item.date + "T00:00:00"); d.setDate(d.getDate()+1);
-    function z(n){ return (n<10?"0":"")+n; }
-    body.start = { date: item.date };
-    body.end = { date: d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate()) };
-  }
-  body.location = item.location || "";
-  var desc = [];
-  if(item.project) desc.push("과제: " + item.project);
-  if(item.content) desc.push(item.content);
-  if(item.attendees) desc.push("참석자: " + item.attendees);
-  body.description = desc.join("\n");
-
-  // event id가 있으면 patch, 없으면 새로 insert
-  if(eventId){
-    var res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_ID) + "/events/" + encodeURIComponent(eventId), {
-      method:"PATCH",
-      headers:{ "Authorization":"Bearer "+token, "Content-Type":"application/json" },
-      body: JSON.stringify(body)
-    });
-    var data = await res.json();
-    if(data.error){
-      // event가 삭제됐거나 못 찾으면 새로 등록
-      if(data.error.code===404 || data.error.code===410){ return await gcalInsert(env, item); }
-      throw new Error("캘린더 수정 실패: " + JSON.stringify(data.error));
-    }
-    return data.id || eventId;
-  } else {
-    return await gcalInsert(env, item);
-  }
-}
-
-// 캘린더에서 event 하나 조회 → {date, time, title} 반환 (없으면 null)
-async function gcalGet(env, eventId){
-  if(!eventId) return null;
-  var token = await getGcalToken(env);
-  var res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_ID) + "/events/" + encodeURIComponent(eventId), {
-    headers:{ "Authorization":"Bearer "+token }
-  });
-  var data = await res.json();
-  if(data.error) return null;               // 삭제됐거나 못 찾음
-  if(data.status === "cancelled") return null;
-  var title = data.summary || "";
-  var date = "", time = "";
-  if(data.start){
-    if(data.start.dateTime){
-      // "2026-07-07T14:00:00+09:00" → date, time
-      var dt = data.start.dateTime;
-      date = dt.slice(0,10);
-      var m = dt.match(/T(\d{2}):(\d{2})/);
-      if(m) time = m[1] + ":" + m[2];
-    } else if(data.start.date){
-      date = data.start.date;               // 종일 일정
-      time = "";
-    }
-  }
-  return { date: date, time: time, title: title };
-}
 
 // 업무계획 캘린더 동기화: event id로 캘린더 조회 → 날짜·시간·제목만 노션에 반영
 // (장소·내용·참석자는 노션 값 유지)
@@ -2027,11 +1725,6 @@ export default {
           if(schedRes.errors && schedRes.errors.archiveScheduleError) body.archiveScheduleError = schedRes.errors.archiveScheduleError;
           if(schedRes.errors && schedRes.errors.doorayScheduleError) body.doorayScheduleError = schedRes.errors.doorayScheduleError;
         } catch(e){ body.schedule = []; body.scheduleError = String(e); }
-      }
-
-      if(want("calendar")){
-        try { body.calendar = await getCalendarEvents(env.GCAL_ICS_URL); }
-        catch(e){ body.calendar = []; body.calError = String(e); }
       }
 
       if(want("work")){
