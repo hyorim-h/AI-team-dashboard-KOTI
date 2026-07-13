@@ -593,6 +593,180 @@ async function gcalList(env, timeMinISO){
   return out;
 }
 
+// ===== 두레이(Dooray!) 캘린더 연동 (공공기관용 gov-dooray.com, 개인 API 토큰) =====
+// "교통빅데이터팀" 캘린더 - 아이폰 캘린더에도 같이 연동해둔 팀 공유 캘린더를 대시보드/일정관리에 병합
+const DOORAY_API_BASE = "https://api.gov-dooray.com";
+const DOORAY_TEAM_CALENDAR_ID = "4193093966505478406"; // 교통빅데이터팀
+
+// Dooray event → 대시보드 표시용 객체(구글 캘린더와 동일한 형태로 변환, 기존 classifySchedule 그대로 재사용)
+function parseDoorayEvent(ev){
+  var title = ev.subject || "(제목 없음)";
+  var location = ev.location || "";
+  var start = "", end = "", time = "", timeEnd = "";
+  var startedAt = ev.startedAt || "", endedAt = ev.endedAt || "";
+  if(ev.wholeDayFlag){
+    start = startedAt.slice(0,10);
+    var endRaw = endedAt.slice(0,10);
+    if(endRaw){
+      // 두레이 종일 일정도 구글과 동일하게 end가 다음날(배타적) → 하루 빼서 실제 마지막 날로
+      var d = new Date(endRaw + "T00:00:00"); d.setDate(d.getDate()-1);
+      function z(n){ return (n<10?"0":"")+n; }
+      end = d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate());
+      if(end < start) end = start;
+    } else end = start;
+  } else {
+    start = startedAt.slice(0,10);
+    var m1 = startedAt.match(/T(\d{2}):(\d{2})/); if(m1) time = m1[1]+":"+m1[2];
+    end = endedAt.slice(0,10) || start;
+    var m2 = endedAt.match(/T(\d{2}):(\d{2})/); if(m2) timeEnd = m2[1]+":"+m2[2];
+  }
+  // 두레이 이벤트에는 구글의 "설명란"에 해당하는 필드가 없어 제목만으로 분류
+  // (휴가(이름)/외출(이름)/재택근무(이름)/과제 키워드 형식은 구글 쪽과 동일한 규칙을 그대로 따름)
+  var cls = classifySchedule({ title: title, desc: "" });
+  var timeStr = time ? (time + (timeEnd && timeEnd!==time ? "~"+timeEnd : "")) : "";
+  return {
+    id: "dooray-" + ev.id, title: title, type: cls.type, person: cls.person, project: cls.project,
+    vacation: cls.vacation, attendees: cls.attendees, start: start, end: end, time: timeStr, location: location,
+    raw_desc: ""
+  };
+}
+
+async function doorayListRange(env, timeMinISO, timeMaxISO){
+  var token = env.DOORAY_API_TOKEN;
+  if(!token) throw new Error("DOORAY_API_TOKEN 미설정");
+  var url = DOORAY_API_BASE + "/calendar/v1/calendars/*/events"
+    + "?calendars=" + encodeURIComponent(DOORAY_TEAM_CALENDAR_ID)
+    + "&timeMin=" + encodeURIComponent(timeMinISO)
+    + "&timeMax=" + encodeURIComponent(timeMaxISO);
+  var res = await fetch(url, { headers: { "Authorization": "dooray-api " + token } });
+  var data = await res.json();
+  if(!data.header || !data.header.isSuccessful){
+    throw new Error("두레이 캘린더 조회 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
+  }
+  return (data.result || []).map(parseDoorayEvent).filter(function(e){ return e.type; });
+}
+// 두레이는 문서엔 "최대 1년치"라고 돼있지만 실제로는 한 달을 넘기면 USER_INVALID_EXCEED_MAXIMUM_PERIOD로 거부됨(실측 확인).
+// 지난 날짜는 노션 아카이브가 담당하므로, 여기선 "이번달/다음달"만 한 달씩 나눠 병렬로 조회한 뒤 합침
+function doorayMonthChunks(){
+  var kst = new Date(Date.now() + 9*60*60*1000); // UTC → KST 보정해서 "지금이 한국 시간으로 며칠인지" 얻기
+  var y = kst.getUTCFullYear(), m = kst.getUTCMonth();
+  function z(n){ return (n<10?"0":"")+n; }
+  function fmt(yy, mm, dd, hh, mi, ss){ return yy+"-"+z(mm+1)+"-"+z(dd)+"T"+z(hh)+":"+z(mi)+":"+z(ss)+"+09:00"; }
+  var chunks = [];
+  for(var i=0;i<=1;i++){
+    var yy = y, mm = m + i;
+    while(mm < 0){ mm += 12; yy--; }
+    while(mm > 11){ mm -= 12; yy++; }
+    var daysInMonth = new Date(Date.UTC(yy, mm+1, 0)).getUTCDate();
+    chunks.push({ timeMin: fmt(yy, mm, 1, 0,0,0), timeMax: fmt(yy, mm, daysInMonth, 23,59,59) });
+  }
+  return chunks;
+}
+async function doorayList(env){
+  var chunks = doorayMonthChunks();
+  var settled = await Promise.allSettled(chunks.map(function(c){ return doorayListRange(env, c.timeMin, c.timeMax); }));
+  var out = [], firstError = null;
+  settled.forEach(function(r){
+    if(r.status === "fulfilled") out = out.concat(r.value);
+    else if(!firstError) firstError = r.reason;
+  });
+  if(out.length === 0 && firstError) throw firstError; // 전부 실패했을 때만 에러로 전파(부분 실패는 있는 만큼만 반영)
+  // 월 경계에 걸친(여러 청크에 겹쳐 조회되는) 이벤트 중복 제거
+  var seen = {}, dedup = [];
+  out.forEach(function(e){ if(!seen[e.id]){ seen[e.id]=1; dedup.push(e); } });
+  return dedup;
+}
+
+// ===== 일정 아카이브 (노션 DB) =====
+// 두레이 조회 기간 제한(약 한 달) 때문에, "오늘 이전" 일정은 매일 크론으로 노션에 옮겨 저장해두고 여기서 불러옴.
+// "오늘 이후"는 항상 두레이에서 실시간으로 조회.
+const SCHEDULE_ARCHIVE_DB_ID = "0bbdeffb-e7e6-4efe-977b-01d914fa7fd0";
+
+function todayKST(){
+  var kst = new Date(Date.now() + 9*60*60*1000);
+  function z(n){ return (n<10?"0":"")+n; }
+  return kst.getUTCFullYear()+"-"+z(kst.getUTCMonth()+1)+"-"+z(kst.getUTCDate());
+}
+function parseArchivedSchedule(page){
+  const p = page.properties || {};
+  function txt(name){ var r=(p[name]&&p[name].rich_text)||[]; return r.map(function(t){return t.plain_text;}).join(""); }
+  function ttl(name){ var r=(p[name]&&p[name].title)||[]; return r.map(function(t){return t.plain_text;}).join(""); }
+  function sel(name){ return (p[name]&&p[name].select&&p[name].select.name)||""; }
+  function dt(name){ return (p[name]&&p[name].date&&p[name].date.start)||""; }
+  return {
+    id: "archive-" + page.id, title: ttl("제목"), type: sel("유형"), person: txt("담당자"),
+    project: sel("과제"), vacation: txt("휴가구분"), attendees: txt("참석자"),
+    start: (dt("시작일")||"").slice(0,10), end: (dt("종료일")||dt("시작일")||"").slice(0,10),
+    time: txt("시간"), location: txt("장소"), raw_desc: ""
+  };
+}
+// 아카이브 DB 전체 조회(오늘 이전 것만) - 매 요청마다 전체를 훑는 구조라 데이터가 아주 많아지면 나중에 날짜 필터 API로 바꿔야 할 수 있음
+async function archivedScheduleList(env){
+  const token = env.NOTION_TOKEN;
+  const pages = await getAllPages(SCHEDULE_ARCHIVE_DB_ID, token);
+  var today = todayKST();
+  return pages.map(parseArchivedSchedule).filter(function(x){ return x.title && x.start && x.start < today; });
+}
+// 어제 하루치 두레이 일정을 노션 아카이브에 저장(매일 크론으로 실행). 이미 저장된 건(원본ID 기준) 건너뜀
+async function archiveYesterdaySchedule(env){
+  const token = env.NOTION_TOKEN;
+  var kst = new Date(Date.now() + 9*60*60*1000);
+  var y = kst.getUTCFullYear(), m = kst.getUTCMonth(), d = kst.getUTCDate() - 1;
+  var yest = new Date(Date.UTC(y, m, d));
+  function z(n){ return (n<10?"0":"")+n; }
+  var yy=yest.getUTCFullYear(), mm=yest.getUTCMonth(), dd=yest.getUTCDate();
+  var dayStr = yy+"-"+z(mm+1)+"-"+z(dd);
+  var timeMin = dayStr+"T00:00:00+09:00", timeMax = dayStr+"T23:59:59+09:00";
+  var events = await doorayListRange(env, timeMin, timeMax);
+
+  var existingPages = await getAllPages(SCHEDULE_ARCHIVE_DB_ID, token);
+  var existingIds = {};
+  existingPages.forEach(function(pg){
+    var r = (pg.properties["원본ID"] && pg.properties["원본ID"].rich_text) || [];
+    var v = r.map(function(t){return t.plain_text;}).join("");
+    if(v) existingIds[v] = true;
+  });
+
+  var created = 0;
+  for(var i=0;i<events.length;i++){
+    var e = events[i];
+    var origId = e.id.indexOf("dooray-")===0 ? e.id.slice(7) : e.id;
+    if(existingIds[origId]) continue;
+    var props = {
+      "제목": { title: rt(e.title) },
+      "담당자": { rich_text: rt(e.person) },
+      "휴가구분": { rich_text: rt(e.vacation) },
+      "참석자": { rich_text: rt(e.attendees) },
+      "시간": { rich_text: rt(e.time) },
+      "장소": { rich_text: rt(e.location) },
+      "원본ID": { rich_text: rt(origId) },
+      "시작일": { date: { start: e.start } },
+      "종료일": { date: { start: e.end || e.start } },
+    };
+    if(e.type) props["유형"] = { select: { name: e.type } };
+    if(e.project) props["과제"] = { select: { name: e.project } };
+    await notionFetch("/pages", token, "POST", { parent:{ database_id: SCHEDULE_ARCHIVE_DB_ID }, properties: props });
+    created++;
+  }
+  return { archived: created, checked: events.length, day: dayStr };
+}
+
+// 아카이브(오늘 이전) + 두레이 실시간(오늘 이후)을 병합해서 하나의 일정 목록으로 - 한쪽이 실패해도 다른 쪽은 그대로 반영
+async function combinedScheduleList(env){
+  var today = todayKST();
+  var results = await Promise.allSettled([
+    archivedScheduleList(env),
+    doorayList(env),
+  ]);
+  var out = [];
+  var errors = {};
+  if(results[0].status === "fulfilled") out = out.concat(results[0].value);
+  else errors.archiveScheduleError = String(results[0].reason);
+  if(results[1].status === "fulfilled") out = out.concat(results[1].value.filter(function(e){ return !e.end || e.end >= today; }));
+  else errors.doorayScheduleError = String(results[1].reason);
+  return { items: out, errors: errors };
+}
+
 
 function parsePerf(page){
   const p = page.properties || {};
@@ -834,7 +1008,7 @@ async function syncPlansFromCalendar(env){
   var result = { checked:0, updated:0, missing:0, imported:0 };
   var wk = currentWeekRange();
   // 캘린더 동기화는 "계획주"(다음주) 범위를 대상으로 함 — 실적주(이번주)가 아님
-  var events = await gcalList(env, wk.planStart + "T00:00:00+09:00");
+  var events = await doorayList(env);
   events = events.filter(function(ev){
     return ev.start >= wk.planStart && ev.start <= wk.planEnd
       && (ev.type === "과제" || ev.type === "기타"); // 휴가/외출/재택근무/출장 등은 제외
@@ -1156,7 +1330,7 @@ async function deleteWbs(env, payload){
   return { deleted: true };
 }
 
-// ===== 일정관리 CRUD (구글 캘린더) =====
+// ===== 일정관리 CRUD (두레이) =====
 // item: { id?, type, person, title, project, vacation, start, end, time('HH:MM' or 'HH:MM~HH:MM'), location }
 function schedSummary(item){
   if(SCHED_ATT_TYPES.indexOf(item.type) >= 0){
@@ -1183,12 +1357,16 @@ function schedTimeRange(item){
   if(!t0) return null;
   return { start: t0, end: t1 || null };
 }
-function schedBody(item){
-  var body = { summary: schedSummary(item) };
-  // description/location은 값이 없어도 반드시 포함해야 함.
-  // PATCH는 "포함 안 된 필드는 그대로 유지"이므로, 비워서 저장해도 여기서 빠지면 기존 값이 안 지워짐.
-  body.description = schedDescription(item) || "";
-  body.location = item.location || "";
+// 두레이 일정 생성/수정 시 "참석자(users.to)"는 필수 필드라 화면에서 안 고르게 하고 고정 시스템 계정으로 자동 채움
+// (실제 담당자는 어차피 제목의 "유형(이름)" 표기가 유일한 출처라 참석자 지정은 의미 없음 - API 필수조건 맞추기용)
+const DOORAY_DEFAULT_ATTENDEE_ID = "4180547016341419629"; // 한효림
+function doorayEventBody(item){
+  var body = {
+    users: { to: [{ type:"member", member:{ organizationMemberId: DOORAY_DEFAULT_ATTENDEE_ID } }] },
+    subject: schedSummary(item),
+    body: { mimeType: "text/plain", content: schedDescription(item) || "" }, // body도 필수 필드(빈 값이라도 구조는 있어야 함)
+    location: item.location || "",
+  };
   var tr = schedTimeRange(item);
   var endDate = (item.end && item.end >= item.start) ? item.end : item.start;
   if(tr){
@@ -1202,56 +1380,67 @@ function schedBody(item){
       var endH = (parseInt(hh,10)+1)%24;
       endISO = endDate + "T" + ("0"+endH).slice(-2) + ":" + mm + ":00+09:00";
     }
-    body.start = { dateTime: startISO, timeZone: "Asia/Seoul" };
-    body.end = { dateTime: endISO, timeZone: "Asia/Seoul" };
+    body.startedAt = startISO;
+    body.endedAt = endISO;
+    body.wholeDayFlag = false;
   } else {
     // 종일: end는 배타적이라 하루 다음날로
     var d = new Date(endDate + "T00:00:00"); d.setDate(d.getDate()+1);
     function z(n){ return (n<10?"0":"")+n; }
     var nextDay = d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate());
-    body.start = { date: item.start };
-    body.end = { date: nextDay };
+    body.startedAt = item.start + "+09:00";
+    body.endedAt = nextDay + "+09:00";
+    body.wholeDayFlag = true;
   }
   return body;
+}
+// 프론트에서 넘어오는 id는 combinedScheduleList에서 "dooray-" 접두어를 붙여둔 상태라, 실제 API 호출 전 원래 id로 복원
+function stripDoorayPrefix(id){
+  id = String(id||"");
+  return id.indexOf("dooray-")===0 ? id.slice(7) : id;
 }
 async function createSchedule(env, payload){
   const item = payload.item || {};
   if(!item.start) throw new Error("시작일 없음");
-  var token = await getGcalToken(env);
-  var res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_ID) + "/events", {
+  var token = env.DOORAY_API_TOKEN;
+  if(!token) throw new Error("DOORAY_API_TOKEN 미설정");
+  var res = await fetch(DOORAY_API_BASE + "/calendar/v1/calendars/" + encodeURIComponent(DOORAY_TEAM_CALENDAR_ID) + "/events", {
     method: "POST",
-    headers: { "Authorization": "Bearer "+token, "Content-Type": "application/json" },
-    body: JSON.stringify(schedBody(item))
+    headers: { "Authorization": "dooray-api " + token, "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify(doorayEventBody(item))
   });
   var data = await res.json();
-  if(data.error) throw new Error("캘린더 등록 실패: " + JSON.stringify(data.error));
-  return { created: true, id: data.id };
+  if(!data.header || !data.header.isSuccessful) throw new Error("일정 등록 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
+  return { created: true, id: "dooray-" + (data.result && data.result.id) };
 }
 async function updateSchedule(env, payload){
   const item = payload.item || {};
   if(!item.id) throw new Error("event id 없음");
   if(!item.start) throw new Error("시작일 없음");
-  var token = await getGcalToken(env);
-  var res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_ID) + "/events/" + encodeURIComponent(item.id), {
-    method: "PATCH",
-    headers: { "Authorization": "Bearer "+token, "Content-Type": "application/json" },
-    body: JSON.stringify(schedBody(item))
+  var token = env.DOORAY_API_TOKEN;
+  if(!token) throw new Error("DOORAY_API_TOKEN 미설정");
+  var rawId = stripDoorayPrefix(item.id);
+  var res = await fetch(DOORAY_API_BASE + "/calendar/v1/calendars/" + encodeURIComponent(DOORAY_TEAM_CALENDAR_ID) + "/events/" + encodeURIComponent(rawId), {
+    method: "PUT",
+    headers: { "Authorization": "dooray-api " + token, "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify(doorayEventBody(item))
   });
   var data = await res.json();
-  if(data.error) throw new Error("캘린더 수정 실패: " + JSON.stringify(data.error));
+  if(!data.header || !data.header.isSuccessful) throw new Error("일정 수정 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
   return { updated: true };
 }
 async function deleteSchedule(env, payload){
   if(!payload.id) throw new Error("event id 없음");
-  var token = await getGcalToken(env);
-  var res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_ID) + "/events/" + encodeURIComponent(payload.id), {
-    method: "DELETE",
-    headers: { "Authorization": "Bearer "+token }
+  var token = env.DOORAY_API_TOKEN;
+  if(!token) throw new Error("DOORAY_API_TOKEN 미설정");
+  var rawId = stripDoorayPrefix(payload.id);
+  var res = await fetch(DOORAY_API_BASE + "/calendar/v1/calendars/" + encodeURIComponent(DOORAY_TEAM_CALENDAR_ID) + "/events/" + encodeURIComponent(rawId) + "/delete", {
+    method: "POST",
+    headers: { "Authorization": "dooray-api " + token, "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({ deleteType: "this" })
   });
-  if(res.status !== 204 && res.status !== 200 && res.status !== 410){
-    var data = await res.json().catch(function(){return {};});
-    throw new Error("캘린더 삭제 실패: " + JSON.stringify(data));
-  }
+  var data = await res.json();
+  if(!data.header || !data.header.isSuccessful) throw new Error("일정 삭제 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
   return { deleted: true };
 }
 
@@ -1609,6 +1798,8 @@ export default {
           result = await updateSchedule(env, payload);
         } else if(payload.action === "schedDelete"){
           result = await deleteSchedule(env, payload);
+        } else if(payload.action === "archiveScheduleNow"){
+          result = await archiveYesterdaySchedule(env); // 크론 기다리지 않고 수동 테스트용
         } else if(payload.action === "comment"){
           result = await addComment(env, payload);
         } else if(payload.action === "deleteComment"){
@@ -1680,7 +1871,7 @@ export default {
           getAllPages(PLAN_DB_ID, token),                    // 4: 업무계획
           meetingsPromise,                                   // 5: 회의자료 + 이번주 코멘트(체인됨, 이제 진짜 병렬)
           getAllPages(CONSIGN_DB_ID, token),                 // 6: 위탁과제 정보만(회의록/요청자료는 대시보드에 안 씀)
-          gcalList(env, "2026-06-01T00:00:00+09:00"),        // 7: 일정(구글 캘린더)
+          combinedScheduleList(env),  // 7: 일정(노션 아카이브 - 오늘 이전 + 두레이 팀 캘린더 - 오늘 이후, 병합)
         ]);
         function ok(i, map){ return results[i].status==="fulfilled" ? map(results[i].value) : []; }
 
@@ -1706,8 +1897,11 @@ export default {
         consignments.sort(function(a,b){ return a.order - b.order; });
         body.consignments = consignments;
 
-        body.schedule = results[7].status==="fulfilled" ? results[7].value : [];
-        if(results[7].status==="rejected") body.scheduleError = String(results[7].reason);
+        var scheduleResult = results[7].status==="fulfilled" ? results[7].value : { items: [], errors: { combinedScheduleError: String(results[7].reason) } };
+        body.schedule = scheduleResult.items || [];
+        if(scheduleResult.errors && scheduleResult.errors.archiveScheduleError) body.archiveScheduleError = scheduleResult.errors.archiveScheduleError;
+        if(scheduleResult.errors && scheduleResult.errors.doorayScheduleError) body.doorayScheduleError = scheduleResult.errors.doorayScheduleError;
+        if(scheduleResult.errors && scheduleResult.errors.combinedScheduleError) body.scheduleError = scheduleResult.errors.combinedScheduleError;
 
         return new Response(JSON.stringify(body), { headers: corsHeaders() });
       }
@@ -1757,7 +1951,10 @@ export default {
 
       if(want("schedule")){
         try {
-          body.schedule = await gcalList(env, "2026-06-01T00:00:00+09:00");
+          var schedRes = await combinedScheduleList(env);
+          body.schedule = schedRes.items || [];
+          if(schedRes.errors && schedRes.errors.archiveScheduleError) body.archiveScheduleError = schedRes.errors.archiveScheduleError;
+          if(schedRes.errors && schedRes.errors.doorayScheduleError) body.doorayScheduleError = schedRes.errors.doorayScheduleError;
         } catch(e){ body.schedule = []; body.scheduleError = String(e); }
       }
 
@@ -1827,5 +2024,14 @@ export default {
     } catch(e){
       return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders() });
     }
+  },
+
+  // 매일 한 번(Cloudflare 대시보드에서 Cron Trigger로 등록 필요) - 어제치 두레이 일정을 노션 아카이브로 저장
+  async scheduled(event, env, ctx){
+    ctx.waitUntil(
+      archiveYesterdaySchedule(env)
+        .then(function(r){ console.log("일정 아카이브 완료:", JSON.stringify(r)); })
+        .catch(function(e){ console.error("일정 아카이브 실패:", e); })
+    );
   },
 };

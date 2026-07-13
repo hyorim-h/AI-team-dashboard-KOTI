@@ -668,6 +668,10 @@
   function openEdit(id, presetDate){
     var isNew=!id;
     var r=isNew?{}:findById(id);
+    if(!isNew && id.indexOf("archive-")===0){
+      alert("지난 날짜 일정(아카이브 보관분)이라 여기서는 수정할 수 없어요.");
+      return;
+    }
     EDIT.id=isNew?null:id;
     EDIT.origVacation=r.vacation||"";
     document.getElementById("editHead").textContent=isNew?"일정 추가":"일정 수정";
