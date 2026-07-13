@@ -1978,6 +1978,19 @@ export default {
         }
       }
 
+      // 위탁과제 요청자료 상세(보기/수정 팝업 전용) - 1건만 가볍게 조회
+      if(scope === "consignRequestDetail"){
+        const reqId = url.searchParams.get("id");
+        if(!reqId) return new Response(JSON.stringify({ error:"id 누락" }), { status:400, headers: corsHeaders() });
+        try {
+          const page = await notionFetch("/pages/" + reqId, token, "GET");
+          const request = await parseConsignRequest(page, token);
+          return new Response(JSON.stringify({ request: request }), { headers: corsHeaders() });
+        } catch(e){
+          return new Response(JSON.stringify({ error: String(e) }), { status:500, headers: corsHeaders() });
+        }
+      }
+
       if(want("reports")){
         const reportPages = await getAllPages(REPORT_DB_ID, token);
         const reports = [];
