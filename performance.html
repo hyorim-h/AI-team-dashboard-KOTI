@@ -621,6 +621,14 @@
 
   fillFilters();
   load();
+
+  // 30초 자동 새로고침 (편집 모달이 열려 있으면 건너뜀 - 작성 중인 내용 보호)
+  setInterval(function(){
+    if(document.querySelector(".ov.open")) return;
+    var ae=document.activeElement;
+    if(ae && (ae.tagName==="INPUT" || ae.tagName==="TEXTAREA" || ae.tagName==="SELECT")) return;
+    load();
+  }, 60000);
 </script>
 </body>
 </html>
