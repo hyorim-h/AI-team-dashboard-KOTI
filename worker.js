@@ -1713,6 +1713,20 @@ export default {
         return new Response(JSON.stringify(body), { headers: corsHeaders() });
       }
 
+      // 대시보드 팝업 전용: 회의 1건만 (본문+코멘트) 가볍게 조회 — scope=meetings(전체) 대신 사용
+      if(scope === "meetingDetail"){
+        const meetingId = url.searchParams.get("id");
+        if(!meetingId) return new Response(JSON.stringify({ error:"id 누락" }), { status:400, headers: corsHeaders() });
+        try {
+          const page = await notionFetch("/pages/" + meetingId, token, "GET");
+          const meeting = await parseMeeting(page, token);
+          meeting.comments = await getComments(meetingId, token);
+          return new Response(JSON.stringify({ meeting: meeting }), { headers: corsHeaders() });
+        } catch(e){
+          return new Response(JSON.stringify({ error: String(e) }), { status:500, headers: corsHeaders() });
+        }
+      }
+
       if(want("reports")){
         const reportPages = await getAllPages(REPORT_DB_ID, token);
         const reports = [];
