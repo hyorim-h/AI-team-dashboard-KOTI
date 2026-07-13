@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<script>if(sessionStorage.getItem("koti_authed")!=="1"){location.href="login.html";}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>성과 관리 · AI빅데이터연구팀</title>
 <style>
@@ -179,7 +180,7 @@
   <a href="https://www.koti.re.kr" target="_blank" rel="noopener">한국교통연구원</a>
   <span class="sep">|</span><span>모빌리티 빅데이터팀</span>
   <span class="sep">|</span>
-  <button class="util-toggle" id="themeBtn">🌙 다크모드</button>
+  <a href="#" id="logoutLink" style="color:#cdd6ec;text-decoration:none;font-size:12.5px;margin-right:14px" onclick="sessionStorage.removeItem('koti_authed');sessionStorage.removeItem('koti_user');location.href='login.html';return false;">로그아웃</a><button class="util-toggle" id="themeBtn">🌙 다크모드</button>
 </div></div>
 
 <header class="head"><div class="in">
@@ -195,7 +196,6 @@
   <a href="weekly-work.html">주간업무 작성</a>
   <a href="weekly-meeting.html">주간회의 자료</a>
   <a class="cur" href="performance.html">성과 관리</a>
-  <a href="wbs.html">WBS 관리</a>
   <a href="schedule.html">일정관리</a>
   <a href="outsourced.html">위탁과제 관리</a>
   <a href="index_aiagent.html">AI에이전트</a>
@@ -530,6 +530,7 @@
       return '<option value="'+y+'"'+(y===curStart?" selected":"")+'>'+y+'년</option>'; }).join("");
     fillSelect(document.getElementById("edStatus"), STATUSES, r.status||"예정", false);
     renderChkEditor();
+    autoCompleteStatus();
     var estat=document.getElementById("editStatus"); estat.className="estatus status"; estat.textContent="";
     var edel=document.getElementById("editDelete"); edel.disabled=false; edel.textContent="삭제"; edel.style.display=isNew?"none":"";
     document.getElementById("editOv").classList.add("open");
@@ -543,16 +544,26 @@
   document.getElementById("chkAdd").addEventListener("click", function(){
     EDIT.checklist.push({ text:"", done:false }); renderChkEditor();
   });
+  // 체크리스트가 전부 체크되면(=100%) 진행상태를 자동으로 "완료"로 전환
+  function autoCompleteStatus(){
+    var total = EDIT.checklist.filter(function(c){ return (c.text||"").trim(); }).length;
+    if(!total) return;
+    var done = EDIT.checklist.filter(function(x){ return x.done && (x.text||"").trim(); }).length;
+    if(done === total){
+      document.getElementById("edStatus").value = "완료";
+    }
+  }
   document.getElementById("chkList").addEventListener("input", function(e){
     var ci=e.target.dataset.ci, ct=e.target.dataset.ct;
     if(ci!==undefined){ EDIT.checklist[+ci].done = e.target.checked; }
     if(ct!==undefined){ EDIT.checklist[+ct].text = e.target.value; }
     var done = EDIT.checklist.filter(function(x){return x.done;}).length;
     document.getElementById("chkCnt").textContent = done+"/"+EDIT.checklist.length+" 완료";
+    if(ci!==undefined) autoCompleteStatus();
   });
   document.getElementById("chkList").addEventListener("click", function(e){
     var cd=e.target.dataset.cd;
-    if(cd!==undefined){ EDIT.checklist.splice(+cd,1); renderChkEditor(); }
+    if(cd!==undefined){ EDIT.checklist.splice(+cd,1); renderChkEditor(); autoCompleteStatus(); }
   });
 
   document.getElementById("editSave").addEventListener("click", async function(){
@@ -611,6 +622,14 @@
 
   fillFilters();
   load();
+
+  // 30초 자동 새로고침 (편집 모달이 열려 있으면 건너뜀 - 작성 중인 내용 보호)
+  setInterval(function(){
+    if(document.querySelector(".ov.open")) return;
+    var ae=document.activeElement;
+    if(ae && (ae.tagName==="INPUT" || ae.tagName==="TEXTAREA" || ae.tagName==="SELECT")) return;
+    load();
+  }, 30000);
 </script>
 </body>
 </html>

@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="ko"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>한지음 · 논문작성 · KOTI TALK</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="agent.css"><style>body{--accent:#a78bfa}</style></head><body>
+<nav><div class="wrap"><a class="brand" href="../index.html"><span class="dot">K</span> KOTI TALK</a><a class="back" href="../index.html#agents">← 팀 전체</a><a href="paperwriter-light.html" style="color:var(--mut);font-size:13px;font-weight:600;margin-left:14px">☀ 라이트</a></div></nav>
+<header class="hero"><div class="wrap"><div class="hrow">
+  <div class="av" style="background:linear-gradient(135deg,#a78bfa,#5b8cff)">한</div>
+  <div><div class="hname">한지음</div><div class="hrole">⑩ 논문작성</div></div></div>
+  <p class="oneliner">확정된 문헌·데이터를 근거로 학술 논문을 <b>기획→초안→비평→편집→투고양식</b>까지 완성하는 서브-오케스트레이터.</p>
+  <div class="tags"><span class="tag hi">서브-오케스트레이터</span><span class="tag">문헌=①윤서지·⑨서지원</span><span class="tag">데이터=⑤남도산</span><span class="tag">중복 없음</span></div>
+</div></header>
+<section><div class="wrap"><span class="eyebrow">Identity</span><h3 class="sec">이 에이전트는</h3>
+<p style="color:var(--mut);font-size:15px">본문을 직접 쓰지 않고 <b>논문 전용 워커 7종</b>을 순차로 운용해 산출물을 취합·검증하는 논문작성 총괄이다. 문헌검색·데이터분석은 <b>직접 하지 않는다</b> — 팀에 이미 담당이 있으므로 기존 에이전트의 산출물을 근거로만 쓴다.</p>
+<div class="note"><b>중복 없음 (De-dup)</b> — 문헌 근거는 <b>①윤서지(내부문헌 litreview)</b>와 <b>⑨서지원(외부논문 LLM-Wiki)</b>, 데이터·수치·표·그림은 <b>⑤남도산(데이터 분석 analyst)</b>에게 위임한다. 이 근거는 서달미가 검증 후 경로로 주입하며, 부족하면 한지음은 직접 찾지 않고 서달미에 선행 태스크를 요청한다.</div></div></section>
+<section><div class="wrap"><span class="eyebrow">Role</span><h3 class="sec">논문 전용 워커 (내부 서브에이전트 ×7)</h3><ul class="rlist">
+<li><b>research-planner</b> <span>— 연구질문·가설·기여점·개요(outline)</span></li>
+<li><b>draft-writer</b> <span>— 장별 원고 초안·수정 (장 단위 순차)</span></li>
+<li><b>paper-critic</b> <span>— 심사위원 관점 비평·심사의견서</span></li>
+<li><b>editor-citation</b> <span>— 인용 실재검증·양식적용·최종 원고</span></li>
+<li><b>manuscript-formatter</b> <span>— 투고 양식(국문 hwpx / 영문 LaTeX)</span></li>
+<li><b>academic-translator</b> <span>— 국문→영문 SCI 번역 (선택 트랙 A)</span></li>
+<li><b>review-responder</b> <span>— 심사의견 대응·답변서 (선택 트랙 B)</span></li></ul>
+<p style="color:var(--dim);font-size:13px;margin-top:8px">이 7종은 한지음 전용이며 서달미가 직접 호출하지 않는다(서달미 → paperwriter만 호출).</p></div></section>
+<section><div class="wrap"><span class="eyebrow">Flow</span><h3 class="sec">동작 플로우 — ★는 연구자 승인 관문</h3><div class="steps">
+<div class="step"><h4>근거 확보</h4><p>①문헌·⑨위키·⑤데이터 산출물 정리</p></div>
+<div class="step gate"><h4>★ 기획 승인</h4><p>research-planner → 개요 승인</p></div>
+<div class="step"><h4>초안·비평</h4><p>draft-writer → paper-critic(≤3회)</p></div>
+<div class="step gate"><h4>★ 최종 승인</h4><p>editor-citation 인용검증 후</p></div>
+<div class="step"><h4>투고 양식</h4><p>hwpx / LaTeX 배치</p></div></div>
+<div class="note">수치는 <span class="mono">results.md</span>, 문헌은 <span class="mono">references.md</span>에서만 인용. 근거 없으면 <span class="mono">[근거 필요]</span> 태그 후 서달미에 보완(=남도산/서지원) 요청 — 임의로 채우지 않는다.</div></div></section>
+<section><div class="wrap"><span class="eyebrow">I/O</span><h3 class="sec">입력 · 출력</h3><div class="io">
+<div class="box"><h4>입력 (서달미 주입)</h4><ul><li>문헌 근거 · 서지 (①윤서지·⑨서지원)</li><li>분석 결과·수치 (⑤남도산)</li><li>연구 주제·대상 저널</li></ul></div>
+<div class="box"><h4>출력 · <span class="mono">workspace/paper/</span></h4><ul><li><span class="mono">outline.md</span> · <span class="mono">drafts/</span> · <span class="mono">reviews/</span></li><li><span class="mono">literature/references.md</span> · <span class="mono">analysis/results.md</span></li><li><span class="mono">final/manuscript.(md·hwpx)</span></li></ul></div></div></div></section>
+<section><div class="wrap"><span class="eyebrow">Usage</span><h3 class="sec">이렇게 사용하세요</h3>
+<div class="usebox"><b>서달미</b>에게 이렇게 지시하면 한지음으로 라우팅됩니다:<br>
+<span class="quote">이 데이터·문헌으로 학회 논문 초안 써줘</span><span class="quote">완성 원고 SCI 저널 투고 양식으로 배치해줘</span></div>
+<p style="color:var(--dim);font-size:13px;margin-top:8px">채널: <span class="mono">#paperwriter</span></p></div></section>
+<section><div class="wrap"><span class="eyebrow">Collab</span><h3 class="sec">협업 (핸드오프)</h3><div class="hand">
+<div class="box recv"><div class="lbl">← 받는다</div><p><b>①윤서지·⑨서지원</b>의 문헌 근거와 <b>⑤남도산</b>의 데이터 분석 결과를 서달미 경유로 받아 논문 근거로 사용</p></div>
+<div class="box supply"><div class="lbl">→ 넘긴다</div><p>완성 원고를 ⑨한지평(보고서 반영)·⑦도지원(발표)·⑥정사하(그림)에</p></div></div></div></section>
+<footer><div class="wrap">KOTI TALK · <a href="../index.html">← 팀 전체 보기</a> · <a href="https://github.com/yewon918/KOTI_multi-agent" target="_blank">GitHub ↗</a></div></footer>
+</body></html>

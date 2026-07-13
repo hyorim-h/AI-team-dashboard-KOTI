@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<script>if(sessionStorage.getItem("koti_authed")!=="1"){location.href="login.html";}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>위탁과제 관리 · AI빅데이터연구팀</title>
 <style>
@@ -297,7 +298,7 @@
   <a href="https://www.koti.re.kr" target="_blank" rel="noopener">한국교통연구원</a>
   <span class="sep">|</span><span>모빌리티 빅데이터팀</span>
   <span class="sep">|</span>
-  <button class="util-toggle" id="themeBtn">🌙 다크모드</button>
+  <a href="#" id="logoutLink" style="color:#cdd6ec;text-decoration:none;font-size:12.5px;margin-right:14px" onclick="sessionStorage.removeItem('koti_authed');sessionStorage.removeItem('koti_user');location.href='login.html';return false;">로그아웃</a><button class="util-toggle" id="themeBtn">🌙 다크모드</button>
 </div></div>
 
 <header class="head"><div class="in">
@@ -313,7 +314,6 @@
   <a href="weekly-work.html">주간업무 작성</a>
   <a href="weekly-meeting.html">주간회의 자료</a>
   <a href="performance.html">성과 관리</a>
-  <a href="wbs.html">WBS 관리</a>
   <a href="schedule.html">일정관리</a>
   <a class="cur" href="outsourced.html">위탁과제 관리</a>
   <a href="index_aiagent.html">AI에이전트</a>
@@ -540,12 +540,14 @@
     }
     return true;
   }
+  // 여러 줄(엔터로 구분)로 작성된 안건 내용 중 목록에서는 첫 줄만 보여줌(상세보기에서는 전체 표시)
+  function firstLine(s){ return (s||"").split(/\r?\n/)[0]; }
   function renderRequests(){
     var all=requestsOf(SEL).sort(function(a,b){return (a.reqDate<b.reqDate)?1:-1;});
     var list=all.filter(reqMatches);
     var cards=list.length ? list.map(function(r){
       var qaHtml=(r.qa&&r.qa.length) ? r.qa.map(function(qa,i){
-        return "<div class=\"qa-item\"><span class=\"qa-n\">안건 "+(i+1)+"</span><div class=\"qa-q\">"+esc(qa.q)+"</div></div>";
+        return "<div class=\"qa-item\"><span class=\"qa-n\">안건 "+(i+1)+"</span><div class=\"qa-q\">"+esc(firstLine(qa.q))+"</div></div>";
       }).join("") : "<div class=\"qa-empty\">아직 정리된 문의·답변이 없습니다.</div>";
       var files="";
       if(r.reqFile) files+="<span class=\"filechip req\">📤 요청 · "+esc(r.reqFile)+"</span>";
@@ -1033,6 +1035,14 @@
   })();
 
   load();
+
+  // 30초 자동 새로고침 (편집 모달이 열려 있으면 건너뜀 - 작성 중인 내용 보호)
+  setInterval(function(){
+    if(document.querySelector(".ov.open")) return;
+    var ae=document.activeElement;
+    if(ae && (ae.tagName==="INPUT" || ae.tagName==="TEXTAREA" || ae.tagName==="SELECT")) return;
+    load();
+  }, 30000);
 </script>
 </body>
 </html>
