@@ -449,8 +449,7 @@ function parseProjectInfo(page){
   }
   const main = msNames(p["Main"]);
   const sub = msNames(p["Sub"]);
-  const piRt = (p["연구책임자"] && p["연구책임자"].rich_text) || [];
-  const pi = piRt.map(function(t){return t.plain_text;}).join("");
+  const pi = msNames(p["연구책임자"]); // multi_select (연구책임자 2명 이상 가능) - 연구진(Main/Sub)과 동일 타입
   const start = (p["시작"] && p["시작"].date && p["시작"].date.start) || "";
   const end = (p["종료"] && p["종료"].date && p["종료"].date.start) || "";
   const order = (p["정렬순서"] && typeof p["정렬순서"].number === "number") ? p["정렬순서"].number : 999;
