@@ -708,25 +708,9 @@ async function archivedScheduleList(env){
   return pages.map(parseArchivedSchedule).filter(function(x){ return x.title && x.start && x.start < today; });
 }
 // 어제 하루치 두레이 일정을 노션 아카이브에 저장(매일 크론으로 실행). 이미 저장된 건(원본ID 기준) 건너뜀
-async function archiveYesterdaySchedule(env){
+// 두레이 이벤트 목록을 노션 아카이브에 저장(이미 있는 원본ID는 건너뜀). existingIds는 미리 조회해둔 {원본ID: true} 맵
+async function archiveEventsToNotion(env, events, existingIds){
   const token = env.NOTION_TOKEN;
-  var kst = new Date(Date.now() + 9*60*60*1000);
-  var y = kst.getUTCFullYear(), m = kst.getUTCMonth(), d = kst.getUTCDate() - 1;
-  var yest = new Date(Date.UTC(y, m, d));
-  function z(n){ return (n<10?"0":"")+n; }
-  var yy=yest.getUTCFullYear(), mm=yest.getUTCMonth(), dd=yest.getUTCDate();
-  var dayStr = yy+"-"+z(mm+1)+"-"+z(dd);
-  var timeMin = dayStr+"T00:00:00+09:00", timeMax = dayStr+"T23:59:59+09:00";
-  var events = await doorayListRange(env, timeMin, timeMax);
-
-  var existingPages = await getAllPages(SCHEDULE_ARCHIVE_DB_ID, token);
-  var existingIds = {};
-  existingPages.forEach(function(pg){
-    var r = (pg.properties["원본ID"] && pg.properties["원본ID"].rich_text) || [];
-    var v = r.map(function(t){return t.plain_text;}).join("");
-    if(v) existingIds[v] = true;
-  });
-
   var created = 0;
   for(var i=0;i<events.length;i++){
     var e = events[i];
@@ -746,9 +730,75 @@ async function archiveYesterdaySchedule(env){
     if(e.type) props["유형"] = { select: { name: e.type } };
     if(e.project) props["과제"] = { select: { name: e.project } };
     await notionFetch("/pages", token, "POST", { parent:{ database_id: SCHEDULE_ARCHIVE_DB_ID }, properties: props });
+    existingIds[origId] = true; // 같은 배치 안에서 중복 생성 방지
     created++;
   }
+  return created;
+}
+async function getArchiveExistingIds(env){
+  const token = env.NOTION_TOKEN;
+  var existingPages = await getAllPages(SCHEDULE_ARCHIVE_DB_ID, token);
+  var existingIds = {};
+  existingPages.forEach(function(pg){
+    var r = (pg.properties["원본ID"] && pg.properties["원본ID"].rich_text) || [];
+    var v = r.map(function(t){return t.plain_text;}).join("");
+    if(v) existingIds[v] = true;
+  });
+  return existingIds;
+}
+// 어제 하루치 두레이 일정을 노션 아카이브에 저장(매일 크론으로 실행). 이미 저장된 건(원본ID 기준) 건너뜀
+async function archiveOneDay(env, dayStr){
+  var events = await doorayListRange(env, dayStr+"T00:00:00+09:00", dayStr+"T23:59:59+09:00");
+  var existingIds = await getArchiveExistingIds(env);
+  var created = await archiveEventsToNotion(env, events, existingIds);
   return { archived: created, checked: events.length, day: dayStr };
+}
+async function archiveYesterdaySchedule(env){
+  var kst = new Date(Date.now() + 9*60*60*1000);
+  var y = kst.getUTCFullYear(), m = kst.getUTCMonth(), d = kst.getUTCDate() - 1;
+  var yest = new Date(Date.UTC(y, m, d));
+  function z(n){ return (n<10?"0":"")+n; }
+  var dayStr = yest.getUTCFullYear()+"-"+z(yest.getUTCMonth()+1)+"-"+z(yest.getUTCDate());
+  return await archiveOneDay(env, dayStr);
+}
+// 지정한 기간(fromDateStr~toDateStr, "YYYY-MM-DD")을 통째로 백필 — 과거 데이터를 한 번에 몰아서 노션에 채워 넣을 때 사용.
+// 두레이 조회 기간 제한(약 한 달) 때문에 내부적으로 한 달 단위 청크로 나눠서 순차 조회함.
+// 주의: 한 청크 안에 새로 만들어야 할 일정이 많으면 Cloudflare 서브요청 한도(50개)에 걸릴 수 있음 —
+// 그런 경우 archiveOneDay(action: "archiveDay")로 하루씩 나눠서 호출할 것.
+async function archiveDateRange(env, fromDateStr, toDateStr){
+  function parseYMD(s){ var p=String(s).split("-").map(function(x){return parseInt(x,10);}); return { y:p[0], m:p[1]-1, d:p[2] }; }
+  function z(n){ return (n<10?"0":"")+n; }
+  function cmp(a,b){ return (a.y*10000+a.m*100+a.d) - (b.y*10000+b.m*100+b.d); }
+  var from = parseYMD(fromDateStr), to = parseYMD(toDateStr);
+  if(isNaN(from.y) || isNaN(to.y) || cmp(from, to) > 0) throw new Error("날짜 범위가 올바르지 않습니다(from이 to보다 늦거나 형식이 잘못됨)");
+  var existingIds = await getArchiveExistingIds(env);
+  var totalChecked = 0, totalCreated = 0, chunkCount = 0;
+  var cursor = { y: from.y, m: from.m, d: from.d };
+  while(cmp(cursor, to) <= 0){
+    var monthLastDay = new Date(Date.UTC(cursor.y, cursor.m+1, 0)).getUTCDate(); // 안전: 순수 날짜 계산용(시간대 변환 없음)
+    var chunkEnd = { y: cursor.y, m: cursor.m, d: monthLastDay };
+    if(cmp(chunkEnd, to) > 0) chunkEnd = { y: to.y, m: to.m, d: to.d };
+    var startStr = cursor.y+"-"+z(cursor.m+1)+"-"+z(cursor.d)+"T00:00:00+09:00";
+    var endStr = chunkEnd.y+"-"+z(chunkEnd.m+1)+"-"+z(chunkEnd.d)+"T23:59:59+09:00";
+    var events = await doorayListRange(env, startStr, endStr);
+    totalChecked += events.length;
+    totalCreated += await archiveEventsToNotion(env, events, existingIds);
+    chunkCount++;
+    // 다음 청크: 다음 달 1일로 이동
+    var ny = cursor.y, nm = cursor.m + 1;
+    if(nm > 11){ nm = 0; ny++; }
+    cursor = { y: ny, m: nm, d: 1 };
+  }
+  return { archived: totalCreated, checked: totalChecked, chunks: chunkCount, from: fromDateStr, to: toDateStr };
+}
+
+// ===== 로그인(접근 장벽 수준 - 진짜 계정 시스템 아님, 팀 공용 아이디/비밀번호 하나로 체크) =====
+// Cloudflare Worker 환경변수에 TEAM_LOGIN_ID / TEAM_LOGIN_PW 를 secret으로 등록해야 동작함
+async function checkLogin(env, payload){
+  var expectId = env.TEAM_LOGIN_ID, expectPw = env.TEAM_LOGIN_PW;
+  if(!expectId || !expectPw) throw new Error("TEAM_LOGIN_ID/TEAM_LOGIN_PW 미설정");
+  var ok = (String(payload.id||"") === String(expectId)) && (String(payload.pw||"") === String(expectPw));
+  return { authed: ok };
 }
 
 // 아카이브(오늘 이전) + 두레이 실시간(오늘 이후)을 병합해서 하나의 일정 목록으로 - 한쪽이 실패해도 다른 쪽은 그대로 반영
@@ -1800,6 +1850,14 @@ export default {
           result = await deleteSchedule(env, payload);
         } else if(payload.action === "archiveScheduleNow"){
           result = await archiveYesterdaySchedule(env); // 크론 기다리지 않고 수동 테스트용
+        } else if(payload.action === "archiveBackfill"){
+          if(!payload.from || !payload.to) throw new Error("from/to 날짜(YYYY-MM-DD)가 필요합니다");
+          result = await archiveDateRange(env, payload.from, payload.to); // 과거 데이터 한 번에 몰아서 채우기
+        } else if(payload.action === "archiveDay"){
+          if(!payload.day) throw new Error("day 날짜(YYYY-MM-DD)가 필요합니다");
+          result = await archiveOneDay(env, payload.day); // 하루씩 백필(서브요청 한도 안전)
+        } else if(payload.action === "login"){
+          result = await checkLogin(env, payload);
         } else if(payload.action === "comment"){
           result = await addComment(env, payload);
         } else if(payload.action === "deleteComment"){

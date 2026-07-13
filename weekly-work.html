@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<script>if(sessionStorage.getItem("koti_authed")!=="1"){location.href="login.html";}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>주간업무 작성 · AI빅데이터연구팀</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -179,7 +180,7 @@
   <a href="https://www.koti.re.kr" target="_blank" rel="noopener">한국교통연구원</a>
   <span class="sep">|</span><span>모빌리티 빅데이터팀</span>
   <span class="sep">|</span>
-  <button class="util-toggle" id="themeBtn">🌙 다크모드</button>
+  <a href="#" id="logoutLink" style="color:#cdd6ec;text-decoration:none;font-size:12.5px;margin-right:14px" onclick="sessionStorage.removeItem('koti_authed');sessionStorage.removeItem('koti_user');location.href='login.html';return false;">로그아웃</a><button class="util-toggle" id="themeBtn">🌙 다크모드</button>
 </div></div>
 
 <header class="head"><div class="in">
@@ -1010,7 +1011,7 @@
     var ae=document.activeElement;
     if(ae && (ae.tagName==="INPUT" || ae.tagName==="TEXTAREA" || ae.tagName==="SELECT")) return;
     load();
-  }, 60000);
+  }, 30000);
 </script>
 </body>
 </html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로그인 · AI빅데이터연구팀</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<style>
+  @font-face {
+    font-family: 'Pretendard Variable';
+    font-weight: 45 920;
+    font-style: normal;
+    font-display: swap;
+    src: url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/variable/woff2/PretendardVariable.woff2') format('woff2-variations');
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    min-height:100vh; background:#f3f5f9; font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,sans-serif;
+    display:flex; flex-direction:column; align-items:center; padding:96px 20px 40px; position:relative; overflow:hidden;
+  }
+  .bgmark{ position:absolute; top:-40px; left:345px; width:230px; height:auto; opacity:0.14; pointer-events:none; z-index:-1; }
+  .wrap{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; width:100%; max-width:460px; }
+
+  .tabbadge{display:flex; margin-bottom:22px; border-radius:6px; overflow:hidden; box-shadow:0 1px 3px rgba(20,30,60,.12)}
+  .tabbadge .l{background:#fff; color:#16265e; font:700 14px/1 'Pretendard Variable'; padding:12px 22px; border:1px solid #dfe5ef; display:flex; align-items:center; gap:8px; white-space:nowrap}
+  .tabbadge .l img{height:16px; display:block}
+  .tabbadge .r{background:#16265e; color:#fff; font:700 14px/1 'Pretendard Variable'; padding:12px 22px; display:flex; align-items:center}
+
+  .banner{ width:260px; max-width:340px; height:auto; display:block; margin-bottom:30px; }
+
+  .card{width:401px; max-width:100%; background:#ffffff; border-radius:10px; box-shadow:0 8px 28px rgba(20,30,60,.10); padding:36px 34px 30px}
+  .card-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px}
+  .card-head h1{font:800 21px/1 'Pretendard Variable'; color:#16265e; margin:0}
+  .card-head img{height:26px; display:block}
+  .rule{height:2px; background:#16265e; margin-bottom:26px}
+
+  .lfield{display:flex; align-items:center; gap:10px; background:#f6f8fc; border:1.5px solid #eef1f6; border-radius:6px; padding:0 14px; margin-bottom:12px; transition:border-color .12s ease, background .12s ease}
+  .lfield:focus-within{border-color:#2c5fbf; background:#fff}
+  .lfield .ico{color:#8a96b0; font-size:15px; flex:none}
+  .lfield input{flex:1; border:none; outline:none; background:transparent; font:500 14.5px/1 'Pretendard Variable'; color:#26334d; padding:13px 0}
+
+  .errmsg{margin:-6px 0 14px; font:600 12px/1.4 'Pretendard Variable'; color:#c8273c; min-height:0}
+
+  .lbtn{cursor:pointer; background:#16265e; color:#fff; text-align:center; font:700 15px/1 'Pretendard Variable'; padding:14px 0; border-radius:6px; margin-top:6px; border:none; width:100%; transition:background .12s ease}
+  .lbtn:hover{background:#0f1c45}
+  .lbtn:disabled{opacity:.6; cursor:default}
+
+  .foot{margin-top:20px; font:500 11.5px/1 'Pretendard Variable'; color:#8a96b0}
+</style>
+</head>
+<body>
+
+  <div class="wrap">
+    <img class="bgmark" src="assets/koti-mark.png" alt="" onerror="this.style.display='none'">
+
+    <div class="tabbadge">
+      <div class="l"><img src="assets/koti-mark.png" alt="KOTI">AI빅데이터연구팀</div>
+      <div class="r">업무포털</div>
+    </div>
+
+    <img class="banner" src="assets/koti-logo.png" alt="KOTI 개원 40주년">
+
+    <div class="card">
+      <div class="card-head">
+        <h1>로그인</h1>
+        <img src="assets/koti-ci.png" alt="한국교통연구원">
+      </div>
+      <div class="rule"></div>
+
+      <div class="lfield"><span class="ico">👤</span><input type="text" id="idInput" placeholder="아이디" autocomplete="username"></div>
+      <div class="lfield"><span class="ico">🔒</span><input type="password" id="pwInput" placeholder="비밀번호" autocomplete="current-password"></div>
+
+      <div class="errmsg" id="errMsg"></div>
+
+      <button class="lbtn" id="loginBtn">로그인</button>
+    </div>
+
+    <div class="foot">© AI빅데이터연구팀 업무포털</div>
+  </div>
+
+<script>
+  var WORKER_URL = "https://notion-proxy.ekqls0458.workers.dev";
+  var idInput = document.getElementById("idInput");
+  var pwInput = document.getElementById("pwInput");
+  var errMsg = document.getElementById("errMsg");
+  var loginBtn = document.getElementById("loginBtn");
+
+  if(sessionStorage.getItem("koti_authed") === "1"){
+    window.location.href = "index.html";
+  }
+
+  async function doLogin(){
+    var id = idInput.value.trim();
+    var pw = pwInput.value;
+    if(!id || !pw){ errMsg.textContent = "아이디와 비밀번호를 입력해 주세요."; return; }
+    errMsg.textContent = "";
+    loginBtn.disabled = true; loginBtn.textContent = "확인 중…";
+    try {
+      var res = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ action: "login", id: id, pw: pw })
+      });
+      var data = await res.json();
+      if(data.ok && data.result && data.result.authed){
+        sessionStorage.setItem("koti_authed", "1");
+        sessionStorage.setItem("koti_user", id);
+        window.location.href = "index.html";
+      } else {
+        errMsg.textContent = "아이디 또는 비밀번호가 올바르지 않습니다.";
+      }
+    } catch(err){
+      errMsg.textContent = "로그인 중 오류가 발생했습니다: " + err.message;
+    }
+    loginBtn.disabled = false; loginBtn.textContent = "로그인";
+  }
+
+  loginBtn.addEventListener("click", doLogin);
+  idInput.addEventListener("keydown", function(e){ if(e.key === "Enter") doLogin(); });
+  pwInput.addEventListener("keydown", function(e){ if(e.key === "Enter") doLogin(); });
+</script>
+</body>
+</html>
