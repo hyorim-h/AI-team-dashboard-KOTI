@@ -309,7 +309,6 @@
   <a href="weekly-work.html">주간업무 작성</a>
   <a href="weekly-meeting.html">주간회의 자료</a>
   <a href="performance.html">성과 관리</a>
-  <a href="wbs.html">WBS 관리</a>
   <a href="schedule.html">일정관리</a>
   <a href="outsourced.html">위탁과제 관리</a>
   <a href="index_aiagent.html">AI에이전트</a>
@@ -542,7 +541,8 @@
     }
     // 휴가/재택근무: 이름 · 날짜(휴가는 구분도 같은 줄에 표기)
     var dateLine = isMulti(ev) ? (fmtMD(ev.start)+" ~ "+fmtMD(ev.end)) : fmtMDW(ev.start);
-    if(ev.type==="휴가" && ev.vacation) dateLine += " · "+ev.vacation;
+    // "휴가" 칸 안에서는 굳이 또 "휴가"라고 반복 표시할 필요 없음 → 오전반차/병가 등 구체적인 구분만 표시
+    if(ev.type==="휴가" && ev.vacation && ev.vacation!=="휴가") dateLine += " · "+ev.vacation;
     return "<div class=\"cal-col-ev\"><span class=\"nm\">"+esc(nm)+"</span>"
       +"<span class=\"sub\">"+esc(dateLine)+"</span></div>";
   }
