@@ -359,7 +359,7 @@
     "재택근무":{c:"#0369a1",bg:"#e0f2fe"},
     "기타":{c:"#5a6680",bg:"#eef1f6"}
   };
-  var OWNERS = ["이종우","전준수","이채영","한효림","김예원","정승환","심지윤","정정호"];
+  var OWNERS = ["이종우","전준수","이채영","한효림","김예원","정승환","심지윤","정정호","이숭봉"];
   var TYPES = ["과제","출장","외출","휴가","재택근무","기타"];           // 필터용 (기존 출장 데이터도 필터 가능해야 함)
   var EDIT_TYPES = ["과제","출장","외출","휴가","재택근무","기타"];             // 출장도 직접 선택 (참석자 자동전환 제거)
   var PERSON_OPTIONS = ["-"].concat(OWNERS);
@@ -739,6 +739,11 @@
       var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:action,item:item})});
       var data=await res.json();
       if(!data.ok) throw new Error(data.error||"실패");
+      if(data.result && data.result.overrideError){
+        st.className="estatus status show err";
+        st.textContent="일정은 저장됐지만 유형(출장/과제) 기억은 실패: "+data.result.overrideError;
+        return;
+      }
       st.className="estatus status show ok"; st.textContent="저장 완료";
       setTimeout(function(){ closeEdit(); load(); }, 550);
     } catch(err){ st.className="estatus status show err"; st.textContent="저장 실패: "+err.message; }
