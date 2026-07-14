@@ -988,6 +988,7 @@
         qa:REDIT.qa.filter(function(x){return (x.q||"").trim();})
       };
       st.className="estatus status show info"; st.textContent="저장 중…";
+      var uploadErrors = [];
       try {
         var action=REDIT.id?"consignRequestUpdate":"consignRequestCreate";
         var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:action,item:item})});
@@ -1001,25 +1002,40 @@
             var imgs = item.qa[qi].images || [];
             for(var ii=0; ii<imgs.length; ii++){
               try {
-                await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
+                var imgRes = await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
                   body: JSON.stringify({ action:"consignRequestAddImage", pageId:pageId, qaIndex:qi,
                     imageBase64: imgs[ii].base64, filename: imgs[ii].filename, mimeType: imgs[ii].mimeType })});
-              } catch(e){}
+                var imgData = await imgRes.json();
+                if(!imgData.ok) uploadErrors.push("이미지(안건 "+(qi+1)+"): "+(imgData.error||"실패"));
+              } catch(e){ uploadErrors.push("이미지(안건 "+(qi+1)+"): "+e.message); }
             }
           }
         }
         if(pageId && (REDIT.pendingReqFile || REDIT.pendingReplyFile)){
           st.textContent="저장 완료 — PDF 업로드 중…";
           if(REDIT.pendingReqFile){
-            try { await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
-              body: JSON.stringify({ action:"consignRequestAttachFile", pageId:pageId, which:"req",
-                fileBase64:REDIT.pendingReqFile.base64, filename:REDIT.pendingReqFile.filename, mimeType:REDIT.pendingReqFile.mimeType })}); } catch(e){}
+            try {
+              var reqFRes = await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({ action:"consignRequestAttachFile", pageId:pageId, which:"req",
+                  fileBase64:REDIT.pendingReqFile.base64, filename:REDIT.pendingReqFile.filename, mimeType:REDIT.pendingReqFile.mimeType })});
+              var reqFData = await reqFRes.json();
+              if(!reqFData.ok) uploadErrors.push("요청 PDF: "+(reqFData.error||"실패"));
+            } catch(e){ uploadErrors.push("요청 PDF: "+e.message); }
           }
           if(REDIT.pendingReplyFile){
-            try { await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
-              body: JSON.stringify({ action:"consignRequestAttachFile", pageId:pageId, which:"reply",
-                fileBase64:REDIT.pendingReplyFile.base64, filename:REDIT.pendingReplyFile.filename, mimeType:REDIT.pendingReplyFile.mimeType })}); } catch(e){}
+            try {
+              var replyFRes = await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({ action:"consignRequestAttachFile", pageId:pageId, which:"reply",
+                  fileBase64:REDIT.pendingReplyFile.base64, filename:REDIT.pendingReplyFile.filename, mimeType:REDIT.pendingReplyFile.mimeType })});
+              var replyFData = await replyFRes.json();
+              if(!replyFData.ok) uploadErrors.push("회신 PDF: "+(replyFData.error||"실패"));
+            } catch(e){ uploadErrors.push("회신 PDF: "+e.message); }
           }
+        }
+        if(uploadErrors.length){
+          st.className="estatus status show err";
+          st.textContent="일부 첨부 실패 — "+uploadErrors.join(" / ");
+          return;
         }
         st.className="estatus status show ok"; st.textContent="저장 완료";
         setTimeout(function(){ closeReq(); load(); }, 500);

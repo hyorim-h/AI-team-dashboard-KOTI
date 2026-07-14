@@ -1534,6 +1534,68 @@ async function writeRequestQaBlocks(pageId, token, qa){
     if(children.length) await notionFetch("/blocks/" + pageId + "/children", token, "PATCH", { children: children });
   }
 }
+// ===== 노션 파일 업로드 API (Ctrl+V로 붙여넣은 그림을 요청자료 안건에 실제로 첨부) =====
+// 파일 업로드 API는 기존 NOTION_VERSION(2022-06-28)보다 최근 버전이 필요해서 이 두 함수만 별도 버전 사용
+const NOTION_UPLOAD_VERSION = "2026-03-11";
+async function notionFileUploadCreate(token, filename, contentType){
+  const res = await fetch("https://api.notion.com/v1/file_uploads", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json", "Notion-Version": NOTION_UPLOAD_VERSION },
+    body: JSON.stringify({ filename: filename, content_type: contentType })
+  });
+  const data = await res.json();
+  if(!data.id) throw new Error("파일 업로드 객체 생성 실패: " + JSON.stringify(data));
+  return data; // { id, upload_url, ... }
+}
+async function notionFileUploadSend(token, uploadId, base64, filename, mimeType){
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mimeType || "application/octet-stream" });
+  const form = new FormData();
+  form.append("file", blob, filename || "image.png");
+  const res = await fetch("https://api.notion.com/v1/file_uploads/" + uploadId + "/send", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Notion-Version": NOTION_UPLOAD_VERSION },
+    body: form
+  });
+  const data = await res.json();
+  if(data.status !== "uploaded") throw new Error("파일 전송 실패: " + JSON.stringify(data));
+  return data;
+}
+// 답변란에 Ctrl+V로 붙여넣은 그림 하나를 실제로 노션에 업로드하고, 해당 안건(qaIndex) 바로 아래에 이미지 블록으로 붙임
+async function consignRequestAddImage(env, payload){
+  const token = env.NOTION_TOKEN;
+  const pageId = payload.pageId;
+  const qaIndex = payload.qaIndex;
+  if(!pageId) throw new Error("pageId 누락");
+  if(qaIndex === undefined || qaIndex === null) throw new Error("qaIndex 누락");
+  if(!payload.imageBase64) throw new Error("imageBase64 누락");
+
+  const created = await notionFileUploadCreate(token, payload.filename || "image.png", payload.mimeType || "image/png");
+  await notionFileUploadSend(token, created.id, payload.imageBase64, payload.filename || "image.png", payload.mimeType || "image/png");
+
+  const sections = await getOrderedQaSections(pageId, token);
+  const sec = sections[qaIndex];
+  if(!sec) throw new Error("해당 안건(qaIndex=" + qaIndex + ")을 찾을 수 없습니다");
+  // 그 안건의 마지막 블록(이미지 > 추가답변 > 답변 > 제목 순으로 있는 것) 바로 뒤에 새 이미지를 붙임
+  const anchorId = (sec.imageIds && sec.imageIds.length) ? sec.imageIds[sec.imageIds.length-1]
+    : (sec.extraBodyIds && sec.extraBodyIds.length) ? sec.extraBodyIds[sec.extraBodyIds.length-1]
+    : (sec.paragraphId || sec.headingId);
+
+  // "after" 파라미터는 최신 버전(NOTION_UPLOAD_VERSION)에서는 거부돼서, 이 요청만 예전 안정 버전으로 보냄
+  // (file_upload 참조 자체는 이미 생성된 파일을 가리키기만 하면 되므로 버전 상관없이 인식됨)
+  const appendRes = await fetch("https://api.notion.com/v1/blocks/" + pageId + "/children", {
+    method: "PATCH",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json", "Notion-Version": NOTION_VERSION },
+    body: JSON.stringify({
+      after: anchorId,
+      children: [{ object:"block", type:"image", image:{ type:"file_upload", file_upload:{ id: created.id } } }]
+    })
+  });
+  if(!appendRes.ok){ const t = await appendRes.text(); throw new Error("이미지 블록 추가 실패: " + appendRes.status + " " + t); }
+  return { added: true };
+}
 async function createConsignRequest(env, payload){
   const token = env.NOTION_TOKEN;
   const item = payload.item || {};
@@ -1624,6 +1686,8 @@ export default {
           result = await deleteConsignMeeting(env, payload);
         } else if(payload.action === "consignRequestCreate"){
           result = await createConsignRequest(env, payload);
+        } else if(payload.action === "consignRequestAddImage"){
+          result = await consignRequestAddImage(env, payload);
         } else if(payload.action === "consignRequestUpdate"){
           result = await updateConsignRequest(env, payload);
         } else if(payload.action === "consignRequestDelete"){
@@ -1732,6 +1796,23 @@ export default {
           return new Response(JSON.stringify({ request: request }), { headers: corsHeaders() });
         } catch(e){
           return new Response(JSON.stringify({ error: String(e) }), { status:500, headers: corsHeaders() });
+        }
+      }
+
+      // 이미지 프록시 - 노션에 올라간 그림(특히 내부 업로드 이미지의 서명된 S3 URL)은 브라우저에서 직접 fetch하면 CORS에 막혀서
+      // 워커가 대신 받아와서 그대로 흘려보내줌
+      if(scope === "imageProxy"){
+        const imgUrl = url.searchParams.get("url");
+        if(!imgUrl) return new Response("url 파라미터 누락", { status: 400 });
+        try {
+          const imgRes = await fetch(imgUrl);
+          if(!imgRes.ok) return new Response("이미지 조회 실패: HTTP " + imgRes.status, { status: 502 });
+          const contentType = imgRes.headers.get("Content-Type") || "application/octet-stream";
+          return new Response(imgRes.body, {
+            headers: { "Content-Type": contentType, "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" }
+          });
+        } catch(e){
+          return new Response("프록시 오류: " + String(e), { status: 500 });
         }
       }
 
