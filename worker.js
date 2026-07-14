@@ -1,7 +1,6 @@
-// notion-proxy Cloudflare Worker (리포트 + WBS)
+// notion-proxy Cloudflare Worker
 // 브라우저 → 이 Worker → 노션 API (CORS 우회 + 토큰 숨김)
 
-const REPORT_DB_ID = "383ce6a25dc6801c874bc6bb96dc83c1"; // 주간 리포트 DB
 const WBS_DB_ID    = "f1a718244eb54c399b70eb216067804d"; // WBS DB
 const PROJECT_DB_ID = "5a75146603614e489364b66e5eab2e1c"; // 과제 정보 DB (노션 확인 database_id)
 // 일정관리 페이지는 노션 DB가 아니라 두레이(Dooray) 캘린더를 소스로 사용 (아래 DOORAY_TEAM_CALENDAR_ID 참조)
@@ -20,12 +19,6 @@ const TEAM = ["이종우","전준수","이채영","한효림","김예원","정�
 const NAME_MAP = { "AI빅데이터팀": "한효림", "js_koti": "전준수" };
 
 function normProj(s){ if(!s) return ""; return s.replace(/[\s\u00a0\u200b]/g, ""); }
-
-const SECTION_MAP = [
-  ["이번 주 한 일", "f1"], ["진행 중", "f2"], ["막힌 것", "f3"],
-  ["다음 주 계획", "f4"], ["관련 논문", "f5"], ["위키 노트", "f5"],
-  ["검토 필요", "f6"], ["연구책임자 코멘트", "comment"],
-];
 
 function corsHeaders(){
   return {
@@ -83,7 +76,6 @@ async function getPageContent(pageId, token){
   return out;
 }
 
-function extractWeek(title){ const m = title.match(/\d+월\s*\d+주차/); return m ? m[0] : title; }
 
 // 관계형(relation) 속성에서 첫 번째 연결된 페이지 id 추출
 function firstRelationId(prop){
@@ -303,39 +295,6 @@ async function parseWorkPage(page, token, isPlan){
   };
 }
 
-async function parseReport(page, token){
-  const props = page.properties || {};
-  const titleList = (props["문서명"] && props["문서명"].title) || [];
-  const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
-  const projSel = (props["프로젝트"] && props["프로젝트"].select) || {};
-  const project = projSel.name || "";
-  const chk = (props["검토 필요"] && props["검토 필요"].checkbox);
-  const blocked = (chk !== undefined ? chk : ((props["막힘"] && props["막힘"].checkbox) || false));
-  const creator = (props["생성자"] && props["생성자"].created_by) || {};
-  const creatorName = creator.name || "";
-  const statusSel = (props["상태"] && props["상태"].select) || {};
-  const statusName = statusSel.name || "";
-  let status;
-  if(statusName) status = statusName.indexOf("제출") >= 0 ? "submitted" : "pending";
-  else status = title ? "submitted" : "pending";
-
-  const content = await getPageContent(page.id, token);
-  const r = { title: title, week: extractWeek(title), project: project, blocked: blocked, status: status,
-    creator_name: creatorName, f1:"", f2:"", f3:"", f4:"", f5:"", f6:"", comment:"",
-    page_url: page.url || "" };
-  for(const heading in content){
-    for(const pair of SECTION_MAP){
-      const key = pair[0], field = pair[1];
-      if(heading.indexOf(key) >= 0){
-        if(field === "f5" && r.f5) r.f5 += "\n" + content[heading];
-        else r[field] = content[heading];
-        break;
-      }
-    }
-  }
-  return r;
-}
-
 function parseWbs(page){
   const p = page.properties || {};
   const titleList = (p["작업명"] && p["작업명"].title) || [];
@@ -500,7 +459,70 @@ function parseDoorayEvent(ev){
   };
 }
 
-async function doorayListRange(env, timeMinISO, timeMaxISO){
+// ===== 일정 유형 오버라이드 (노션 DB) =====
+// 두레이 본문(body)을 다시 읽어올 방법이 없어서(권한상 불가, 실측 확인), 제목만으로는 안 잡히는 출장/과제 등을
+// 수동으로 지정한 내용을 여기 저장해두고, 조회할 때마다 원본 이벤트ID로 매칭해서 유형을 덮어씌움
+const SCHED_OVERRIDE_DB_ID = "3142385f70394d5da6bb9126dd2b3bdf";
+async function getScheduleOverrides(env){
+  const token = env.NOTION_TOKEN;
+  const pages = await getAllPages(SCHED_OVERRIDE_DB_ID, token);
+  var map = {};
+  pages.forEach(function(pg){
+    var p = pg.properties || {};
+    var idRt = (p["원본ID"] && p["원본ID"].title) || [];
+    var origId = idRt.map(function(t){ return t.plain_text; }).join("").trim();
+    if(!origId) return;
+    var personRt = (p["담당자"] && p["담당자"].rich_text) || [];
+    var vacRt = (p["휴가구분"] && p["휴가구분"].rich_text) || [];
+    var attRt = (p["참석자"] && p["참석자"].rich_text) || [];
+    map[origId] = {
+      pageId: pg.id,
+      type: (p["유형"] && p["유형"].select && p["유형"].select.name) || "",
+      person: personRt.map(function(t){ return t.plain_text; }).join(""),
+      project: (p["과제"] && p["과제"].select && p["과제"].select.name) || "",
+      vacation: vacRt.map(function(t){ return t.plain_text; }).join(""),
+      attendees: attRt.map(function(t){ return t.plain_text; }).join("")
+    };
+  });
+  return map;
+}
+function applyScheduleOverride(event, overrides){
+  var ov = overrides && overrides[doorayOrigId(event.id)];
+  if(!ov) return event;
+  if(ov.type) event.type = ov.type;
+  if(ov.person) event.person = ov.person;
+  if(ov.project) event.project = ov.project;
+  if(ov.vacation) event.vacation = ov.vacation;
+  if(ov.attendees) event.attendees = ov.attendees;
+  return event;
+}
+// 오버라이드 저장(있으면 갱신, 없으면 새로 생성) - 출장/과제처럼 제목만으로 못 잡는 유형을 수동 지정할 때 호출
+async function upsertScheduleOverride(env, origId, fields){
+  const token = env.NOTION_TOKEN;
+  var overrides = await getScheduleOverrides(env);
+  var existing = overrides[origId];
+  var props = {
+    "원본ID": { title: rt(origId) },
+    "유형": { select: { name: fields.type } },
+    "담당자": { rich_text: rt(fields.person || "") },
+    "휴가구분": { rich_text: rt(fields.vacation || "") },
+    "참석자": { rich_text: rt(fields.attendees || "") },
+  };
+  if(fields.project) props["과제"] = { select: { name: fields.project } };
+  if(existing){
+    await notionFetch("/pages/" + existing.pageId, token, "PATCH", { properties: props });
+  } else {
+    await notionFetch("/pages", token, "POST", { parent: { database_id: SCHED_OVERRIDE_DB_ID }, properties: props });
+  }
+}
+async function deleteScheduleOverride(env, origId){
+  const token = env.NOTION_TOKEN;
+  var overrides = await getScheduleOverrides(env);
+  var existing = overrides[origId];
+  if(existing) await notionFetch("/pages/" + existing.pageId, token, "PATCH", { archived: true });
+}
+
+async function doorayListRange(env, timeMinISO, timeMaxISO, overrides){
   var token = env.DOORAY_API_TOKEN;
   if(!token) throw new Error("DOORAY_API_TOKEN 미설정");
   var url = DOORAY_API_BASE + "/calendar/v1/calendars/*/events"
@@ -512,7 +534,8 @@ async function doorayListRange(env, timeMinISO, timeMaxISO){
   if(!data.header || !data.header.isSuccessful){
     throw new Error("두레이 캘린더 조회 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
   }
-  return (data.result || []).map(parseDoorayEvent).filter(function(e){ return e.type; });
+  var ov = overrides || await getScheduleOverrides(env);
+  return (data.result || []).map(parseDoorayEvent).filter(function(e){ return e.type; }).map(function(e){ return applyScheduleOverride(e, ov); });
 }
 // 두레이는 문서엔 "최대 1년치"라고 돼있지만 실제로는 한 달을 넘기면 USER_INVALID_EXCEED_MAXIMUM_PERIOD로 거부됨(실측 확인).
 // 지난 날짜는 노션 아카이브가 담당하므로, 여기선 "이번달/다음달"만 한 달씩 나눠 병렬로 조회한 뒤 합침
@@ -533,7 +556,8 @@ function doorayMonthChunks(){
 }
 async function doorayList(env){
   var chunks = doorayMonthChunks();
-  var settled = await Promise.allSettled(chunks.map(function(c){ return doorayListRange(env, c.timeMin, c.timeMax); }));
+  var overrides = await getScheduleOverrides(env);
+  var settled = await Promise.allSettled(chunks.map(function(c){ return doorayListRange(env, c.timeMin, c.timeMax, overrides); }));
   var out = [], firstError = null;
   settled.forEach(function(r){
     if(r.status === "fulfilled") out = out.concat(r.value);
@@ -566,7 +590,7 @@ function parseArchivedSchedule(page){
     id: "archive-" + page.id, title: ttl("제목"), type: sel("유형"), person: txt("담당자"),
     project: sel("과제"), vacation: txt("휴가구분"), attendees: txt("참석자"),
     start: (dt("시작일")||"").slice(0,10), end: (dt("종료일")||dt("시작일")||"").slice(0,10),
-    time: txt("시간"), location: txt("장소"), raw_desc: ""
+    time: txt("시간"), location: txt("장소"), raw_desc: "", origId: txt("원본ID")
   };
 }
 // 아카이브 DB 전체 조회(오늘 이전 것만) - 매 요청마다 전체를 훑는 구조라 데이터가 아주 많아지면 나중에 날짜 필터 API로 바꿔야 할 수 있음
@@ -617,7 +641,8 @@ async function getArchiveExistingIds(env){
 }
 // 어제 하루치 두레이 일정을 노션 아카이브에 저장(매일 크론으로 실행). 이미 저장된 건(원본ID 기준) 건너뜀
 async function archiveOneDay(env, dayStr){
-  var events = await doorayListRange(env, dayStr+"T00:00:00+09:00", dayStr+"T23:59:59+09:00");
+  var overrides = await getScheduleOverrides(env);
+  var events = await doorayListRange(env, dayStr+"T00:00:00+09:00", dayStr+"T23:59:59+09:00", overrides);
   var existingIds = await getArchiveExistingIds(env);
   var created = await archiveEventsToNotion(env, events, existingIds);
   return { archived: created, checked: events.length, day: dayStr };
@@ -641,6 +666,7 @@ async function archiveDateRange(env, fromDateStr, toDateStr){
   var from = parseYMD(fromDateStr), to = parseYMD(toDateStr);
   if(isNaN(from.y) || isNaN(to.y) || cmp(from, to) > 0) throw new Error("날짜 범위가 올바르지 않습니다(from이 to보다 늦거나 형식이 잘못됨)");
   var existingIds = await getArchiveExistingIds(env);
+  var overrides = await getScheduleOverrides(env);
   var totalChecked = 0, totalCreated = 0, chunkCount = 0;
   var cursor = { y: from.y, m: from.m, d: from.d };
   while(cmp(cursor, to) <= 0){
@@ -649,7 +675,7 @@ async function archiveDateRange(env, fromDateStr, toDateStr){
     if(cmp(chunkEnd, to) > 0) chunkEnd = { y: to.y, m: to.m, d: to.d };
     var startStr = cursor.y+"-"+z(cursor.m+1)+"-"+z(cursor.d)+"T00:00:00+09:00";
     var endStr = chunkEnd.y+"-"+z(chunkEnd.m+1)+"-"+z(chunkEnd.d)+"T23:59:59+09:00";
-    var events = await doorayListRange(env, startStr, endStr);
+    var events = await doorayListRange(env, startStr, endStr, overrides);
     totalChecked += events.length;
     totalCreated += await archiveEventsToNotion(env, events, existingIds);
     chunkCount++;
@@ -671,8 +697,8 @@ async function checkLogin(env, payload){
 }
 
 // 아카이브(오늘 이전) + 두레이 실시간(오늘 이후)을 병합해서 하나의 일정 목록으로 - 한쪽이 실패해도 다른 쪽은 그대로 반영
+function doorayOrigId(id){ return String(id||"").indexOf("dooray-")===0 ? id.slice(7) : id; }
 async function combinedScheduleList(env){
-  var today = todayKST();
   var results = await Promise.allSettled([
     archivedScheduleList(env),
     doorayList(env),
@@ -681,9 +707,18 @@ async function combinedScheduleList(env){
   var errors = {};
   if(results[0].status === "fulfilled") out = out.concat(results[0].value);
   else errors.archiveScheduleError = String(results[0].reason);
-  if(results[1].status === "fulfilled") out = out.concat(results[1].value.filter(function(e){ return !e.end || e.end >= today; }));
+  if(results[1].status === "fulfilled") out = out.concat(results[1].value);
   else errors.doorayScheduleError = String(results[1].reason);
-  return { items: out, errors: errors };
+  // 아카이브(과거)와 두레이 실시간(이번달+다음달, 오늘 이전 날짜도 포함)이 겹칠 수 있어서 원본 이벤트ID 기준 중복 제거
+  // (크론이 실패해서 아카이브가 비어있는 날도, 두레이 실시간 쪽에 그대로 남아있어서 통째로 안 사라지게)
+  var seen = {}, dedup = [];
+  out.forEach(function(e){
+    var key = e.origId || doorayOrigId(e.id); // 아카이브 항목은 저장해둔 원본ID, 두레이 실시간 항목은 id에서 추출
+    if(key && seen[key]) return;
+    if(key) seen[key] = true;
+    dedup.push(e);
+  });
+  return { items: dedup, errors: errors };
 }
 
 
@@ -1159,7 +1194,12 @@ async function createSchedule(env, payload){
   });
   var data = await res.json();
   if(!data.header || !data.header.isSuccessful) throw new Error("일정 등록 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
-  return { created: true, id: "dooray-" + (data.result && data.result.id) };
+  var newRawId = data.result && data.result.id;
+  var overrideError = null;
+  if(item.type === "출장" || item.type === "과제"){
+    try { await upsertScheduleOverride(env, newRawId, item); } catch(e){ overrideError = String(e); }
+  }
+  return { created: true, id: "dooray-" + newRawId, overrideError: overrideError };
 }
 async function updateSchedule(env, payload){
   const item = payload.item || {};
@@ -1175,7 +1215,12 @@ async function updateSchedule(env, payload){
   });
   var data = await res.json();
   if(!data.header || !data.header.isSuccessful) throw new Error("일정 수정 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
-  return { updated: true };
+  var overrideError = null;
+  try {
+    if(item.type === "출장" || item.type === "과제") await upsertScheduleOverride(env, rawId, item);
+    else await deleteScheduleOverride(env, rawId); // 다른 유형으로 바뀌었으면 예전 오버라이드는 정리
+  } catch(e){ overrideError = String(e); }
+  return { updated: true, overrideError: overrideError };
 }
 async function deleteSchedule(env, payload){
   if(!payload.id) throw new Error("event id 없음");
@@ -1189,6 +1234,7 @@ async function deleteSchedule(env, payload){
   });
   var data = await res.json();
   if(!data.header || !data.header.isSuccessful) throw new Error("일정 삭제 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
+  try { await deleteScheduleOverride(env, rawId); } catch(e){ /* 무시 */ }
   return { deleted: true };
 }
 
@@ -1687,13 +1733,6 @@ export default {
         } catch(e){
           return new Response(JSON.stringify({ error: String(e) }), { status:500, headers: corsHeaders() });
         }
-      }
-
-      if(want("reports")){
-        const reportPages = await getAllPages(REPORT_DB_ID, token);
-        const reports = [];
-        for(const pg of reportPages){ try { reports.push(await parseReport(pg, token)); } catch(e){} }
-        body.reports = reports;
       }
 
       if(want("wbs")){
