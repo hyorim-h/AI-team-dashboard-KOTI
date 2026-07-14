@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<!-- TODO: 로그인 연동 시 여기에 인증 가드 스크립트 다시 추가 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>가이드 · AI빅데이터연구팀</title>
+<style>
+  :root{
+    --navy:#16265e; --navy-2:#1a2942; --blue:#2c5fbf; --blue-soft:#e8eefb;
+    --red:#c8273c; --red-soft:#fdeaec; --green:#1f8a5b; --green-soft:#e3f5ec;
+    --orange:#b9770a; --orange-soft:#fff4e0; --purple:#7a4ec2; --purple-soft:#efeafa;
+    --bg:#eef1f6; --surface:#ffffff; --line:#dfe5ef; --line-2:#cdd6ec;
+    --text:#16265e; --text-2:#5a6680; --muted:#9fb0cf;
+    --shadow:0 1px 3px rgba(16,38,94,.06),0 8px 24px rgba(16,38,94,.07);
+    --radius:6px; --maxw:1500px;
+  }
+  html[data-theme="dark"]{
+    --navy:#0d1836; --navy-2:#0a1228; --blue:#5b8def; --blue-soft:#16233f;
+    --red:#ff7a7a; --red-soft:#3a1717; --green:#43c794; --green-soft:#103024;
+    --orange:#e0a94a; --orange-soft:#3a2c17; --purple:#a888e0; --purple-soft:#241a3a;
+    --bg:#0a1020; --surface:#111c33; --line:#1e2d4d; --line-2:#26375c;
+    --text:#e7eef7; --text-2:#a8b6d4; --muted:#6b7ba0;
+    --shadow:0 1px 3px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Pretendard Variable","Pretendard","Apple SD Gothic Neo",-apple-system,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 120px}
+
+  .utilbar{background:var(--navy-2);color:#cdd6ec;font-size:12.5px}
+  .utilbar .in{max-width:var(--maxw);margin:0 auto;padding:7px 120px;display:flex;justify-content:flex-end;gap:16px;align-items:center}
+  .utilbar a{color:#cdd6ec;text-decoration:none}
+  .utilbar .sep{color:#3a4a72}
+  .util-toggle{background:none;border:none;color:#cdd6ec;cursor:pointer;font-size:12.5px}
+
+  .head{background:var(--surface);border-bottom:1px solid var(--line)}
+  .head .in{max-width:var(--maxw);margin:0 auto;padding:16px 120px;display:flex;align-items:center;gap:16px}
+  .logo{height:44px}
+  .head h1{font-size:20px;font-weight:800;margin:0;color:var(--navy)}
+
+  nav.tabs{background:var(--navy)}
+  nav.tabs .in{max-width:var(--maxw);margin:0 auto;padding:0 120px;display:flex;gap:2px;flex-wrap:wrap}
+  nav.tabs a{color:#b9c8e8;text-decoration:none;font-size:14.5px;font-weight:700;padding:14px 20px;border-bottom:3px solid transparent}
+  nav.tabs a:hover{color:#fff}
+  nav.tabs a.cur{color:#fff;background:var(--blue);border-bottom-color:#fff}
+
+  .ptitle{padding:26px 0 8px}
+  .ptitle .crumb{font-size:12.5px;color:var(--text-2);font-weight:600}
+  .ptitle h2{font-size:26px;font-weight:850;margin:2px 0 6px;color:var(--navy)}
+  .ptitle p{margin:0 0 20px;color:var(--text-2);font-size:14px}
+
+  .toc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px}
+  .toc a{font-size:13px;font-weight:700;color:var(--navy);background:var(--surface);border:1px solid var(--line-2);
+    border-radius:20px;padding:7px 16px;text-decoration:none;box-shadow:var(--shadow)}
+  .toc a:hover{background:var(--blue-soft)}
+
+  .gcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);
+    padding:24px 28px;margin-bottom:20px;scroll-margin-top:20px}
+  .gcard-h{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .gcard-h .badge{width:34px;height:34px;border-radius:9px;background:var(--blue-soft);color:var(--blue);
+    display:flex;align-items:center;justify-content:center;font-size:17px;flex:none}
+  .gcard-h h3{margin:0;font-size:18.5px;font-weight:800;color:var(--navy)}
+  .gcard-h .pagelink{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--blue);text-decoration:none;
+    border:1px solid var(--line-2);border-radius:8px;padding:6px 12px;white-space:nowrap}
+  .gcard-h .pagelink:hover{background:var(--blue-soft)}
+  .gcard p.desc{margin:0 0 14px;color:var(--text-2);font-size:14.5px}
+  .shot{display:block;max-width:340px;width:100%;border-radius:8px;border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:16px;cursor:zoom-in;transition:opacity .12s ease}
+  .shot:hover{opacity:.88}
+  .shot-inline{display:block;max-width:260px;width:100%;border-radius:8px;border:1px solid var(--line);box-shadow:var(--shadow);margin-top:8px;cursor:zoom-in;transition:opacity .12s ease}
+  .shot-inline:hover{opacity:.88}
+  .shot-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+  .shot-row .shot-inline{margin-top:0}
+
+  #lightbox{display:none;position:fixed;inset:0;background:rgba(10,16,32,.82);z-index:999;align-items:center;justify-content:center;padding:40px;cursor:zoom-out}
+  #lightbox.open{display:flex}
+  #lightbox img{max-width:92vw;max-height:88vh;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  #lightbox .lbclose{position:absolute;top:22px;right:32px;color:#fff;font-size:32px;font-weight:300;cursor:pointer;line-height:1}
+  .feat{list-style:none;margin:0 0 8px;padding:0;display:grid;grid-template-columns:repeat(2,1fr);gap:6px 20px}
+  .feat li{font-size:13.5px;color:var(--text);padding-left:16px;position:relative}
+  .feat li::before{content:"•";position:absolute;left:0;color:var(--blue);font-weight:800}
+
+  details.more{margin-top:10px;border-top:1px solid var(--line);padding-top:12px}
+  details.more>summary{cursor:pointer;font-size:13.5px;font-weight:700;color:var(--blue);list-style:none;user-select:none}
+  details.more>summary::-webkit-details-marker{display:none}
+  details.more>summary::before{content:"▸ ";display:inline-block}
+  details.more[open]>summary::before{content:"▾ "}
+  details.more[open]>summary{margin-bottom:12px}
+
+  .steps{list-style:none;margin:0;padding:0;counter-reset:step}
+  .steps li{counter-increment:step;font-size:13.5px;color:var(--text);padding:8px 0 8px 32px;position:relative;
+    border-bottom:1px dashed var(--line)}
+  .steps li:last-child{border-bottom:none}
+  .steps li::before{content:counter(step);position:absolute;left:0;top:7px;width:20px;height:20px;border-radius:50%;
+    background:var(--navy);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .steps b{color:var(--navy)}
+  .steps .tip{display:block;margin-top:3px;color:var(--text-2);font-size:12.5px}
+
+  .note{background:var(--orange-soft);border:1px solid #f0d9ae;border-radius:8px;padding:10px 14px;
+    font-size:12.5px;color:var(--orange);margin-top:12px}
+  html[data-theme="dark"] .note{border-color:#5a4520}
+</style>
+</head>
+<body>
+<div class="utilbar"><div class="in">
+  <a href="https://www.koti.re.kr" target="_blank" rel="noopener">한국교통연구원</a>
+  <span class="sep">|</span><span>모빌리티 빅데이터팀</span>
+  <span class="sep">|</span>
+  <a href="#" id="logoutLink" style="color:#cdd6ec;text-decoration:none;font-size:12.5px;margin-right:14px" onclick="sessionStorage.removeItem('koti_authed');sessionStorage.removeItem('koti_user');location.href='login.html';return false;">로그아웃</a><button class="util-toggle" id="themeBtn">🌙 다크모드</button>
+</div></div>
+
+<header class="head"><div class="in">
+  <img class="logo" src="assets/koti-logo.png" alt="KOTI" onerror="this.style.display='none'">
+  <h1>AI빅데이터연구팀 업무포털</h1>
+</div></header>
+
+<nav class="tabs"><div class="in">
+  <a href="index.html">대시보드</a>
+  <a href="weekly-work.html">주간업무 작성</a>
+  <a href="weekly-meeting.html">주간회의 자료</a>
+  <a href="performance.html">성과 관리</a>
+  <a href="schedule.html">일정관리</a>
+  <a href="outsourced.html">위탁과제 관리</a>
+  <a href="index_aiagent.html">AI에이전트</a>
+  <a class="cur" href="guide.html">가이드</a>
+</div></nav>
+
+<div class="wrap">
+  <div class="ptitle">
+    <div class="crumb">홈 · 가이드</div>
+    <h2>업무포털 사용 가이드</h2>
+    <p>페이지별로 어떤 기능이 있는지, 어떻게 쓰는지 정리했어요. 제목을 눌러 자세한 사용법을 펼쳐볼 수 있습니다.</p>
+  </div>
+
+  <div class="toc">
+    <a href="#g-dashboard">① 대시보드</a>
+    <a href="#g-weeklywork">② 주간업무 작성</a>
+    <a href="#g-weeklymeeting">③ 주간회의 자료</a>
+    <a href="#g-performance">④ 성과관리</a>
+    <a href="#g-schedule">⑤ 일정관리</a>
+    <a href="#g-outsourced">⑥ 위탁과제 관리</a>
+  </div>
+
+  <!-- ① 대시보드 -->
+  <div class="gcard" id="g-dashboard">
+    <div class="gcard-h"><span class="badge">①</span><h3>대시보드</h3><a class="pagelink" href="index.html">페이지로 이동 →</a></div>
+    <p class="desc">로그인하면 가장 먼저 보이는 첫 화면이에요. 위에서부터 <b>과제 현황 → 성과 현황/위탁과제 현황 → 캘린더</b> 순서로 배치돼 있습니다.</p>
+    <img class="shot" src="assets/guide-dashboard.png" alt="대시보드 화면" onerror="this.style.display='none'">
+    <ul class="feat">
+      <li>과제 현황 (연구진 구성 · 주간회의 · 일정)</li>
+      <li>성과 현황 · 위탁과제 현황 (나란히)</li>
+      <li>캘린더</li>
+      <li>1분마다 자동 새로고침</li>
+    </ul>
+    <details class="more">
+      <summary>자세히 보기</summary>
+      <ol class="steps">
+        <li>맨 위 <b>과제 현황</b>에서는 과제별로 연구책임자·실무연구진·연구진 구성을 한눈에 볼 수 있고, 그 아래 각 과제의 <b>주간회의 자료</b>와 <b>일정</b>이 같이 표시됩니다.</li>
+        <li>과제 현황에 나오는 <b>회의 항목을 클릭</b>하면 <b>요약 · 회의내용 · 코멘트</b>를 보여주는 팝업이 뜹니다. 팝업 안에서 코멘트를 바로 작성하거나 삭제할 수 있고, "검토 필요" 배지가 붙은 회의는 아직 확인이 필요하다는 뜻이에요.
+          <span class="tip">팝업 하단의 "주간회의 페이지로 이동" 버튼을 누르면 원본 회의자료 페이지로 넘어갑니다.</span>
+          <img class="shot-inline" src="assets/guide-dashboard-meeting.png" alt="회의 상세 팝업" onerror="this.style.display='none'"></li>
+        <li>그 아래 <b>성과 현황</b> 카드에서는 과제별 <b>정량 · 정성 성과</b> 진행률을 도넛 차트로 보여줘요. 카드를 클릭하면 성과관리 페이지로 이동합니다.</li>
+        <li>바로 옆 <b>위탁과제 현황</b> 카드에서는 진행 중인 위탁과제 목록(기관·기간·예산)을 볼 수 있어요. 클릭하면 위탁과제 관리 페이지로 이동합니다.</li>
+        <li>맨 아래 <b>캘린더</b>는 이번 달 미니 달력과, 선택한 날짜의 일정, 그리고 <b>출장·외출·휴가·재택근무</b> 인원을 4칸으로 따로 보여줍니다. 날짜를 클릭하면 그날 일정으로 바뀌고, "N월 ›"을 누르면 일정관리 페이지로 이동해요.</li>
+        <li>화면은 1분마다 자동으로 새로고침되고, 우측 상단 <b>↻ 새로고침</b> 버튼으로 즉시 갱신할 수도 있습니다. (입력 중인 필드나 열려있는 모달이 있으면 자동 새로고침은 건너뜁니다.)</li>
+        <li>우측 상단 <b>🌙 다크모드</b> 버튼으로 화면 테마를 바꿀 수 있고, <b>로그아웃</b> 링크로 로그인 화면으로 돌아갑니다.</li>
+      </ol>
+    </details>
+  </div>
+
+  <!-- ② 주간업무 작성 -->
+  <div class="gcard" id="g-weeklywork">
+    <div class="gcard-h"><span class="badge">②</span><h3>주간업무 작성</h3><a class="pagelink" href="weekly-work.html">페이지로 이동 →</a></div>
+    <p class="desc">그 주의 <b>주무</b>가 주간업무 PDF를 올리면 업무실적·업무계획이 자동으로 채워지고, 팀원들이 각자 확인·수정하는 페이지예요.</p>
+    <img class="shot" src="assets/guide-weeklywork.png" alt="주간업무 작성 화면" onerror="this.style.display='none'">
+    <ul class="feat">
+      <li>PDF 업로드 → 업무실적(PDF 기반) · 업무계획(두레이 캘린더 기반) 자동 채움</li>
+      <li>팀원별 확인·수정·삭제</li>
+      <li>캘린더 동기화로 두레이 신규 일정 실시간 반영</li>
+      <li>Word 다운로드 → 한글(HWP) 파일에 붙여넣어 제출</li>
+    </ul>
+    <details class="more">
+      <summary>자세히 보기</summary>
+      <ol class="steps">
+        <li>그 주의 <b>주무</b>가 상단 <b>PDF 불러오기</b> 버튼으로 주간업무 PDF를 올립니다. 그러면 <b>업무실적</b>은 PDF 내용을 바탕으로, <b>업무계획</b>은 두레이 팀 캘린더를 바탕으로 자동으로 채워져요.</li>
+        <li>팀원들은 각자 자기 항목을 확인해서, <b>업무실적</b>은 고칠 내용이 있으면 수정하고, <b>업무계획</b>은 채울 내용이 있으면 채웁니다. 항목을 클릭하면 수정 팝업이 열려요.
+          <div class="shot-row">
+            <img class="shot-inline" src="assets/guide-weeklywork-edit1.png" alt="업무실적 수정 팝업" onerror="this.style.display='none'">
+            <img class="shot-inline" src="assets/guide-weeklywork-edit2.png" alt="업무계획 수정 팝업" onerror="this.style.display='none'">
+          </div></li>
+        <li>작성이 필요 없는 항목은 팝업 하단의 <b>삭제</b> 버튼을 눌러 지우면 됩니다.</li>
+        <li>업무계획 쪽 팝업에는 <b>캘린더 등기화</b> 버튼도 있어요. 두레이 캘린더에 새로 추가된 일정이 있으면, 이 버튼(또는 화면 상단 팀 캘린더의 <b>🔄 캘린더 동기화</b> 버튼)을 눌러서 실시간으로 반영할 수 있습니다.</li>
+        <li>팀원들이 다 작성했으면, <b>주무</b>가 상단의 <b>Word 다운로드</b> 버튼을 눌러 수정된 내용을 문서로 받습니다.
+          <img class="shot-inline" src="assets/guide-weeklywork-word.png" alt="Word 다운로드 결과 예시" onerror="this.style.display='none'">
+          <span class="tip">다운로드한 내용을 제출용 한글(HWP) 파일에 붙여넣으면 끝!</span></li>
+        <li>화면 상단 좌우 화살표(◀ ▶)로 다른 주(week)로 이동할 수 있고, <b>+ 항목 추가</b>로 항목을 직접 추가할 수도 있습니다.</li>
+      </ol>
+    </details>
+  </div>
+
+  <!-- ③ 주간회의 자료 -->
+  <div class="gcard" id="g-weeklymeeting">
+    <div class="gcard-h"><span class="badge">③</span><h3>주간회의 자료</h3><a class="pagelink" href="weekly-meeting.html">페이지로 이동 →</a></div>
+    <p class="desc">매주 과제별로 진행한 주간회의 내용을 한곳에 모아보기 위한 페이지예요.</p>
+    <img class="shot" src="assets/guide-weeklymeeting.png" alt="주간회의 자료 화면" onerror="this.style.display='none'">
+    <ul class="feat">
+      <li>이번 주 회의 안건(과제별 개요) 보기</li>
+      <li>회의 추가</li>
+      <li>회의 상세보기 · 수정 · 코멘트</li>
+      <li>회의 캘린더</li>
+      <li>과제별 필터링해서 다운로드</li>
+    </ul>
+    <details class="more">
+      <summary>자세히 보기</summary>
+      <ol class="steps">
+        <li>맨 처음 보이는 <b>이번 주 회의 안건</b>에서는 과제별로 이번 주에 어떤 회의를 했는지, 누가 참석했는지를 <b>개요식으로 간단하게</b> 볼 수 있어요. (자세한 내용까지는 안 나오고, 요약만 보여요.)</li>
+        <li>같은 화면에서 <b>+ 회의 추가</b> 버튼으로 새 회의 항목을 만들 수 있습니다.</li>
+        <li>목록에서 <b>회의를 클릭</b>하면 자세한 회의 내용(요약·회의내용)이 나오는 상세 화면으로 들어가요. <b>정보 수정</b> · <b>요약 수정</b> · <b>내용 수정</b> 버튼으로 각 부분을 그 자리에서 고칠 수 있습니다.
+          <img class="shot-inline" src="assets/guide-weeklymeeting-detail.png" alt="회의 상세 화면" onerror="this.style.display='none'"></li>
+        <li>상세 화면 하단에는 <b>코멘트</b>도 달 수 있어요. 이름을 고르고 의견을 입력한 뒤 <b>등록</b> 버튼을 누르면 됩니다.
+          <span class="tip">← 주간 종합 보기를 누르면 다시 목록으로 돌아갑니다.</span></li>
+        <li>화면 위쪽에는 <b>회의 캘린더</b>도 있어요. 달력에 표시된 회의를 클릭해도 똑같이 그 회의의 상세 내용으로 들어갈 수 있습니다.</li>
+        <li>상단 <b>⭳ 다운로드</b> 버튼으로 회의 내용을 문서로 받을 수 있는데, 이때 <b>과제 필터를 걸어두면 그 과제 회의만 골라서 다운로드</b>돼요. 예를 들어 "자율주행R&D"만 선택해두고 다운로드하면 그 과제 회의 내용만 담깁니다.</li>
+        <li><b>정보 수정</b>에서는 과제·구분·일시·장소·참석자를 고칠 수 있어요.
+          <img class="shot-inline" src="assets/guide-weeklymeeting-editinfo.png" alt="회의 정보 수정 팝업" onerror="this.style.display='none'"></li>
+        <li><b>내용 수정</b>(회의 내용)을 쓸 때는 <b>줄바꿈과 빈 줄</b>로 아젠다를 구분해요.
+          <img class="shot-inline" src="assets/guide-weeklymeeting-editagenda.png" alt="회의 내용 수정 팝업" onerror="this.style.display='none'"></li>
+      </ol>
+      <div class="note">
+        📝 <b>회의 내용(아젠다) 작성 방법</b><br>
+        · 한 아젠다 블록의 <b>첫 줄</b> = 굵게(볼드) 표시되는 <b>아젠다 제목</b><br>
+        · 그 아래 줄들 = 그대로 <b>본문 내용</b>으로 표시 (줄바꿈 그대로 유지됨)<br>
+        · 아젠다를 <b>새로 구분</b>하고 싶으면 사이에 <b>빈 줄(엔터 두 번)</b>을 넣으면 돼요<br><br>
+        예시:
+        <pre style="background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:12px;white-space:pre-wrap;margin-top:6px">한양대학교 답변자료 (Issue 관련 문의 완료)
+답변자료 Output: EVT 사고데이터 기반 위험도 예측 모형
+Target 위험교통류: 중상 이상 사고 활용
+
+시흥시 통합 시연 관련
+실증 일정: 7월 이후 예상</pre>
+        → "한양대학교 답변자료…"와 "시흥시 통합 시연 관련"이 각각 굵은 제목이 되고, 그 아래 줄들이 본문으로 붙어요.
+      </div>
+    </details>
+  </div>
+
+  <!-- ④ 성과관리 -->
+  <div class="gcard" id="g-performance">
+    <div class="gcard-h"><span class="badge">④</span><h3>성과관리</h3><a class="pagelink" href="performance.html">페이지로 이동 →</a></div>
+    <p class="desc">과제별 성과 목표를 <b>정량 · 정성 · 추가 성과</b> 세 가지로 나눠 등록하고, 진행률을 관리하는 페이지예요.</p>
+    <img class="shot" src="assets/guide-performance.png" alt="성과관리 화면" onerror="this.style.display='none'">
+    <ul class="feat">
+      <li>정량 성과 · 정성 성과 · 추가 성과 등록</li>
+      <li>클릭해서 상세보기 · 수정 · 삭제</li>
+      <li>체크리스트 기반 진행률 또는 진행상태 직접 변경</li>
+      <li>과제 · 담당자 · 유형 · 상태 필터, 연도별 보기</li>
+    </ul>
+    <details class="more">
+      <summary>자세히 보기</summary>
+      <ol class="steps">
+        <li>성과는 <b>정량 성과</b> · <b>정성 성과</b> · <b>추가 성과</b> 세 영역으로 나뉘어요. 각 영역 우측의 <b>+ 등록</b> 버튼으로 과제별 성과 목표를 새로 추가할 수 있습니다.
+          <div class="shot-row">
+            <img class="shot-inline" src="assets/guide-performance-add-quant.png" alt="정량 성과 등록 팝업" onerror="this.style.display='none'">
+            <img class="shot-inline" src="assets/guide-performance-add-qual.png" alt="정성 성과 등록 팝업" onerror="this.style.display='none'">
+          </div></li>
+        <li>목록에서 성과 항목을 클릭하면 <b>상세 팝업</b>이 열려서 과제·담당자·기간·세부내용·달성 계획을 확인할 수 있어요. 여기서 <b>삭제</b>하거나 <b>수정</b>으로 들어갈 수 있습니다.
+          <img class="shot-inline" src="assets/guide-performance-detail.png" alt="성과 상세 팝업" onerror="this.style.display='none'"></li>
+        <li>수정 화면에서는 <b>달성 계획을 단계별 체크리스트</b>로 만들어서 진행률을 관리할 수 있어요. 체크할 때마다 진행률(%)이 자동으로 계산됩니다.
+          <img class="shot-inline" src="assets/guide-performance-edit.png" alt="성과목표 수정 팝업" onerror="this.style.display='none'"></li>
+        <li>체크리스트를 <b>전부 체크</b>하면 진행상태가 자동으로 <b>"완료"</b>로 바뀝니다.
+          <span class="tip">체크리스트 없이 진행상태(예정/진행중/완료 등) 드롭다운만 직접 바꿔서 관리할 수도 있어요.</span></li>
+        <li>상단 <b>필터</b>(과제 · 담당자 · 유형 · 상태)로 원하는 항목만 골라볼 수 있고, <b>◀ 연도 ▶</b>로 다른 연도의 성과도 확인할 수 있어요. <b>초기화</b> 버튼으로 필터를 되돌립니다.</li>
+      </ol>
+    </details>
+  </div>
+
+  <!-- ⑤ 일정관리 -->
+  <div class="gcard" id="g-schedule">
+    <div class="gcard-h"><span class="badge">⑤</span><h3>일정관리</h3><a class="pagelink" href="schedule.html">페이지로 이동 →</a></div>
+    <p class="desc">팀 캘린더(두레이) 일정을 달력 형태로 보고, 직접 추가·수정·삭제할 수 있는 페이지예요.</p>
+    <img class="shot" src="assets/guide-schedule.png" alt="일정관리 화면" onerror="this.style.display='none'">
+    <ul class="feat">
+      <li>월별 달력 보기 + 유형·과제 필터</li>
+      <li>이번 주 근태 현황(출장·외출·휴가·재택근무)</li>
+      <li>이번 주 전체 일정 목록</li>
+      <li>일정 추가/수정/삭제 (두레이와 실시간 연동)</li>
+      <li>지난 날짜 일정은 자동 보관(읽기 전용)</li>
+    </ul>
+    <details class="more">
+      <summary>자세히 보기</summary>
+      <ol class="steps">
+        <li>맨 위 <b>팀 캘린더</b>에서 필터(유형/과제)로 원하는 일정만 골라볼 수 있어요.</li>
+        <li>달력 아래 <b>이번 주 근태 현황</b>에서는 이번 주에 <b>출장 · 외출 · 휴가 · 재택근무</b>인 사람을 유형별로 한눈에 볼 수 있어요.
+          <img class="shot-inline" src="assets/guide-schedule-att.png" alt="이번 주 근태 현황 및 전체 일정" onerror="this.style.display='none'"></li>
+        <li>그 아래 <b>이번 주 전체 일정</b> 표에서는 근태뿐 아니라 회의 등 이번 주의 모든 일정을 목록으로 볼 수 있어요. <b>행을 클릭하면 바로 수정</b>할 수 있습니다.</li>
+        <li>달력에서 <b>날짜를 클릭</b>하거나 상단 <b>+ 일정 추가</b> 버튼을 눌러 새 일정을 등록합니다.
+          <img class="shot-inline" src="assets/guide-schedule-add.png" alt="일정 추가 팝업" onerror="this.style.display='none'"></li>
+        <li>유형을 고르면 그에 맞는 입력창이 나와요.
+          <span class="tip">휴가/외출/재택근무는 담당자(또는 여러 명이면 참석자란에 콤마로)를 반드시 입력해야 합니다. 과제/출장은 담당자·참석자·과제(프로젝트)를 선택할 수 있어요. 참석자란에 이름을 입력하면 자동으로 "출장"으로 등록되니 참고하세요.</span></li>
+        <li>이미 있는 일정을 클릭하면 같은 창이 <b>수정 모드</b>로 열립니다. 하단의 <b>삭제</b> 버튼으로 지울 수도 있어요.
+          <div class="shot-row">
+            <img class="shot-inline" src="assets/guide-schedule-edit.png" alt="일정 수정 팝업(과제)" onerror="this.style.display='none'">
+            <img class="shot-inline" src="assets/guide-schedule-edit-travel.png" alt="일정 수정 팝업(출장)" onerror="this.style.display='none'">
+          </div></li>
+        <li>저장하면 즉시 팀 캘린더(두레이)에 반영되고, 대시보드·주간업무 등 다른 페이지에도 같이 표시됩니다.</li>
+        <li><b>초기화</b> 버튼으로 필터·선택 상태를 처음으로 되돌릴 수 있어요.</li>
+      </ol>
+      <div class="note">⚠ <b>오늘 이전(지난) 일정</b>은 매일 자동으로 별도 보관되는 기록이라, 이 화면에서 수정·삭제가 안 돼요. 지난 일정을 고치고 싶으면 담당자에게 문의해 주세요.</div>
+    </details>
+  </div>
+
+  <!-- ⑥ 위탁과제 관리 -->
+  <div class="gcard" id="g-outsourced">
+    <div class="gcard-h"><span class="badge">⑥</span><h3>위탁과제 관리</h3><a class="pagelink" href="outsourced.html">페이지로 이동 →</a></div>
+    <p class="desc">위탁업체와 진행한 <b>회의록</b>과, 주고받은 <b>요청자료</b>를 연도·과제별로 정리하는 페이지예요.</p>
+    <div class="shot-row">
+      <img class="shot" src="assets/guide-outsourced.png" alt="위탁과제 관리 - 회의록" onerror="this.style.display='none'">
+      <img class="shot" src="assets/guide-outsourced-requests.png" alt="위탁과제 관리 - 요청자료" onerror="this.style.display='none'">
+    </div>
+    <ul class="feat">
+      <li>연도(◀ ▶)와 과제 선택</li>
+      <li>회의록: 월간회의 · 실무진회의 · 보고로 구분해서 기록</li>
+      <li>요청자료: 요청·회신 내용을 안건별로 정리</li>
+      <li>둘 다 키워드 검색 가능</li>
+    </ul>
+    <details class="more">
+      <summary>자세히 보기</summary>
+      <ol class="steps">
+        <li>상단의 <b>◀ 연도 ▶</b> 화살표로 연도를 바꾸고, 드롭다운에서 <b>과제</b>를 선택합니다. <b>회의록</b> / <b>요청자료</b> 탭으로 전환할 수 있어요.</li>
+        <li><b>회의록</b>은 <b>월간회의 · 실무진회의 · 보고</b>로 구분해서 등록해요. "보고"는 착수보고·중간보고·최종보고처럼 제목에 직접 적어서 구분하면 됩니다. 항목을 클릭하면 상세 팝업이 열리고, <b>수정</b> 버튼으로 구분·일시·상태·형태·안건·참석·회의 내용을 고칠 수 있어요.
+          <div class="shot-row">
+            <img class="shot-inline" src="assets/guide-outsourced-meeting-view.png" alt="회의 상세 보기" onerror="this.style.display='none'">
+            <img class="shot-inline" src="assets/guide-outsourced-meeting-edit.png" alt="회의 수정" onerror="this.style.display='none'">
+          </div>
+          <span class="tip">+ 회의 추가로 새 회의를 등록할 때도 같은 형태의 입력창이 열려요.</span>
+          <img class="shot-inline" src="assets/guide-outsourced-meeting-add.png" alt="회의 추가" onerror="this.style.display='none'"></li>
+        <li><b>요청자료</b>는 위탁업체와 주고받은 자료를 한 번에 파악하기 위한 곳이에요. <b>+ 자료 추가</b> 버튼을 눌러 등록합니다.
+          <img class="shot-inline" src="assets/guide-outsourced-request-add.png" alt="자료 추가" onerror="this.style.display='none'"></li>
+        <li>자료 추가 화면에서는 구분·제목·요청일·회신일·상태와 함께, <b>요청 PDF / 회신 PDF 파일</b>을 첨부할 수 있어요. 그 아래 <b>안건별로 문의사항과 답변</b>을 정리하는데, <b>+ 문의·답변 추가</b> 버튼으로 안건을 여러 개 만들 수 있습니다.
+          <img class="shot-inline" src="assets/guide-outsourced-request-edit.png" alt="요청자료 수정 - 안건별 문의·답변" onerror="this.style.display='none'"></li>
+        <li><b>그림(이미지)을 넣으려면</b>, 이미지를 복사해둔 상태에서 해당 안건의 <b>답변란 안을 클릭하고 Ctrl+V로 붙여넣기</b>만 하면 돼요. 붙여넣은 그림은 그 안건 밑에 미리보기로 나타나고, <b>저장 버튼을 눌러야 실제로 반영</b>됩니다.</li>
+        <li>등록된 요청자료는 상세보기에서 안건별 문의·답변과 첨부된 그림(FIGURES)을 한 화면에서 볼 수 있어요.
+          <img class="shot-inline" src="assets/guide-outsourced-request-view.png" alt="요청자료 상세 - FIGURES" onerror="this.style.display='none'"></li>
+        <li>회의록/요청자료 둘 다 검색창(<b>제목·참석자·안건 검색</b> / <b>키워드 검색</b>)으로 원하는 내용을 바로 찾을 수 있습니다.</li>
+      </ol>
+      <div class="note">등록된 위탁과제가 안 보이면, 노션의 "위탁과제 정보" DB에 과제가 먼저 등록되어 있어야 해요.</div>
+    </details>
+  </div>
+
+</div>
+
+<div id="lightbox"><span class="lbclose">×</span><img id="lightboxImg" src="" alt=""></div>
+
+<script>
+  (function(){
+    var root=document.documentElement, btn=document.getElementById("themeBtn");
+    function set(t){ root.setAttribute("data-theme",t); btn.textContent=(t==="dark"?"☀️ 라이트모드":"🌙 다크모드"); }
+    btn.addEventListener("click", function(){ set(root.getAttribute("data-theme")==="dark"?"light":"dark"); });
+  })();
+
+  (function(){
+    var lb = document.getElementById("lightbox");
+    var lbImg = document.getElementById("lightboxImg");
+    document.querySelectorAll("img.shot, img.shot-inline").forEach(function(img){
+      img.addEventListener("click", function(){
+        lbImg.src = img.src;
+        lb.classList.add("open");
+      });
+    });
+    lb.addEventListener("click", function(){ lb.classList.remove("open"); lbImg.src=""; });
+    document.addEventListener("keydown", function(e){ if(e.key==="Escape"){ lb.classList.remove("open"); lbImg.src=""; } });
+  })();
+</script>
+</body>
+</html>
