@@ -2,14 +2,6 @@
 
 > 한국교통연구원 교통빅데이터본부 AI빅데이터연구팀이 매일 여는 그 사이트
 
-![status](https://img.shields.io/badge/status-야근으로_완성-ff5c5c?style=for-the-badge)
-![stack](https://img.shields.io/badge/stack-GitHub_Pages%20%2B%20Cloudflare%20%2B%20Notion-2c5fbf?style=for-the-badge)
-![vibe](https://img.shields.io/badge/vibe-바이브코딩-16265e?style=for-the-badge)
-![coffee](https://img.shields.io/badge/fuel-☕×∞-6f4e37?style=for-the-badge)
-
-노션에 흩어져 있던 일정·회의록·성과·위탁과제를 한곳에 몰아넣고, 두레이 캘린더까지 실시간으로 끌어와서
-"오늘 누가 출장 갔더라?" 를 3초 안에 확인할 수 있게 만든 사내 업무포털입니다.
-
 ---
 
 ## 🖥️ 미리보기
