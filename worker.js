@@ -143,6 +143,7 @@ async function generateWeeklyHwpx(achievements, plans) {
 }
 
 
+const WBS_DB_ID    = "f1a718244eb54c399b70eb216067804d"; // WBS DB
 const PROJECT_DB_ID = "5a75146603614e489364b66e5eab2e1c"; // 과제 정보 DB (노션 확인 database_id)
 // 일정관리 페이지는 노션 DB가 아니라 두레이(Dooray) 캘린더를 소스로 사용 (아래 DOORAY_TEAM_CALENDAR_ID 참조)
 const PERF_DB_ID   = "2f590aa04b1243f09255ca3850833038"; // 성과 DB
