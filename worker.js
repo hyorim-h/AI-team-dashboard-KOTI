@@ -143,16 +143,16 @@ async function generateWeeklyHwpx(achievements, plans) {
 }
 
 
-const PROJECT_DB_ID = "5a75146603614e489364b66e5eab2e1c"; // 과제 정보 DB (노션 확인 database_id)
+const PROJECT_DB_ID = "ce0db68c-983d-83df-9c00-01f5668c56cd"; // 과제 정보 DB (노션 확인 database_id)
 // 일정관리 페이지는 노션 DB가 아니라 두레이(Dooray) 캘린더를 소스로 사용 (아래 DOORAY_TEAM_CALENDAR_ID 참조)
-const PERF_DB_ID   = "2f590aa04b1243f09255ca3850833038"; // 성과 DB
-const ACHIEVE_DB_ID = "34ab53ea4afb4b1481c8c5358cd67b29"; // 업무실적 DB
-const PLAN_DB_ID    = "d104d01ba9b140e6a83ceaea36e86b48"; // 업무계획 DB
-const MEETING_DB_ID = "04abad201f3b4d08a5a293749c28626c"; // 회의자료 DB
-const COMMENT_DB_ID = "b65a81a8947b415ebd921c45f155c0f6"; // 코멘트 DB
-const CONSIGN_DB_ID = "3824cab3f1fe427f9e7f8f62664ed8a7"; // 위탁과제 정보 DB
-const CONSIGN_MEETING_DB_ID = "12245461cc924caea18603f30deb6a9f"; // 위탁과제 회의록 DB
-const CONSIGN_REQUEST_DB_ID = "5dbf4ecde36a42e0bffeed87502b3f1b"; // 위탁과제 요청자료 DB
+const PERF_DB_ID   = "805db68c-983d-8331-b206-81d8ffbf09f3"; // 성과 DB
+const ACHIEVE_DB_ID = "c1fdb68c-983d-83cd-b4c3-01802e4f88c6"; // 업무실적 DB
+const PLAN_DB_ID    = "e7ddb68c-983d-835f-9958-01f98803acc0"; // 업무계획 DB
+const MEETING_DB_ID = "782db68c-983d-82bf-b607-013f0314fcfb"; // 회의자료 DB
+const COMMENT_DB_ID = "b4edb68c-983d-82f2-a7ab-01cbba6245c1"; // 코멘트 DB
+const CONSIGN_DB_ID = "b2edb68c-983d-83fe-a580-815b224b17b9"; // 위탁과제 정보 DB
+const CONSIGN_MEETING_DB_ID = "206db68c-983d-82f0-ad12-01188a5dd72f"; // 위탁과제 회의록 DB
+const CONSIGN_REQUEST_DB_ID = "4ccdb68c-983d-831e-b5e7-0102bbce1354"; // 위탁과제 요청자료 DB
 const NOTION_VERSION = "2022-06-28";
 
 const TEAM = ["이종우","전준수","이채영","한효림","김예원","정승환"];
@@ -582,7 +582,7 @@ function parseDoorayEvent(ev){
 // ===== 일정 유형 오버라이드 (노션 DB) =====
 // 두레이 본문(body)을 다시 읽어올 방법이 없어서(권한상 불가, 실측 확인), 제목만으로는 안 잡히는 출장/과제 등을
 // 수동으로 지정한 내용을 여기 저장해두고, 조회할 때마다 원본 이벤트ID로 매칭해서 유형을 덮어씌움
-const SCHED_OVERRIDE_DB_ID = "3142385f70394d5da6bb9126dd2b3bdf";
+const SCHED_OVERRIDE_DB_ID = "238db68c-983d-82c2-8bbb-01f9cfc02c0d";
 async function getScheduleOverrides(env){
   const token = env.NOTION_TOKEN;
   const pages = await getAllPages(SCHED_OVERRIDE_DB_ID, token);
@@ -693,7 +693,7 @@ async function doorayList(env){
 // ===== 일정 아카이브 (노션 DB) =====
 // 두레이 조회 기간 제한(약 한 달) 때문에, "오늘 이전" 일정은 매일 크론으로 노션에 옮겨 저장해두고 여기서 불러옴.
 // "오늘 이후"는 항상 두레이에서 실시간으로 조회.
-const SCHEDULE_ARCHIVE_DB_ID = "0bbdeffb-e7e6-4efe-977b-01d914fa7fd0";
+const SCHEDULE_ARCHIVE_DB_ID = "caddb68c-983d-82e9-84b2-01dc5dcd0ac7";
 
 function todayKST(){
   var kst = new Date(Date.now() + 9*60*60*1000);
