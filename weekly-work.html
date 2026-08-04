@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>주간업무 작성 · AI빅데이터연구팀</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx@9.7.1/dist/index.iife.js"></script>
 <script>
   if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 </script>
@@ -187,8 +186,9 @@
   <img class="logo" src="assets/koti-logo.png" alt="KOTI" onerror="this.style.display='none'">
   <h1>AI빅데이터연구팀 업무포털</h1>
   <div class="head-actions">
+    <button class="hbtn" id="refreshBtn">↻ 새로고침</button>
     <button class="hbtn" id="pdfBtn">PDF 불러오기</button>
-    <button class="hbtn primary" id="wordBtn">Word 다운로드</button>
+    <button class="hbtn primary" id="wordBtn">한글 다운로드</button>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
   </div>
 </div></header>
@@ -605,6 +605,7 @@
 
   document.getElementById("weekPrev").addEventListener("click", function(){ WEEK_OFFSET--; load(); });
   document.getElementById("weekNext").addEventListener("click", function(){ WEEK_OFFSET++; load(); });
+  document.getElementById("refreshBtn").addEventListener("click", load);
   document.getElementById("pdfBtn").addEventListener("click", function(){ document.getElementById("fileInput").click(); });
   document.getElementById("fileInput").addEventListener("change", function(e){ if(e.target.files[0]) handlePdf(e.target.files[0]); });
   document.getElementById("wordBtn").addEventListener("click", downloadWord);
@@ -927,7 +928,7 @@
     }
   }
 
-  // ===== Word 다운로드 =====
+  // ===== 한글(HWPX) 다운로드 =====
   var PROJECT_FULL = {
     "국가교통조사사업": "(DB사업) 「2026 국가교통조사 및 DB시스템」",
     "자율주행R&D": "(R&D) 「자율주행시대 고위험 사고인자·위험상황 예측 및 단속 기술 개발」",
@@ -937,60 +938,59 @@
     "기타": "(기타)"
   };
   var PROJECT_ORDER = ["국가교통조사사업","자율주행R&D","탄소공간지도R&D","교통SOC R&D","데이터스페이스R&D","기타"];
-  var WFONT = { head:"KoPub돋움체 Bold", proj:"KoPub바탕체 Medium", title:"KoPub바탕체 Bold", body:"KoPub바탕체 Light" };
 
   function wDateTimeLoc(it){
     var dt = it.date ? (fmtDateDow(it.date) + (it.time ? " " + it.time : "")) : "";
     if(dt && it.location) return dt + " · " + it.location;
     return dt || it.location || "";
   }
-  function wItemParas(d, it){
-    var P=d.Paragraph, T=d.TextRun;
-    function bl(label,value){ return new P({ indent:{left:360,hanging:360}, spacing:{after:0},
-      children:[new T({ text:"- "+label+": "+(value||""), font:WFONT.body, size:24 })] }); }
-    return [
-      new P({ indent:{left:360,hanging:360}, spacing:{before:120,after:0},
-        children:[new T({ text:"□ "+(it.title||""), bold:true, font:WFONT.title, size:24 })] }),
-      bl("일시·장소", wDateTimeLoc(it)), bl("내용", it.content), bl("참석자", it.attendees)
-    ];
-  }
-  function wSection(d, label, items){
-    var P=d.Paragraph, T=d.TextRun;
-    var out=[ new P({ spacing:{before:240,after:120}, children:[new T({ text:"〈"+label+"〉", bold:true, font:WFONT.head, size:30 })] }) ];
+  function hwpxGroupByProject(items){
     var groups={}; items.forEach(function(it){ var k=it.project||"기타"; (groups[k]=groups[k]||[]).push(it); });
-    var n=1;
+    var out=[];
     PROJECT_ORDER.forEach(function(pk){
       if(!groups[pk]) return;
-      out.push(new P({ spacing:{before:160,after:80}, children:[new T({ text:n+". "+(PROJECT_FULL[pk]||pk), font:WFONT.proj, size:26 })] }));
-      groups[pk].forEach(function(it){ wItemParas(d,it).forEach(function(p){ out.push(p); }); });
-      n++;
+      out.push({
+        label: PROJECT_FULL[pk] || pk,
+        meetings: groups[pk].map(function(it){
+          return {
+            title: it.title || "",
+            dateLocation: wDateTimeLoc(it),
+            content: it.content || "",
+            attendees: it.attendees || "",
+            needsDelete: it.status === "삭제필요"
+          };
+        })
+      });
     });
     return out;
   }
   async function downloadWord(){
-    var d = window.docx;
-    if(!d){ alert("Word 라이브러리 로딩 중입니다. 잠시 후 다시 시도하세요."); return; }
     // 업무실적: 수정된 것만 / 업무계획: 완료된 것만
     var modAchieve = DATA.achievements.filter(function(x){ return x.modified; });
     var donePlans = DATA.plans.filter(function(x){ return x.status==="완료"||x.status==="작성완료"||x.status==="수정됨"; });
     if(!modAchieve.length && !donePlans.length){
-      alert("Word로 내보낼 내용이 없습니다.\n(수정된 업무실적 · 완료된 업무계획이 없음)"); return;
+      alert("한글 파일로 내보낼 내용이 없습니다.\n(수정된 업무실적 · 완료된 업무계획이 없음)"); return;
     }
     var btn=document.getElementById("wordBtn"); var orig=btn.textContent;
     btn.textContent="생성 중…"; btn.disabled=true;
     try {
-      var children=[];
-      wSection(d,"업무실적",modAchieve).forEach(function(p){children.push(p);});
-      wSection(d,"업무계획",donePlans).forEach(function(p){children.push(p);});
-      var doc=new d.Document({
-        styles:{ default:{ document:{ run:{ font:WFONT.body, size:24 } } } },
-        sections:[{ properties:{ page:{ size:{width:11906,height:16838}, margin:{top:1701,right:1440,bottom:1440,left:1440} } }, children:children }]
+      var achievements = hwpxGroupByProject(modAchieve);
+      var plans = hwpxGroupByProject(donePlans);
+      var res = await fetch(WORKER_URL, {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ action:"downloadHwpx", achievements: achievements, plans: plans })
       });
-      var blob=await d.Packer.toBlob(doc);
+      var data = await res.json();
+      if(!data.ok) throw new Error(data.error || "생성 실패");
+      var b64 = data.result.hwpxBase64;
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for(var i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+      var blob = new Blob([bytes], { type: "application/haansofthwp" });
       var url=URL.createObjectURL(blob); var a=document.createElement("a");
-      a.href=url; a.download="주간업무_"+(DATA.week||"export")+".docx";
+      a.href=url; a.download="주간업무_"+(DATA.week||"export")+".hwpx";
       document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-    } catch(e){ alert("Word 생성 실패: "+e.message); }
+    } catch(e){ alert("한글 파일 생성 실패: "+e.message); }
     finally { btn.textContent=orig; btn.disabled=false; }
   }
 
@@ -1006,13 +1006,13 @@
 
   load();
 
-  // 1분 자동 새로고침 (편집 모달이 열려 있으면 건너뜀 - 작성 중인 내용 보호)
+  // 1시간 자동 새로고침 (편집 모달이 열려 있으면 건너뜀 - 작성 중인 내용 보호)
   setInterval(function(){
     if(document.querySelector(".ov.open")) return;
     var ae=document.activeElement;
     if(ae && (ae.tagName==="INPUT" || ae.tagName==="TEXTAREA" || ae.tagName==="SELECT")) return;
     load();
-  }, 60000);
+  }, 3600000);
 </script>
 </body>
 </html>
