@@ -349,15 +349,19 @@ async function parseMeeting(page, token){
   // "회의요약"은 직접 작성하는 진짜 요약문(자동 덮어쓰기 없음) — 화면에 보여줄 summary는 이걸로
   const overviewRt = (p["회의요약"] && p["회의요약"].rich_text) || [];
   const summary = overviewRt.map(function(t){return t.plain_text;}).join("");
+  // "결정사항"도 회의요약과 동일하게 전용 필드(자동 덮어쓰기 없음)
+  const decisionRt = (p["결정사항"] && p["결정사항"].rich_text) || [];
+  const decision = decisionRt.map(function(t){return t.plain_text;}).join("");
 
-  // 본문 꼭지 (heading별로 묶음)
-  const content = await getPageContent(page.id, token);
+  // 본문 꼭지 (heading별로 묶음) — getPageContent는 이미지 블록을 건너뛰므로(rich_text만 읽음),
+  // 위탁과제 요청자료에서 이미 쓰던 getPageContentWithFigures로 교체해서 이미지도 같이 읽어옴
+  const content = await getPageContentWithFigures(page.id, token);
   const sections = [];
-  for(const h in content){ sections.push({ heading: h, body: content[h] }); }
+  for(const h in content){ sections.push({ heading: h, body: content[h].body, figures: content[h].figures || [] }); }
 
   return {
     id: page.id, title: title, project: project, kind: kind, date: date, week: week,
-    time: time, place: place, attendees: attendees, summary: summary, headingList: headingList,
+    time: time, place: place, attendees: attendees, summary: summary, decision: decision, headingList: headingList,
     writer: writer, sections: sections, last_edited: page.last_edited_time || "",
     page_url: page.url || ""
   };
@@ -1388,6 +1392,16 @@ async function updateMeetingSummary(env, payload){
   return { updated: true };
 }
 
+// 결정사항(전용 필드, 회의요약과 동일한 방식 — 자동 덮어쓰기 없음) 수정
+async function updateMeetingDecision(env, payload){
+  const token = env.NOTION_TOKEN;
+  const meetingId = payload.meetingId;
+  const decision = payload.decision || "";
+  if(!meetingId) throw new Error("회의자료 id 누락");
+  await notionFetch("/pages/" + meetingId, token, "PATCH", { properties: { "결정사항": { rich_text: rt(decision) } } });
+  return { updated: true };
+}
+
 // 회의 기본 정보(과제/구분/일시/장소/참석자) 수정 — 요약·내용 수정과는 별개
 async function updateMeetingInfo(env, payload){
   const token = env.NOTION_TOKEN;
@@ -1446,6 +1460,7 @@ async function createMeeting(env, payload){
     "장소": { rich_text: rt(item.place || "") },
     "참석자": { rich_text: rt(item.attendees || "") },
     "회의요약": { rich_text: rt(item.summary || "") },
+    "결정사항": { rich_text: rt(item.decision || "") },
   };
   props["과제"] = item.project ? { select: { name: item.project } } : { select: null };
 
@@ -1667,6 +1682,51 @@ async function consignRequestAddImage(env, payload){
   if(!appendRes.ok){ const t = await appendRes.text(); throw new Error("이미지 블록 추가 실패: " + appendRes.status + " " + t); }
   return { added: true };
 }
+// 회의자료 페이지의 heading_3(꼭지)+paragraph(본문) 순서를 그대로 읽어옴 — createMeeting이 만드는 구조와 1:1로 대응
+async function getOrderedMeetingSections(pageId, token){
+  const data = await notionFetch("/blocks/" + pageId + "/children?page_size=100", token);
+  const sections = []; let cur = null;
+  for(const b of (data.results || [])){
+    const t = b.type;
+    if(t && t.startsWith("heading")){
+      cur = { headingId: b.id, paragraphId: null, imageIds: [] };
+      sections.push(cur);
+    } else if(cur){
+      if(t === "image") cur.imageIds.push(b.id);
+      else if(cur.paragraphId === null) cur.paragraphId = b.id;
+    }
+  }
+  return sections;
+}
+// PDF에서 크롭한 표/그림 이미지를 지정한 꼭지(sectionIndex) 바로 뒤에 붙임
+// (사용자가 미리보기에서 크롭 영역을 확인/수정한 뒤 저장 시 호출 — 반자동 방식)
+async function meetingAddImage(env, payload){
+  const token = env.NOTION_TOKEN;
+  const meetingId = payload.meetingId;
+  const sectionIndex = payload.sectionIndex;
+  if(!meetingId) throw new Error("meetingId 누락");
+  if(!payload.imageBase64) throw new Error("imageBase64 누락");
+
+  const created = await notionFileUploadCreate(token, payload.filename || "figure.png", payload.mimeType || "image/png");
+  await notionFileUploadSend(token, created.id, payload.imageBase64, payload.filename || "figure.png", payload.mimeType || "image/png");
+
+  const sections = await getOrderedMeetingSections(meetingId, token);
+  const sec = (typeof sectionIndex === "number") ? sections[sectionIndex] : null;
+  // 대상 꼭지를 못 찾으면(예: 저장 전에 아젠다를 수정해서 순서가 바뀐 경우) 페이지 맨 끝에 덧붙임
+  const anchorId = sec ? (sec.imageIds.length ? sec.imageIds[sec.imageIds.length-1] : (sec.paragraphId || sec.headingId)) : null;
+
+  const body = { children: [{ object:"block", type:"image", image:{ type:"file_upload", file_upload:{ id: created.id } } }] };
+  if(anchorId) body.after = anchorId;
+  // "after" 파라미터는 최신 업로드 버전에서 거부돼서 안정 버전(NOTION_VERSION)으로 별도 호출
+  const appendRes = await fetch("https://api.notion.com/v1/blocks/" + meetingId + "/children", {
+    method: "PATCH",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json", "Notion-Version": NOTION_VERSION },
+    body: JSON.stringify(body)
+  });
+  if(!appendRes.ok){ const t = await appendRes.text(); throw new Error("이미지 블록 추가 실패: " + appendRes.status + " " + t); }
+  return { added: true };
+}
+
 async function createConsignRequest(env, payload){
   const token = env.NOTION_TOKEN;
   const item = payload.item || {};
@@ -1739,10 +1799,14 @@ export default {
           result = await updateMeeting(env, payload);
         } else if(payload.action === "updateMeetingSummary"){
           result = await updateMeetingSummary(env, payload);
+        } else if(payload.action === "updateMeetingDecision"){
+          result = await updateMeetingDecision(env, payload);
         } else if(payload.action === "updateMeetingInfo"){
           result = await updateMeetingInfo(env, payload);
         } else if(payload.action === "meetingDelete"){
           result = await deleteMeeting(env, payload);
+        } else if(payload.action === "meetingAddImage"){
+          result = await meetingAddImage(env, payload);
         } else if(payload.action === "consignMeetingCreate"){
           result = await createConsignMeeting(env, payload);
         } else if(payload.action === "consignMeetingUpdate"){

@@ -186,6 +186,7 @@
   <img class="logo" src="assets/koti-logo.png" alt="KOTI" onerror="this.style.display='none'">
   <h1>AI빅데이터연구팀 업무포털</h1>
   <div class="head-actions">
+    <button class="hbtn" id="refreshBtn">↻ 새로고침</button>
     <button class="hbtn" id="pdfBtn">PDF 불러오기</button>
     <button class="hbtn primary" id="wordBtn">한글 다운로드</button>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
@@ -604,6 +605,7 @@
 
   document.getElementById("weekPrev").addEventListener("click", function(){ WEEK_OFFSET--; load(); });
   document.getElementById("weekNext").addEventListener("click", function(){ WEEK_OFFSET++; load(); });
+  document.getElementById("refreshBtn").addEventListener("click", load);
   document.getElementById("pdfBtn").addEventListener("click", function(){ document.getElementById("fileInput").click(); });
   document.getElementById("fileInput").addEventListener("change", function(e){ if(e.target.files[0]) handlePdf(e.target.files[0]); });
   document.getElementById("wordBtn").addEventListener("click", downloadWord);
@@ -1004,13 +1006,13 @@
 
   load();
 
-  // 1분 자동 새로고침 (편집 모달이 열려 있으면 건너뜀 - 작성 중인 내용 보호)
+  // 1시간 자동 새로고침 (편집 모달이 열려 있으면 건너뜀 - 작성 중인 내용 보호)
   setInterval(function(){
     if(document.querySelector(".ov.open")) return;
     var ae=document.activeElement;
     if(ae && (ae.tagName==="INPUT" || ae.tagName==="TEXTAREA" || ae.tagName==="SELECT")) return;
     load();
-  }, 60000);
+  }, 3600000);
 </script>
 </body>
 </html>
