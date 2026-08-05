@@ -941,7 +941,7 @@
 
   function wDateTimeLoc(it){
     var dt = it.date ? (fmtDateDow(it.date) + (it.time ? " " + it.time : "")) : "";
-    if(dt && it.location) return dt + " · " + it.location;
+    if(dt && it.location) return dt + ", " + it.location;
     return dt || it.location || "";
   }
   function hwpxGroupByProject(items){
@@ -978,7 +978,7 @@
       var plans = hwpxGroupByProject(donePlans);
       var res = await fetch(WORKER_URL, {
         method: "POST", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ action:"downloadHwpx", achievements: achievements, plans: plans })
+        body: JSON.stringify({ action:"downloadHwpx", achievements: achievements, plans: plans, weekOffset: WEEK_OFFSET })
       });
       var data = await res.json();
       if(!data.ok) throw new Error(data.error || "생성 실패");
