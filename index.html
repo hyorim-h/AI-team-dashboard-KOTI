@@ -446,8 +446,15 @@
     document.getElementById("meetHead").textContent = m.title || "주간회의 자료";
     document.getElementById("meetGoto").onclick = function(){ nav("weekly-meeting.html?meeting="+encodeURIComponent(m.id)); };
     var sm=meetSummary(m);
+    var decisionHtml = (m.decision && m.decision.trim())
+      ? "<div class=\"summary-box\">"+esc(m.decision)+"</div>"
+      : "<div class=\"summary-box empty\">결정사항이 아직 없습니다.</div>";
     var agendaHtml=(m.sections&&m.sections.length) ? m.sections.map(function(a){
-      return "<div class=\"agenda-item\"><div class=\"head\">"+esc(a.heading)+"</div><div class=\"body\">"+esc(a.body)+"</div></div>";
+      var figsHtml = (a.figures||[]).map(function(f){
+        var src = WORKER_URL + "?scope=imageProxy&url=" + encodeURIComponent(f.url);
+        return "<img src=\""+esc(src)+"\" alt=\""+esc(f.caption||"")+"\" style=\"max-width:100%;border-radius:6px;border:1px solid var(--line-2);margin-top:8px;display:block\">";
+      }).join("");
+      return "<div class=\"agenda-item\"><div class=\"head\">"+esc(a.heading)+"</div><div class=\"body\">"+esc(a.body)+"</div>"+figsHtml+"</div>";
     }).join("") : "<div class=\"agenda-empty\">등록된 회의 내용이 없습니다.</div>";
     var comments=m.comments||[];
     var commentsHtml = comments.length ? comments.map(function(c){
@@ -466,6 +473,7 @@
         +"<span><b>참석</b>"+esc(m.attendees||"-")+"</span>"
       +"</div>"
       +"<div class=\"meet-card\"><div class=\"meet-card-h\">회의 요약</div><div class=\"summary-box"+(sm.empty?" empty":"")+"\">"+esc(sm.text)+"</div></div>"
+      +"<div class=\"meet-card\"><div class=\"meet-card-h\">결정사항</div>"+decisionHtml+"</div>"
       +"<div class=\"meet-card\"><div class=\"meet-card-h\">회의 내용</div><div class=\"agenda-list\">"+agendaHtml+"</div></div>"
       +"<div class=\"cmt-wrap\">"
         +"<div style=\"display:flex;align-items:center;margin-bottom:12px\"><span style=\"font-size:13px;font-weight:700;color:var(--navy)\">코멘트</span>"
