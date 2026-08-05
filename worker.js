@@ -412,6 +412,7 @@ async function parseWorkPage(page, token, isPlan){
   const titleList = (p["제목"] && p["제목"].title) || [];
   const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
   const date = (p["날짜"] && p["날짜"].date && p["날짜"].date.start) || "";
+  const dateEnd = (p["날짜"] && p["날짜"].date && p["날짜"].date.end) || "";
   const timeRt = (p["시간"] && p["시간"].rich_text) || [];
   const time = timeRt.map(function(t){return t.plain_text;}).join("");
   const attendRt = (p["참석자"] && p["참석자"].rich_text) || [];
@@ -439,7 +440,7 @@ async function parseWorkPage(page, token, isPlan){
   var gcalId = gcalRt.map(function(t){return t.plain_text;}).join("");
 
   return {
-    id: page.id, title: title, date: date, time: time,
+    id: page.id, title: title, date: date, dateEnd: dateEnd, time: time,
     project: proj, attendees: attendees, week: week,
     location: location, content: body,
     status: status, writer: writer, modified: modified, modifier: modifier,
@@ -1084,7 +1085,7 @@ async function updateWork(env, payload){
     "수정일시": { rich_text: rt(now) },
   };
   if(item.project) props["과제"] = { select: { name: item.project } };
-  if(item.date) props["날짜"] = { date: { start: item.date } };
+  if(item.date) props["날짜"] = { date: { start: item.date, end: item.dateEnd || null } };
 
   if(isPlan){
     // 업무계획 상태 로직:
@@ -1132,7 +1133,7 @@ async function createWork(env, payload){
     "수정일시": { rich_text: rt(item.now || "") },
   };
   if(item.project) props["과제"] = { select: { name: item.project } };
-  if(item.date) props["날짜"] = { date: { start: item.date } };
+  if(item.date) props["날짜"] = { date: { start: item.date, end: item.dateEnd || null } };
   if(isPlan){
     // 업무계획 추가 → 자동 "완료" (사용자가 삭제필요 아닌 다른 상태 명시하면 존중)
     var planStatus = (item.status && item.status!=="예정") ? item.status : "완료";
