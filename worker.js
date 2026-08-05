@@ -1484,29 +1484,52 @@ async function createMeeting(env, payload){
 }
 
 // 회의자료 꼭지(본문) 수정 — 본문 전체를 새 섹션으로 교체
+// 회의자료 꼭지(본문) 수정 — 기존 블록을 "그 자리에서" 내용만 교체(Q&A 저장 방식과 동일).
+// 절대 전체 삭제 후 재생성하지 않음 — 그러면 사이에 있는 이미지 블록이 통째로 날아감.
 async function updateMeeting(env, payload){
   const token = env.NOTION_TOKEN;
   const meetingId = payload.meetingId;
-  const sections = payload.sections || []; // [{heading, body}]
+  const list = payload.sections || []; // [{heading, body}]
   if(!meetingId) throw new Error("회의자료 id 누락");
 
-  // 기존 본문 블록 삭제
-  const cur = await notionFetch("/blocks/" + meetingId + "/children?page_size=100", token);
-  for(const b of (cur.results||[])){
-    try { await notionFetch("/blocks/" + b.id, token, "DELETE"); } catch(e){}
+  const sections = await getOrderedMeetingSections(meetingId, token);
+  const n = Math.min(sections.length, list.length);
+  for(let i=0;i<n;i++){
+    const sec = sections[i], item = list[i];
+    var headingPatch = {}; headingPatch[sec.headingType] = { rich_text: rt(item.heading||"") };
+    await notionFetch("/blocks/" + sec.headingId, token, "PATCH", headingPatch);
+    if(sec.paragraphId){
+      var bodyPatch = {}; bodyPatch[sec.paragraphType] = { rich_text: rt(item.body||"") };
+      await notionFetch("/blocks/" + sec.paragraphId, token, "PATCH", bodyPatch);
+    } else {
+      await notionFetch("/blocks/" + meetingId + "/children", token, "PATCH", { children: [{ object:"block", type:"paragraph", paragraph:{ rich_text: rt(item.body||"") } }], after: sec.headingId });
+    }
+    // 본문이 여러 블록으로 나뉘어 있었으면(수동 편집 등) 첫 블록에 전체를 담았으니 나머지는 정리
+    for(const extraId of (sec.extraBodyIds||[])){ try { await notionFetch("/blocks/" + extraId, token, "DELETE"); } catch(e){} }
   }
-  // 새 본문: 꼭지마다 heading_3 + paragraph
-  const children = [];
-  sections.forEach(function(s){
-    children.push({ object:"block", type:"heading_3", heading_3:{ rich_text: rt(s.heading||"") } });
-    children.push({ object:"block", type:"paragraph", paragraph:{ rich_text: rt(s.body||"") } });
-  });
-  if(children.length){
-    await notionFetch("/blocks/" + meetingId + "/children", token, "PATCH", { children: children });
+  // 삭제된 꼭지(사용자가 아젠다 자체를 지운 경우) — 그 꼭지의 이미지까지 함께 제거. 병렬 처리로 속도 개선.
+  if(sections.length > list.length){
+    var toDelete = [];
+    for(let i=list.length; i<sections.length; i++){
+      const sec = sections[i];
+      toDelete.push(sec.headingId);
+      if(sec.paragraphId) toDelete.push(sec.paragraphId);
+      toDelete = toDelete.concat(sec.extraBodyIds||[], sec.imageIds||[]);
+    }
+    await Promise.allSettled(toDelete.map(function(id){ return notionFetch("/blocks/" + id, token, "DELETE"); }));
+  }
+  // 새로 추가된 꼭지(기존보다 많아진 만큼) — 맨 뒤에 덧붙임
+  if(list.length > sections.length){
+    const children = [];
+    for(let i=sections.length; i<list.length; i++){
+      children.push({ object:"block", type:"heading_3", heading_3:{ rich_text: rt(list[i].heading||"") } });
+      children.push({ object:"block", type:"paragraph", paragraph:{ rich_text: rt(list[i].body||"") } });
+    }
+    if(children.length) await notionFetch("/blocks/" + meetingId + "/children", token, "PATCH", { children: children });
   }
   // 요약 속성도 꼭지 제목 나열로 동기화 (개요 표에 표시되는 값)
   try {
-    const summaryText = sections.map(function(s){ return s.heading; }).filter(Boolean).join(" / ");
+    const summaryText = list.map(function(s){ return s.heading; }).filter(Boolean).join(" / ");
     await notionFetch("/pages/" + meetingId, token, "PATCH", { properties: { "요약": { rich_text: rt(summaryText) } } });
   } catch(e){}
   return { updated: true };
@@ -1686,14 +1709,18 @@ async function consignRequestAddImage(env, payload){
 async function getOrderedMeetingSections(pageId, token){
   const data = await notionFetch("/blocks/" + pageId + "/children?page_size=100", token);
   const sections = []; let cur = null;
+  const BODY_TYPES = ["paragraph","bulleted_list_item","numbered_list_item","quote","callout"];
   for(const b of (data.results || [])){
     const t = b.type;
     if(t && t.startsWith("heading")){
-      cur = { headingId: b.id, paragraphId: null, imageIds: [] };
+      cur = { headingId: b.id, headingType: t, paragraphId: null, paragraphType: "paragraph", extraBodyIds: [], imageIds: [] };
       sections.push(cur);
     } else if(cur){
       if(t === "image") cur.imageIds.push(b.id);
-      else if(cur.paragraphId === null) cur.paragraphId = b.id;
+      else if(BODY_TYPES.indexOf(t) >= 0){
+        if(cur.paragraphId === null){ cur.paragraphId = b.id; cur.paragraphType = t; }
+        else cur.extraBodyIds.push(b.id);
+      }
     }
   }
   return sections;
