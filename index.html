@@ -738,7 +738,6 @@
     var first=new Date(y,m,1), startDow=first.getDay(), daysInMonth=new Date(y,m+1,0).getDate();
     var evDays={};
     (DATA.schedule||[]).forEach(function(s){ if(s.start && s.start.slice(0,7)===iso(TODAY).slice(0,7)) evDays[s.start.slice(8,10)]=true; });
-    (DATA.meetings||[]).forEach(function(s){ if(s.date && s.date.slice(0,7)===iso(TODAY).slice(0,7)) evDays[s.date.slice(8,10)]=true; });
     var dowHtml=DOW.map(function(x){return "<div>"+x+"</div>";}).join("");
     var cells="";
     for(var i=0;i<startDow;i++) cells+="<div class=\"cell\"></div>";
@@ -750,7 +749,7 @@
     }
     var selLabel = (selDay===TODAY.getDate()) ? "오늘" : (m+1)+"."+selDay;
     var ATT_TITLE_EXCLUDE = ["육아휴직","출근"]; // 정식 유형이 없어 "기타"로 분류되지만 일정 목록에선 제외해야 하는 항목
-    var upcoming=(DATA.schedule||[]).concat((DATA.meetings||[]).map(function(m2){return {start:m2.date, title:(m2.summary||m2.title)};}))
+    var upcoming=(DATA.schedule||[])
       .filter(function(e){ return (e.start||e.date)===selIso; })
       .filter(function(e){
         if(ATT_GROUP[e.type]) return false; // 휴가/오전반차/오후반차/병가/공가/건강검진/외출/재택근무는 근태 4칸에서 별도 표시
