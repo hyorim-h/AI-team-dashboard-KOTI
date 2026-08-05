@@ -257,8 +257,11 @@
         <label class="fld"><span>과제</span><select id="edProject"></select></label>
         <label class="fld"><span>담당자</span><select id="edOwner"></select></label>
       </div>
-      <div class="fld-row3">
+      <div class="fld-row">
         <label class="fld"><span>일자</span><input type="date" id="edDate"></label>
+        <label class="fld"><span>종료일 (선택 · 출장 등 기간)</span><input type="date" id="edDateEnd"></label>
+      </div>
+      <div class="fld-row">
         <label class="fld"><span>시간</span><input type="text" id="edTime" placeholder="예) 14:00"></label>
         <label class="fld"><span>상태</span><select id="edStatus"></select></label>
       </div>
@@ -310,6 +313,12 @@
     var p=ymd.split("-"); var d=new Date(ymd+"T00:00:00");
     var dows=["일","월","화","수","목","금","토"];
     return (+p[1])+"."+("0"+(+p[2])).slice(-2)+"("+dows[d.getDay()]+")";
+  }
+  // 종료일이 시작일과 다르면 "07.27(월)~07.29(수)" 범위로, 아니면 하루짜리 그대로 표시 (출장 등 기간 항목용)
+  function fmtDateRange(r){
+    if(!r || !r.date) return "-";
+    if(r.dateEnd && r.dateEnd !== r.date) return fmtDateDow(r.date) + "~" + fmtDateDow(r.dateEnd);
+    return fmtDateDow(r.date);
   }
   function z(n){ return (n<10?"0":"")+n; }
   function ymd(d){ return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate()); }
@@ -478,7 +487,7 @@
         + '<td class="col-no">'+(i+1)+'</td>'
         + '<td>'+ptag(r.project)+'</td>'
         + '<td class="'+titleCls+'">'+esc(r.title)+'</td>'
-        + '<td class="t-sub">'+fmtDateDow(r.date)+(r.time?", "+esc(r.time):"")+'</td>'
+        + '<td class="t-sub">'+fmtDateRange(r)+(r.time?", "+esc(r.time):"")+'</td>'
         + '<td class="t-sub">'+esc(r.location||"-")+'</td>'
         + '<td class="t-sub">'+esc(r.modifier||"-")+'</td>'
         + '<td>'+stt+'</td>'
@@ -504,7 +513,7 @@
         + '<td class="col-no">'+(i+1)+'</td>'
         + '<td>'+ptag(r.project)+'</td>'
         + '<td class="t-title">'+esc(r.title)+'</td>'
-        + '<td class="t-sub">'+fmtDateDow(r.date)+(r.time?", "+esc(r.time):"")+'</td>'
+        + '<td class="t-sub">'+fmtDateRange(r)+(r.time?", "+esc(r.time):"")+'</td>'
         + '<td class="t-sub">'+esc(r.location||"-")+'</td>'
         + '<td class="t-sub">'+esc(r.writer||"-")+'</td>'
         + '<td>'+stt+'</td>'
@@ -632,7 +641,7 @@
       +'<div class="v-grid">'
       +'<div class="v-item"><div class="v-lab">과제</div><div class="v-val">'+esc(r.project||"-")+'</div></div>'
       +'<div class="v-item"><div class="v-lab">담당자</div><div class="v-val">'+esc(owner)+'</div></div>'
-      +'<div class="v-item"><div class="v-lab">일시</div><div class="v-val">'+fmtDateDow(r.date)+(r.time?", "+esc(r.time):"")+'</div></div>'
+      +'<div class="v-item"><div class="v-lab">일시</div><div class="v-val">'+fmtDateRange(r)+(r.time?", "+esc(r.time):"")+'</div></div>'
       +'<div class="v-item"><div class="v-lab">상태</div><div class="v-val">'+esc(curStatusText(r,isPlan))+'</div></div>'
       +'<div class="v-item"><div class="v-lab">장소</div><div class="v-val">'+esc(r.location||"-")+'</div></div>'
       +'<div class="v-item"><div class="v-lab">참석자</div><div class="v-val">'+esc(r.attendees||"-")+'</div></div>'
@@ -674,6 +683,7 @@
     fillSelect(document.getElementById("edProject"), PROJECTS, r.project||"");
     fillSelect(document.getElementById("edOwner"), [""].concat(OWNERS), (isPlan?r.writer:r.modifier)||"");
     document.getElementById("edDate").value = r.date||"";
+    document.getElementById("edDateEnd").value = r.dateEnd||"";
     document.getElementById("edTime").value = r.time||"";
     // 상태 옵션
     var stOpts = isPlan ? ["예정","완료","수정됨"] : ["","삭제필요"];
@@ -710,11 +720,17 @@
     if(!title){ st.className="estatus status show err"; st.textContent="제목을 입력하세요."; return; }
     var who=document.getElementById("edOwner").value;
     var selStatus=document.getElementById("edStatus").value;
+    var dateEndVal = document.getElementById("edDateEnd").value;
+    var dateVal = document.getElementById("edDate").value;
+    if(dateEndVal && dateVal && dateEndVal < dateVal){
+      st.className="estatus status show err"; st.textContent="종료일이 일자보다 빠를 수 없습니다."; return;
+    }
     var item={
       id: EDIT.id,
       title: title,
       project: document.getElementById("edProject").value,
-      date: document.getElementById("edDate").value,
+      date: dateVal,
+      dateEnd: dateEndVal,
       time: document.getElementById("edTime").value.trim(),
       location: document.getElementById("edLocation").value.trim(),
       content: document.getElementById("edContent").value.trim(),
@@ -940,8 +956,8 @@
   var PROJECT_ORDER = ["국가교통조사사업","자율주행R&D","탄소공간지도R&D","교통SOC R&D","데이터스페이스R&D","기타"];
 
   function wDateTimeLoc(it){
-    var dt = it.date ? (fmtDateDow(it.date) + (it.time ? " " + it.time : "")) : "";
-    if(dt && it.location) return dt + " · " + it.location;
+    var dt = it.date ? (fmtDateRange(it) + (it.time ? " " + it.time : "")) : "";
+    if(dt && it.location) return dt + ", " + it.location;
     return dt || it.location || "";
   }
   function hwpxGroupByProject(items){
@@ -978,7 +994,7 @@
       var plans = hwpxGroupByProject(donePlans);
       var res = await fetch(WORKER_URL, {
         method: "POST", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ action:"downloadHwpx", achievements: achievements, plans: plans })
+        body: JSON.stringify({ action:"downloadHwpx", achievements: achievements, plans: plans, weekOffset: WEEK_OFFSET })
       });
       var data = await res.json();
       if(!data.ok) throw new Error(data.error || "생성 실패");

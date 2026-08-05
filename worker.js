@@ -107,15 +107,24 @@ function bytesToBase64(bytes) {
 }
 
 // 주간업무 데이터(achievements/plans, 과제별로 이미 그룹핑된 배열)로 실제 HWPX 파일 바이트를 생성
-async function generateWeeklyHwpx(achievements, plans) {
+async function generateWeeklyHwpx(achievements, plans, wkR) {
   const res = await fetch(WEEKLY_HWPX_TEMPLATE_URL);
   if (!res.ok) throw new Error("HWPX 템플릿을 불러올 수 없습니다: HTTP " + res.status);
   const templateBytes = new Uint8Array(await res.arrayBuffer());
   const zip = self.fflate.unzipSync(templateBytes);
 
   const dec = new TextDecoder("utf-8"), enc = new TextEncoder();
-  const section0 = dec.decode(zip["Contents/section0.xml"]);
+  let section0 = dec.decode(zip["Contents/section0.xml"]);
   const header = dec.decode(zip["Contents/header.xml"]);
+
+  // 표지의 날짜범위("YYYY.MM.DD. ~ YYYY.MM.DD.")와 주차("(N주차)")는 템플릿에 고정 텍스트로 박혀있어서
+  // 실적/계획 본문과 달리 지금까지 자동으로 안 바뀌고 있었음 — 패턴 매칭으로 실제 값으로 치환
+  if(wkR){
+    const toDot = function(ymd){ return ymd.replace(/-/g, ".") + "."; };
+    const coverDateText = toDot(wkR.start) + " ~ " + toDot(wkR.end);
+    section0 = section0.replace(/\d{4}\.\d{2}\.\d{2}\.\s*~\s*\d{4}\.\d{2}\.\d{2}\./, coverDateText);
+    section0 = section0.replace(/\(\d+주차\)/, "(" + wkR.weekNum + "주차)");
+  }
 
   const startMarker = '<hp:p id="2147483648" paraPrIDRef="82"';
   const startIdx = section0.indexOf(startMarker);
@@ -403,6 +412,7 @@ async function parseWorkPage(page, token, isPlan){
   const titleList = (p["제목"] && p["제목"].title) || [];
   const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
   const date = (p["날짜"] && p["날짜"].date && p["날짜"].date.start) || "";
+  const dateEnd = (p["날짜"] && p["날짜"].date && p["날짜"].date.end) || "";
   const timeRt = (p["시간"] && p["시간"].rich_text) || [];
   const time = timeRt.map(function(t){return t.plain_text;}).join("");
   const attendRt = (p["참석자"] && p["참석자"].rich_text) || [];
@@ -430,7 +440,7 @@ async function parseWorkPage(page, token, isPlan){
   var gcalId = gcalRt.map(function(t){return t.plain_text;}).join("");
 
   return {
-    id: page.id, title: title, date: date, time: time,
+    id: page.id, title: title, date: date, dateEnd: dateEnd, time: time,
     project: proj, attendees: attendees, week: week,
     location: location, content: body,
     status: status, writer: writer, modified: modified, modifier: modifier,
@@ -900,7 +910,7 @@ function currentWeekRange(offsetWeeks){
   var awn=isoWeekNumSrv(aStart)-1, pwn=isoWeekNumSrv(pStart)-1;
   return {
     // 실적주(오프셋 적용된 기준주)
-    start: aStart, end: aEnd, label: aStart+" ~ "+aEnd.slice(5)+" ("+awn+"주차)",
+    start: aStart, end: aEnd, weekNum: awn, label: aStart+" ~ "+aEnd.slice(5)+" ("+awn+"주차)",
     // 계획주(기준주+1주) — 캘린더 동기화·PDF 계획 읽기는 오프셋 없이(실제 현재) 이 범위를 대상으로 함
     planStart: pStart, planEnd: pEnd, planLabel: pStart+" ~ "+pEnd.slice(5)+" ("+pwn+"주차)"
   };
@@ -1075,7 +1085,7 @@ async function updateWork(env, payload){
     "수정일시": { rich_text: rt(now) },
   };
   if(item.project) props["과제"] = { select: { name: item.project } };
-  if(item.date) props["날짜"] = { date: { start: item.date } };
+  if(item.date) props["날짜"] = { date: { start: item.date, end: item.dateEnd || null } };
 
   if(isPlan){
     // 업무계획 상태 로직:
@@ -1123,7 +1133,7 @@ async function createWork(env, payload){
     "수정일시": { rich_text: rt(item.now || "") },
   };
   if(item.project) props["과제"] = { select: { name: item.project } };
-  if(item.date) props["날짜"] = { date: { start: item.date } };
+  if(item.date) props["날짜"] = { date: { start: item.date, end: item.dateEnd || null } };
   if(isPlan){
     // 업무계획 추가 → 자동 "완료" (사용자가 삭제필요 아닌 다른 상태 명시하면 존중)
     var planStatus = (item.status && item.status!=="예정") ? item.status : "완료";
@@ -1845,7 +1855,8 @@ export default {
         } else if(payload.action === "consignRequestAddImage"){
           result = await consignRequestAddImage(env, payload);
         } else if(payload.action === "downloadHwpx"){
-          const hwpxBytes = await generateWeeklyHwpx(payload.achievements || [], payload.plans || []);
+          const wkR = currentWeekRange(payload.weekOffset || 0);
+          const hwpxBytes = await generateWeeklyHwpx(payload.achievements || [], payload.plans || [], wkR);
           result = { hwpxBase64: bytesToBase64(hwpxBytes) };
         } else if(payload.action === "consignRequestUpdate"){
           result = await updateConsignRequest(env, payload);
