@@ -188,12 +188,19 @@
   .cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px;text-align:center}
   .cal-dow div{font-size:11.5px;font-weight:700;color:var(--text-2)}
   .cal-dow .sun{color:var(--red)} .cal-dow .sat{color:var(--blue)}
-  .cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
-  .cal-cell{height:128px;border:1px solid var(--line);border-radius:6px;padding:6px 7px;background:var(--surface);overflow:hidden}
+  .cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px;position:relative}
+  .cal-cell{min-height:128px;border:1px solid var(--line);border-radius:6px;padding:6px 7px;background:var(--surface);overflow:hidden}
   .cal-cell.out{background:var(--bg);opacity:.5}
   .cal-cell.thisweek{background:var(--blue-soft);border-color:var(--line-2)}
   .cal-cell .dnum{font-size:11.5px;font-weight:700;color:var(--text-2);margin-bottom:4px;line-height:1.2}
   .cal-cell .dnum.sun{color:var(--red)} .cal-cell .dnum.sat{color:var(--blue)}
+  .cal-bars{position:absolute;left:0;right:0;top:0;bottom:0;pointer-events:none;z-index:2}
+  .cal-bar{position:absolute;height:18px;line-height:18px;border-radius:4px;font-size:10.5px;font-weight:700;
+    padding:0 8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;pointer-events:auto;
+    box-sizing:border-box;transition:filter .12s}
+  .cal-bar:hover{filter:brightness(.94)}
+  .cal-bar.cont-l{border-top-left-radius:0;border-bottom-left-radius:0}
+  .cal-bar.cont-r{border-top-right-radius:0;border-bottom-right-radius:0}
   .evchip{display:block;font-size:10.5px;font-weight:700;padding:3px 6px;border-radius:4px;margin-bottom:3px;line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:filter .12s}
   .evchip:hover{filter:brightness(.94)}
@@ -357,15 +364,15 @@
     "출장":{c:"#0f766e",bg:"#d9f0ec"},
     "외출":{c:"#7c3aed",bg:"#efe8fb"},
     "휴가":{c:"#b45309",bg:"#fdeede"},
-    "재택근무":{c:"#0369a1",bg:"#e0f2fe"},
+    "공가":{c:"#0369a1",bg:"#e0f2fe"},
     "기타":{c:"#5a6680",bg:"#eef1f6"}
   };
   var OWNERS = ["이종우","전준수","이채영","한효림","김예원","정승환","심지윤","정정호","이숭봉"];
-  var TYPES = ["과제","출장","외출","휴가","재택근무","기타"];           // 필터용 (기존 출장 데이터도 필터 가능해야 함)
-  var EDIT_TYPES = ["과제","출장","외출","휴가","재택근무","기타"];             // 출장도 직접 선택 (참석자 자동전환 제거)
+  var TYPES = ["과제","출장","외출","휴가","기타"];           // 필터용 (기존 출장 데이터도 필터 가능해야 함)
+  var EDIT_TYPES = ["과제","출장","외출","휴가","기타"];             // 출장도 직접 선택 (참석자 자동전환 제거)
   var PERSON_OPTIONS = ["-"].concat(OWNERS);
   var VACATIONS = ["휴가","오전반차","오후반차","공가","병가","건강검진"];
-  var ATT_TYPES = VACATIONS.concat(["외출","재택근무"]); // 제목이 "유형(이름)"로 자동 구성되는 유형
+  var ATT_TYPES = VACATIONS.concat(["외출"]); // 제목이 "유형(이름)"로 자동 구성되는 유형
   // 사유(내용) 텍스트를 보고 휴가 구분 자동 판단 (건강검진/오전반차/오후반차/병가/공가/그 외→휴가)
   var VAC_KEYWORDS = [
     { kw: "건강검진", vac: "건강검진" },
@@ -443,11 +450,10 @@
     if(ev.type==="과제") return (t?t+" ":"")+ev.title;               // 과제는 색으로만 구분, 과제명 프리픽스 없음
     if(ev.type==="외출") return (t?t+" ":"")+"외출("+sh+")";
     if(ev.type==="휴가") return (ev.vacation||"휴가")+"("+sh+")";
-    if(ev.type==="재택근무") return "재택("+sh+")";
     return (t?t+" ":"")+ev.title; // 출장·기타
   }
-  // 날짜 안 정렬 순위: 휴가/외출/재택근무 최상단, 과제·출장 중간, 기타 최하단
-  var TYPE_ORDER = { "휴가":0, "외출":0, "재택근무":0, "과제":1, "출장":1, "기타":2 };
+  // 날짜 안 정렬 순위: 휴가/외출 최상단, 과제·출장 중간, 기타 최하단
+  var TYPE_ORDER = { "휴가":0, "외출":0, "과제":1, "출장":1, "기타":2 };
   function sortDayEvents(list){
     return list.slice().sort(function(a,b){
       var oa=(TYPE_ORDER[a.type]!==undefined)?TYPE_ORDER[a.type]:1;
@@ -483,13 +489,60 @@
     var first=new Date(y,m-1,1);
     var startDow=first.getDay();
     var daysInMonth=new Date(y,m,0).getDate();
-    var weeks=Math.ceil((startDow+daysInMonth)/7);
+    var weeksCount=Math.ceil((startDow+daysInMonth)/7);
     var wk=thisWeek();
     var evs=visibleEvents();
     var gridStart=new Date(y,m-1,1-startDow);
     var html="";
-    for(var w=0; w<weeks; w++){
+    var BAR_H=19, BAR_GAP=3;   // 막대 높이, 레인 사이 간격
+    var CELL_PAD_TOP=6;        // .cal-cell padding-top(css)와 반드시 일치해야 함
+    var DNUM_H=18;             // 날짜숫자 블록 높이(margin-bottom 포함) — 칩이 dnum 바로 뒤에 붙는 간격과 동일한 기준
+    var GAP_BOTTOM=4;          // 막대 마지막 줄과 칩 사이 간격
+    var BAR_TOP=CELL_PAD_TOP+DNUM_H; // 막대의 절대 top(px, 칸 "테두리" 기준 — 패딩까지 포함해서 계산)
+    var COLS=7, GAP_PX=6; // .cal-week grid-template-columns(7) / gap(6px)와 반드시 일치해야 함
+    var CELL_PAD_X=7;     // .cal-cell 좌우 패딩(css) — 칩이 안쪽으로 들어가는 만큼 막대 시작/끝에도 동일하게 적용
+    // 그리드 gap(6px)까지 반영한 정확한 컬럼 좌표(퍼센트만으로는 gap이 누적되어 오른쪽으로 갈수록 밀려남)
+    function colLeftExpr(i){ return (i/COLS*100).toFixed(4) + "% + " + (i*GAP_PX/COLS).toFixed(4) + "px"; }
+    function colWidthExpr(n){ return (n/COLS*100).toFixed(4) + "% + " + (n*GAP_PX/COLS - GAP_PX).toFixed(4) + "px"; }
+
+    for(var w=0; w<weeksCount; w++){
+      var weekStartDate=new Date(gridStart); weekStartDate.setDate(gridStart.getDate()+w*7);
+      var weekStart=iso(weekStartDate);
+      var weekEndDate=new Date(weekStartDate); weekEndDate.setDate(weekStartDate.getDate()+6);
+      var weekEnd=iso(weekEndDate);
+
+      // 이 주와 겹치는 "여러 날" 일정 → 막대(bar)로, 겹치면 레인(줄)을 나눠서 쌓음(시작일 빠른 순으로 배정)
+      var multiEvs = evs.filter(function(ev){ return isMulti(ev) && overlaps(ev, weekStart, weekEnd); })
+        .sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
+      var laneEnd=[]; // laneEnd[i] = 그 레인에서 마지막으로 채워진 요일 컬럼(0~6)
+      var placed = multiEvs.map(function(ev){
+        var s = ev.start<weekStart ? weekStart : ev.start;
+        var e = endOf(ev)>weekEnd ? weekEnd : endOf(ev);
+        var sCol = Math.round((parseYMD(s)-parseYMD(weekStart))/86400000);
+        var eCol = Math.round((parseYMD(e)-parseYMD(weekStart))/86400000);
+        var lane=0;
+        while(laneEnd[lane]!==undefined && laneEnd[lane]>=sCol) lane++;
+        laneEnd[lane]=eCol;
+        return { ev:ev, sCol:sCol, eCol:eCol, lane:lane, contL: ev.start<weekStart, contR: endOf(ev)>weekEnd };
+      });
+      // 요일 컬럼별 실제 필요한 여백 계산: 그 컬럼을 지나는 막대 중 "가장 높은 레인"까지만 공간을 확보(막대 없는 날은 0)
+      var barsCoverCol=[0,0,0,0,0,0,0], laneMaxCol=[-1,-1,-1,-1,-1,-1,-1];
+      placed.forEach(function(p){
+        for(var c=p.sCol;c<=p.eCol;c++){ barsCoverCol[c]++; if(p.lane>laneMaxCol[c]) laneMaxCol[c]=p.lane; }
+      });
+      var barsHtml = placed.map(function(p){
+        var st=evStyle(p.ev);
+        var cls="cal-bar"+(p.contL?" cont-l":"")+(p.contR?" cont-r":"");
+        // 실제 시작일(이전 주에서 이어진 게 아님)엔 칩과 같은 좌측 여백을, 실제 종료일엔 우측 여백을 줌(이어지는 쪽은 여백 없이 그대로 붙임)
+        var insetL = p.contL ? 0 : CELL_PAD_X;
+        var insetR = p.contR ? 0 : CELL_PAD_X;
+        var leftCss = "calc(" + colLeftExpr(p.sCol) + (insetL? " + "+insetL+"px" : "") + ")";
+        var widthCss = "calc(" + colWidthExpr(p.eCol-p.sCol+1) + (insetL+insetR? " - "+(insetL+insetR)+"px" : "") + ")";
+        return '<div class="'+cls+'" data-id="'+esc(p.ev.id)+'" style="left:'+leftCss+';width:'+widthCss+';top:'+(BAR_TOP+p.lane*(BAR_H+BAR_GAP))+'px;color:'+st.c+';background:'+st.bg+'">'+esc(evLabel(p.ev))+'</div>';
+      }).join("");
+
       html+='<div class="cal-week">';
+      if(barsHtml) html+='<div class="cal-bars">'+barsHtml+'</div>';
       for(var i=0;i<7;i++){
         var d=new Date(gridStart); d.setDate(gridStart.getDate()+w*7+i);
         var dIso=iso(d);
@@ -499,23 +552,30 @@
         var dowc=(i===0?" sun":(i===6?" sat":""));
         var chips="";
         if(inMonth){
-          var dayEvs = sortDayEvents(evs.filter(function(ev){return containsDay(ev,dIso);}));
-          var MAX_CHIPS = 3;
-          dayEvs.slice(0,MAX_CHIPS).forEach(function(ev){
+          // 여러 날 일정(막대로 이미 표시됨)은 칸 안 목록에서 제외 — 하루짜리 일정만 칩으로 표시
+          var dayEvs = sortDayEvents(evs.filter(function(ev){return !isMulti(ev) && containsDay(ev,dIso);}));
+          // 하루 최대 3개 표시 규칙에 막대도 포함(막대가 이미 슬롯을 차지한 만큼 칩 표시 개수를 줄임)
+          var MAX_TOTAL = 3;
+          var availSlots = Math.max(0, MAX_TOTAL - barsCoverCol[i]);
+          dayEvs.slice(0,availSlots).forEach(function(ev){
             var st=evStyle(ev);
             chips+='<div class="evchip" data-id="'+esc(ev.id)+'" style="color:'+st.c+';background:'+st.bg+'">'+esc(evLabel(ev))+'</div>';
           });
-          if(dayEvs.length>MAX_CHIPS){
-            chips+='<div class="evchip evmore" data-more-date="'+dIso+'">+'+(dayEvs.length-MAX_CHIPS)+'건 더보기</div>';
+          if(dayEvs.length>availSlots){
+            chips+='<div class="evchip evmore" data-more-date="'+dIso+'">+'+(dayEvs.length-availSlots)+'건 더보기</div>';
           }
         }
         var dattr = inMonth ? ' data-date="'+dIso+'"' : '';
-        html+='<div class="'+cls+'"'+dattr+'><div class="dnum'+dowc+'">'+d.getDate()+'</div>'+chips+'</div>';
+        // 이 컬럼을 실제로 지나는 막대가 있을 때만 그 레인 수만큼 여백 확보(막대 없는 날은 0 — 주 전체가 아니라 요일별로 계산)
+        var rowsForCol = laneMaxCol[i]+1;
+        var colBarsAreaH = rowsForCol>0 ? (rowsForCol*(BAR_H+BAR_GAP) - BAR_GAP + GAP_BOTTOM) : 0;
+        var spacer = colBarsAreaH ? '<div style="height:'+colBarsAreaH+'px"></div>' : '';
+        html+='<div class="'+cls+'"'+dattr+'><div class="dnum'+dowc+'">'+d.getDate()+'</div>'+spacer+chips+'</div>';
       }
       html+='</div>';
     }
     var legend=PROJECTS.map(function(p){ var st=PROJ_STYLE[p]; return '<span class="lg"><span class="dot" style="background:'+st.c+'"></span>'+esc(PROJ_SHORT[p])+'</span>'; }).join("")
-      + ["휴가","외출","출장","재택근무"].map(function(t){ var st=TYPE_STYLE[t]; return '<span class="lg"><span class="dot" style="background:'+st.c+'"></span>'+t+'</span>'; }).join("");
+      + ["휴가","외출","출장"].map(function(t){ var st=TYPE_STYLE[t]; return '<span class="lg"><span class="dot" style="background:'+st.c+'"></span>'+t+'</span>'; }).join("");
     var dow=DOW.map(function(x,i){ return '<div class="'+(i===0?"sun":(i===6?"sat":""))+'">'+x+'</div>'; }).join("");
     return '<div class="cal">'
       +'<div class="cal-h"><div class="cal-ttl"><span class="bar"></span><h3>팀 캘린더</h3><span class="hint">파란 음영이 이번 주입니다</span></div>'
@@ -528,17 +588,41 @@
     var t=startTime(ev);
     if(ev.type==="출장") return isMulti(ev)?(fmtMD(ev.start)+" ~ "+fmtMD(ev.end)):fmtMDW(ev.start);
     if(ev.type==="외출") return fmtMDW(ev.start)+(t?" "+t:"");
-    if(ev.type==="휴가") return (isMulti(ev)?(fmtMD(ev.start)+" ~ "+fmtMD(ev.end)):fmtMDW(ev.start))+" · "+(ev.vacation||"휴가");
-    return isMulti(ev)?(fmtMD(ev.start)+" ~ "+fmtMD(ev.end)):fmtMDW(ev.start); // 재택근무
+    var base = isMulti(ev)?(fmtMD(ev.start)+" ~ "+fmtMD(ev.end)):fmtMDW(ev.start);
+    // "공가" 카드 안에서는 병가/공가/건강검진을 설명으로 구분 표시, "휴가" 카드(휴가/오전·오후반차)는 구분 생략
+    if(ev.type==="휴가" && VAC_SEPARATE_SUB.indexOf(ev.vacation)>=0) return base+" · "+ev.vacation;
+    return base;
   }
   // 출장은 "일정 이름, (장소)" 배치, 그 외는 장소만
+  // 제목 끝의 "(이름)"은 위쪽에 담당자로 이미 표시되므로, 근태카드 설명에서는 떼어냄(정보 중복 방지)
+  function schedShortNameJS(o){ return (o && o.length>=3) ? o.slice(1) : o; }
+  function isKnownOwnerToken(t){
+    t = (t||"").trim();
+    return OWNERS.indexOf(t)>=0 || OWNERS.some(function(o){ return schedShortNameJS(o)===t; });
+  }
+  function stripNameParen(title){
+    var s = (title||"").trim();
+    var m = s.match(/^(.*)\(([^()]+)\)\s*$/);
+    if(!m) return s;
+    var names = m[2].split(/[,\s]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+    if(names.length && names.every(isKnownOwnerToken)) return m[1].trim();
+    return s;
+  }
   function attDesc(ev){
-    if(ev.type==="출장") return ev.title + (ev.location ? " ("+ev.location+")" : "");
+    if(ev.type==="출장") return stripNameParen(ev.title) + (ev.location ? " ("+ev.location+")" : "");
     return ev.location || "";
+  }
+  // "휴가" 카드는 휴가/오전반차/오후반차, "공가" 카드는 병가/공가/건강검진을 묶어서 표시(카드 안에서 설명으로 구분)
+  var VAC_HYUGA_SUB = ["휴가","오전반차","오후반차"];
+  var VAC_SEPARATE_SUB = ["병가","공가","건강검진"];
+  function attTypeMatch(type, ev){
+    if(type==="공가") return ev.type==="휴가" && VAC_SEPARATE_SUB.indexOf(ev.vacation)>=0;
+    if(type==="휴가") return ev.type==="휴가" && VAC_HYUGA_SUB.indexOf(ev.vacation||"휴가")>=0;
+    return ev.type===type;
   }
   function attCard(type, wkEvents){
     var st=TYPE_STYLE[type];
-    var list=wkEvents.filter(function(e){return e.type===type;});
+    var list=wkEvents.filter(function(e){return attTypeMatch(type,e);});
     var rows=list.length ? list.map(function(ev){
       var nm=displayPerson(ev);
       return '<div class="att-row" data-id="'+esc(ev.id)+'">'
@@ -593,7 +677,7 @@
     var wkEvents=visibleEvents().filter(function(ev){return overlaps(ev,wk.start,wk.end);});
     document.getElementById("visCnt").textContent=wkEvents.length;
 
-    var attTypes=["출장","외출","휴가","재택근무"];
+    var attTypes=["출장","외출","휴가","공가"];
     var attHtml='<div class="att-h"><span class="bar"></span><h3>이번 주 근태 현황</h3><span class="wk">'+fmtMD(wk.start)+"~"+fmtMD(wk.end)+'</span></div>'
       +'<div class="att-grid">'+attTypes.map(function(t){return attCard(t,wkEvents);}).join("")+'</div>';
 
@@ -661,7 +745,7 @@
     var attInput=document.getElementById("edAttendees");
     if(attInput) attInput.placeholder = isAtt ? "예) 효림, 준수 (2명 이상이면 콤마로 구분)" : "예) 효림, 준수 (입력 시 출장으로 등록됩니다)";
     document.getElementById("wrapTime").style.display=(t==="휴가")?"none":"";
-    document.getElementById("labTitle").textContent=(t==="과제"||t==="기타"||t==="재택근무")?"내용":"사유";
+    document.getElementById("labTitle").textContent=(t==="과제"||t==="기타")?"내용":"사유";
     var titleEl=document.getElementById("edTitle");
     titleEl.placeholder=(t==="휴가")?"예) 건강검진 / 오전 반차 / 병가 등 (입력 내용으로 자동 구분됩니다)":"일정 내용";
     document.getElementById("labDetail").textContent=(t==="과제")?"장소·기관":"비고";
@@ -716,7 +800,7 @@
     var attRaw = document.getElementById("edAttendees").value.trim();
     var attendees = attRaw ? normalizeAttendees(attRaw) : "";
     var personVal=document.getElementById("edPerson").value;
-    // 휴가/외출/재택근무: 여러 명이면 "대상자"(참석자 필드)에 콤마로, 한 명이면 담당자 드롭다운으로 — 둘 중 하나는 있어야 함(제목에 이름이 들어가야 하므로)
+    // 휴가/외출: 여러 명이면 "대상자"(참석자 필드)에 콤마로, 한 명이면 담당자 드롭다운으로 — 둘 중 하나는 있어야 함(제목에 이름이 들어가야 하므로)
     var personFinal = (personVal==="-") ? "" : personVal;
     if(isAttType){
       if(attendees) personFinal = attendees; // 여러 명 지정 시 이걸 이름 자리에 사용(자동으로 풀네임 정규화됨)

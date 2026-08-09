@@ -120,7 +120,7 @@
   /* 모달 */
   .ov{display:none;position:fixed;inset:0;background:rgba(10,20,45,.5);z-index:300;align-items:center;justify-content:center;padding:20px}
   .ov.open{display:flex}
-  .modal{background:var(--surface);border-radius:10px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;
+  .modal{background:var(--surface);border-radius:10px;width:100%;max-width:860px;max-height:90vh;overflow-y:auto;
     box-shadow:0 20px 60px rgba(0,0,0,.3);animation:mpop .16s ease}
   @keyframes mpop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   .modal-head{background:var(--navy);color:#fff;font-size:16px;font-weight:800;padding:16px 22px;
@@ -139,6 +139,8 @@
   .fld input,.fld select,.fld textarea{border:1px solid var(--line-2);border-radius:6px;padding:9px 11px;font-size:13.5px;
     background:var(--surface);color:var(--text);font-family:inherit;resize:vertical}
   .fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(44,95,191,.13)}
+  .agenda-edit{width:100%;min-height:180px;border:1px solid var(--line-2);border-radius:6px;padding:11px 13px;font-size:13px;
+    background:var(--surface);color:var(--text);font-family:inherit;resize:vertical;line-height:1.7;white-space:pre}
   .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .fld-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
   /* 체크리스트 */
@@ -156,6 +158,13 @@
     padding:8px;font-size:12.5px;font-weight:700;cursor:pointer;margin-top:4px}
   .chk-add:hover{background:var(--blue-soft)}
   .estatus{margin:0}
+  .edit-hint{font-size:11px;color:var(--muted);margin-bottom:7px}
+  .crop-block{border:1px solid var(--line-2);border-radius:6px;padding:8px;margin-bottom:8px}
+  .crop-block .crop-tools{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
+  .crop-canvas-wrap{position:relative;max-width:100%;overflow:auto;border:1px dashed var(--line-2);cursor:crosshair}
+  .crop-canvas-wrap canvas{display:block;max-width:100%}
+  .crop-sel{position:absolute;border:2px solid #2c5fbf;background:rgba(44,95,191,.15);pointer-events:none}
+  .crop-status{font-size:11px;color:var(--muted)}
   .status{font-size:13px;padding:9px 13px;border-radius:6px;display:none}
   .status.show{display:block}
   .status.info{background:var(--blue-soft);color:var(--blue)}
@@ -293,6 +302,7 @@
   .empty-note{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:28px;text-align:center;font-size:12.5px;color:var(--muted)}
 </style>
 </head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <body>
 <div class="utilbar"><div class="in">
   <a href="https://www.koti.re.kr" target="_blank" rel="noopener">한국교통연구원</a>
@@ -348,40 +358,20 @@
   </div>
 </div>
 
-<div class="lightbox" id="lightbox">
-  <div>
-    <img id="lightboxImg" src="" alt="">
-    <div class="cap" id="lightboxCap"></div>
-  </div>
-</div>
-
-<div class="ov" id="reqOv">
-  <div class="modal">
-    <div class="modal-head"><span id="reqHead">요청자료 상세</span><button class="x" id="reqX">×</button></div>
-    <div class="modal-body" id="reqBody"></div>
-    <div class="modal-foot" id="reqFoot"></div>
-  </div>
-</div>
-
 <script>
   var WORKER_URL = "https://notion-proxy.ekqls0458.workers.dev";
   var KIND_LIST = ["월간회의","실무진회의","보고","기타"];
   var KIND_STYLE = { "월간회의":{c:"#fff",bg:"#16265e"}, "실무진회의":{c:"#2c5fbf",bg:"#e8eefb"}, "보고":{c:"#8a3fb0",bg:"#f3e8fa"}, "기타":{c:"#5a6680",bg:"#eef1f6"} };
   var MSTATUS_STYLE = { "완료":{c:"#fff",bg:"#1f8a5b"}, "예정":{c:"#b9770a",bg:"#fff4e0"} };
   var MODE_STYLE = { "화상":{c:"#3a5bbf",bg:"#eef2fb"}, "대면":{c:"#3f7a5a",bg:"#eef3ef"} };
-  var CAT_LIST = ["연구진행","발표자료","회의자료","기타"];
-  var CAT_STYLE = { "연구진행":{c:"#2c5fbf",bg:"#e8eefb"}, "발표자료":{c:"#7a4ec2",bg:"#efeafa"}, "회의자료":{c:"#1f8a5b",bg:"#eafaf0"}, "기타":{c:"#5a6680",bg:"#eef1f6"} };
-  var RSTATUS_STYLE = { "회신완료":{c:"#fff",bg:"#1f8a5b"}, "검토중":{c:"#b9770a",bg:"#fff4e0"} };
   var DOW = ["일","월","화","수","목","금","토"];
 
-  var DATA = { consignments:[], meetings:[], requests:[] };
+  var DATA = { consignments:[], meetings:[] };
   var YEAR = new Date().getFullYear();
   var SEL = null;
-  var VIEW = "meetings";
   var MFILTER = { search:"", type:"전체", status:"전체" };
-  var RFILTER = { search:"", category:"전체", status:"전체" };
   var MEDIT = { id:null, mode:"view" };
-  var REDIT = { id:null, mode:"view", qa:[] };
+  var pendingConsignImages = []; // [{ dataUrl, filename }] — PDF에서 크롭해 담아둔 표/그림, 저장 시 함께 업로드
 
   function esc(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   // 규칙 기반 핵심 문구 강조: [결정]/[요청]/[이슈]/[완료]/[중요] 태그가 붙은 문장 + 숫자·단위(%, 시간, 건, 명, 원 등)
@@ -420,8 +410,6 @@
   function kindBadge(k){ var st=KIND_STYLE[k]||KIND_STYLE["기타"]; return "<span class=\"kindb\" style=\"color:"+st.c+";background:"+st.bg+"\">"+esc(k)+"</span>"; }
   function mstatBadge(s){ var st=MSTATUS_STYLE[s]||MSTATUS_STYLE["예정"]; return "<span class=\"kindb\" style=\"color:"+st.c+";background:"+st.bg+"\">"+esc(s)+"</span>"; }
   function modeBadge(m){ var st=MODE_STYLE[m]||MODE_STYLE["대면"]; return "<span class=\"kindb\" style=\"color:"+st.c+";background:"+st.bg+"\">"+esc(m)+"</span>"; }
-  function catTag(c){ return tagSpan(c, CAT_STYLE[c]||CAT_STYLE["기타"]); }
-  function rstatBadge(s){ var st=RSTATUS_STYLE[s]||RSTATUS_STYLE["검토중"]; return "<span class=\"kindb\" style=\"color:"+st.c+";background:"+st.bg+"\">"+esc(s)+"</span>"; }
 
   function periodYears(c){ return [yearOf(c.start), yearOf(c.end)]; }
   function inYear(c, y){
@@ -440,8 +428,6 @@
   }
   function curConsignment(){ return DATA.consignments.filter(function(c){return c.id===SEL;})[0] || null; }
   function meetingsOf(id){ return DATA.meetings.filter(function(m){return m.project===id;}); }
-  function requestsOf(id){ return DATA.requests.filter(function(r){return r.project===id;}); }
-
   async function load(){
     document.getElementById("content").innerHTML="<div class=\"state\">불러오는 중…</div>";
     try {
@@ -449,9 +435,8 @@
       var data=await res.json();
       DATA.consignments=data.consignments||[];
       DATA.meetings=data.consignMeetings||[];
-      DATA.requests=data.consignRequests||[];
-      DATA.errorSrc = data.consignError ? "위탁과제 정보" : (data.consignMeetingError ? "위탁과제 회의록" : (data.consignRequestError ? "위탁과제 요청자료" : ""));
-      DATA.error = data.consignError || data.consignMeetingError || data.consignRequestError || "";
+      DATA.errorSrc = data.consignError ? "위탁과제 정보" : (data.consignMeetingError ? "위탁과제 회의록" : "");
+      DATA.error = data.consignError || data.consignMeetingError || "";
       var yb=yearBounds();
       if(YEAR<yb[0]) YEAR=yb[1]; if(YEAR>yb[1]) YEAR=yb[1];
       var qProject = new URLSearchParams(location.search).get("project");
@@ -491,12 +476,7 @@
       +"</div>";
   }
 
-  function renderSubtabs(){
-    return "<div class=\"subtabs\">"
-      +"<div class=\"subtab"+(VIEW==="meetings"?" on":"")+"\" data-view=\"meetings\">회의록</div>"
-      +"<div class=\"subtab"+(VIEW==="requests"?" on":"")+"\" data-view=\"requests\">요청자료</div>"
-      +"</div>";
-  }
+
 
   function meetMatches(m){
     if(MFILTER.type!=="전체" && m.kind!==MFILTER.type) return false;
@@ -531,44 +511,6 @@
       +"<tbody>"+rows+"</tbody></table>";
   }
 
-  function reqMatches(r){
-    if(RFILTER.category!=="전체" && r.category!==RFILTER.category) return false;
-    if(RFILTER.status!=="전체" && r.status!==RFILTER.status) return false;
-    var q=(RFILTER.search||"").trim().toLowerCase();
-    if(q){
-      var hay=[r.title].concat((r.qa||[]).map(function(x){return x.q;})).join(" ").toLowerCase();
-      if(hay.indexOf(q)<0) return false;
-    }
-    return true;
-  }
-  // 여러 줄(엔터로 구분)로 작성된 안건 내용 중 목록에서는 첫 줄만 보여줌(상세보기에서는 전체 표시)
-  function firstLine(s){ return (s||"").split(/\r?\n/)[0]; }
-  function renderRequests(){
-    var all=requestsOf(SEL).sort(function(a,b){return (a.reqDate<b.reqDate)?1:-1;});
-    var list=all.filter(reqMatches);
-    var cards=list.length ? list.map(function(r){
-      var qaHtml=(r.qa&&r.qa.length) ? r.qa.map(function(qa,i){
-        return "<div class=\"qa-item\"><span class=\"qa-n\">안건 "+(i+1)+"</span><div class=\"qa-q\">"+esc(firstLine(qa.q))+"</div></div>";
-      }).join("") : "<div class=\"qa-empty\">아직 정리된 문의·답변이 없습니다.</div>";
-      var files="";
-      if(r.reqFile) files+="<span class=\"filechip req\">📤 요청 · "+esc(r.reqFile)+"</span>";
-      if(r.replyFile) files+="<span class=\"filechip reply\">📥 회신 · "+esc(r.replyFile)+"</span>";
-      return "<div class=\"req-card\" data-id=\""+esc(r.id)+"\">"
-        +"<div class=\"req-h\"><div class=\"l\">"+catTag(r.category)+"<span class=\"title\">"+esc(r.title)+"</span></div>"
-        +"<div class=\"r\"><span class=\"meta\">요청 "+fmtYM(r.reqDate)+" · 회신 "+fmtYM(r.replyDate)+"</span>"+rstatBadge(r.status)
-        +"<span class=\"req-edit\" data-edit=\""+esc(r.id)+"\">편집</span></div></div>"
-        +"<div class=\"req-body\">"+(files?"<div class=\"req-files\">"+files+"</div>":"")+qaHtml+"</div></div>";
-    }).join("") : "<div class=\"empty-note\">"+(all.length?"검색·필터 조건에 맞는 자료가 없습니다.":"등록된 자료가 없습니다.")+"</div>";
-    return "<div class=\"sec-h\"><span class=\"sub\">연구진행·발표자료·회의자료 · 총 "+all.length+"건</span>"
-      +"<button class=\"addbtn\" id=\"addReqBtn\">+ 자료 추가</button></div>"
-      +"<div class=\"filterbar\">"
-        +"<input type=\"text\" id=\"rSearch\" placeholder=\"키워드 검색\" style=\"flex:1;max-width:230px;border:1px solid var(--line-2);border-radius:6px;padding:8px 11px;font-size:12.5px\" value=\""+esc(RFILTER.search)+"\">"
-        +"<select id=\"rCategory\"></select><select id=\"rStatus\"></select>"
-        +"<span class=\"cnt\">조회 <b>"+list.length+"</b>건</span>"
-        +"<button class=\"reset\" id=\"rReset\">초기화</button>"
-      +"</div>"+cards;
-  }
-
   function render(){
     buildTabs();
     var c=curConsignment();
@@ -582,72 +524,98 @@
     } else if(!c){
       html="<div class=\"empty-note\">"+YEAR+"년에 해당하는 위탁과제가 없습니다.</div>";
     } else {
-      html = renderInfoStrip(c) + renderSubtabs() + (VIEW==="meetings"?renderMeetings():renderRequests());
+      html = renderInfoStrip(c) + renderMeetings();
     }
     document.getElementById("content").innerHTML = html;
     if(c && !DATA.error){ fillDynamicFilters(); }
   }
   function fillDynamicFilters(){
     function opt(arr,all,cur){ return "<option value=\"전체\""+(cur==="전체"?" selected":"")+">"+all+"</option>"+arr.map(function(x){return "<option value=\""+esc(x)+"\""+(x===cur?" selected":"")+">"+esc(x)+"</option>";}).join(""); }
-    if(VIEW==="meetings"){
-      document.getElementById("mType").innerHTML=opt(KIND_LIST,"종류 전체",MFILTER.type);
-      document.getElementById("mStatus").innerHTML=opt(["예정","완료"],"상태 전체",MFILTER.status);
-    } else {
-      document.getElementById("rCategory").innerHTML=opt(CAT_LIST,"구분 전체",RFILTER.category);
-      document.getElementById("rStatus").innerHTML=opt(["회신완료","검토중"],"상태 전체",RFILTER.status);
-    }
+    document.getElementById("mType").innerHTML=opt(KIND_LIST,"종류 전체",MFILTER.type);
+    document.getElementById("mStatus").innerHTML=opt(["예정","완료"],"상태 전체",MFILTER.status);
   }
 
   // ===== 탭/필터 이벤트 (동적 요소이므로 문서 위임) =====
   document.getElementById("ptabs").addEventListener("click", function(e){
     var t=e.target.closest("[data-sel]"); if(!t) return;
-    SEL=t.dataset.sel; VIEW="meetings"; render();
+    SEL=t.dataset.sel; render();
   });
   document.getElementById("yearPrev").addEventListener("click", function(){ YEAR--; var avail=DATA.consignments.filter(function(c){return inYear(c,YEAR);}); SEL=avail.length?avail[0].id:null; render(); });
   document.getElementById("yearNext").addEventListener("click", function(){ YEAR++; var avail=DATA.consignments.filter(function(c){return inYear(c,YEAR);}); SEL=avail.length?avail[0].id:null; render(); });
   document.getElementById("refreshBtn").addEventListener("click", load);
 
   document.getElementById("content").addEventListener("click", function(e){
-    var sub=e.target.closest("[data-view]");
-    if(sub){ VIEW=sub.dataset.view; render(); return; }
     var addM=e.target.closest("#addMeetBtn");
     if(addM){ openMeetAdd(); return; }
-    var addR=e.target.closest("#addReqBtn");
-    if(addR){ openReqAdd(); return; }
     var mReset=e.target.closest("#mReset");
     if(mReset){ MFILTER={search:"",type:"전체",status:"전체"}; render(); return; }
-    var rReset=e.target.closest("#rReset");
-    if(rReset){ RFILTER={search:"",category:"전체",status:"전체"}; render(); return; }
-    var edit=e.target.closest("[data-edit]");
-    if(edit){ openReqEdit(edit.dataset.edit); e.stopPropagation(); return; }
-    var reqCard=e.target.closest(".req-card[data-id]");
-    if(reqCard){ openReqView(reqCard.dataset.id); return; }
     var mRow=e.target.closest("tr[data-id]");
     if(mRow){ openMeetView(mRow.dataset.id); return; }
   });
   document.getElementById("content").addEventListener("change", function(e){
     if(e.target.id==="mType"){ MFILTER.type=e.target.value; render(); }
     if(e.target.id==="mStatus"){ MFILTER.status=e.target.value; render(); }
-    if(e.target.id==="rCategory"){ RFILTER.category=e.target.value; render(); }
-    if(e.target.id==="rStatus"){ RFILTER.status=e.target.value; render(); }
   });
   document.getElementById("content").addEventListener("input", function(e){
     if(e.target.id==="mSearch"){ MFILTER.search=e.target.value; render(); document.getElementById("mSearch").focus(); document.getElementById("mSearch").selectionStart=document.getElementById("mSearch").value.length; }
-    if(e.target.id==="rSearch"){ RFILTER.search=e.target.value; render(); document.getElementById("rSearch").focus(); document.getElementById("rSearch").selectionStart=document.getElementById("rSearch").value.length; }
   });
 
   // ===== 회의록 모달 =====
   function findMeet(id){ return DATA.meetings.filter(function(m){return m.id===id;})[0]; }
+  // 위계별 들여쓰기(2/4칸 공백)를 줄마다 별도 div의 padding으로 옮겨서, 줄바꿈(wrap)되는 긴 문장도
+  // 들여쓰기 위치가 흐트러지지 않고 정렬 유지되게 함 (leading space만으로는 wrap된 줄이 정렬 안 됨)
+  // 위계별 들여쓰기 + 내어쓰기(hanging indent): 줄바꿈된 두 번째 줄부터는 "표식(❑/-/‣)" 위치가 아니라
+  // 첫 줄의 실제 글자 시작 위치에 맞춰지게 padding-left + text-indent 조합 사용
+  function renderIndentedText(text){
+    if(!text || !text.trim()) return "-";
+    var HANG = 14; // 표식("❑ "/"- "/"‣ ") 실제 너비에 맞춘 내어쓰기 폭
+    return text.split("\n").map(function(ln){
+      if(ln.trim()===""){ return "<div style=\"height:8px\"></div>"; }
+      var m = ln.match(/^( *)/);
+      var level = m[1].length>=4 ? 2 : (m[1].length>=2 ? 1 : 0);
+      var base = level*18;
+      return "<div style=\"padding-left:"+(base+HANG)+"px;text-indent:-"+HANG+"px\">"+esc(ln.replace(/^ +/,""))+"</div>";
+    }).join("");
+  }
+  function meetSectionBox(label, text){
+    return "<div style=\"font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:8px;margin-top:14px\">"+label+"</div>"
+      +"<div style=\"font-size:14.5px;color:var(--text);background:var(--bg);border:1px solid var(--line-2);border-radius:6px;padding:14px 16px;line-height:1.8\">"+renderIndentedText(text)+"</div>";
+  }
+  // 회의 내용: 새 방식(꼭지별 블록 + 꼭지별 이미지)이 있으면 그걸로, 없으면(예전 회의) 속성 하나였던 legacy 텍스트로 표시
+  function meetBodySectionsHtml(m){
+    if(m.sections && m.sections.length){
+      return m.sections.map(function(s){
+        var figsHtml = (s.figures||[]).map(function(f){
+          var src = WORKER_URL + "?scope=imageProxy&url=" + encodeURIComponent(f.url);
+          return "<img src=\""+esc(src)+"\" alt=\""+esc(f.caption||"")+"\" style=\"max-width:100%;border-radius:6px;border:1px solid var(--line-2);margin-top:8px;display:block\">";
+        }).join("");
+        return "<div style=\"border-bottom:1px solid var(--line-2);padding:10px 2px\">"
+          +"<div style=\"font-size:14px;font-weight:700;color:var(--navy);margin-bottom:6px\">"+esc(s.heading)+"</div>"
+          +"<div style=\"font-size:14px;color:var(--text);line-height:1.8\">"+renderIndentedText(s.body)+"</div>"
+          +figsHtml+"</div>";
+      }).join("");
+    }
+    return "<div style=\"font-size:14.5px;color:var(--text);background:var(--bg);border:1px solid var(--line-2);border-radius:6px;padding:14px 16px;line-height:1.8\">"+renderIndentedText(m.body)+"</div>";
+  }
   function meetViewHtml(m){
     return "<div style=\"display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px\">"+kindBadge(m.kind)+mstatBadge(m.status)+modeBadge(m.mode)
       +"<span style=\"font-size:12.5px;font-weight:600;color:var(--muted)\">"+fmtMDW(m.date)+" · "+esc(m.attendees||"-")+"</span></div>"
-      +"<div style=\"font-size:17px;font-weight:800;color:var(--navy);margin-bottom:14px\">"+esc(m.title)+"</div>"
-      +"<div style=\"font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:8px\">회의 내용</div>"
-      +"<div style=\"font-size:13.5px;color:var(--text);white-space:pre-wrap;background:var(--bg);border:1px solid var(--line-2);border-radius:6px;padding:14px 16px;line-height:1.8\">"+esc(m.body||"-")+"</div>";
+      +"<div style=\"font-size:17px;font-weight:800;color:var(--navy);margin-bottom:0\">"+esc(m.title)+"</div>"
+      +meetSectionBox("회의 주제", m.topic)
+      +meetSectionBox("결정 사항", m.decision)
+      +meetSectionBox("향후 논의사항", m.followup)
+      +"<div style=\"font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:8px;margin-top:14px\">회의 내용</div>"
+      +meetBodySectionsHtml(m);
   }
   function meetEditHtml(m){
     function opt(arr,cur){ return arr.map(function(x){return "<option value=\""+esc(x)+"\""+(x===cur?" selected":"")+">"+esc(x)+"</option>";}).join(""); }
-    return "<div class=\"fld-row\">"
+    return "<div class=\"fld-row\" style=\"align-items:center\">"
+      +"<label class=\"mbtn ghost\" for=\"mfPdfInput\" style=\"cursor:pointer\">PDF 업로드로 자동 채우기</label>"
+      +"<input type=\"file\" id=\"mfPdfInput\" accept=\"application/pdf\" style=\"display:none\">"
+      +"<span class=\"estatus status\" id=\"mfPdfStatus\" style=\"margin:0\"></span></div>"
+      +"<div class=\"edit-hint\" id=\"mfFiguresHint\" style=\"display:none\"></div>"
+      +"<div id=\"mfFiguresCropArea\" style=\"display:none\"></div>"
+      +"<div class=\"fld-row\">"
       +"<label class=\"fld\"><span>구분</span><select id=\"mfType\">"+opt(KIND_LIST,m.kind)+"</select></label>"
       +"<label class=\"fld\"><span>일시</span><input type=\"date\" id=\"mfDate\" value=\""+esc(m.date||"")+"\"></label></div>"
       +"<div class=\"fld-row\">"
@@ -655,9 +623,321 @@
       +"<label class=\"fld\"><span>형태</span><select id=\"mfMode\">"+opt(["대면","화상"],m.mode)+"</select></label></div>"
       +"<label class=\"fld\"><span>주요 안건 <b>*</b></span><input type=\"text\" id=\"mfTitle\" value=\""+esc(m.title||"")+"\" placeholder=\"예) 3월 연구진행 점검\"></label>"
       +"<label class=\"fld\"><span>참석</span><input type=\"text\" id=\"mfAttendees\" value=\""+esc(m.attendees||"")+"\" placeholder=\"예) 이종우, 김OO 교수\"></label>"
-      +"<label class=\"fld\"><span>회의 내용</span><textarea id=\"mfBody\" rows=\"7\" placeholder=\"안건별 논의·결정사항을 정리하세요\">"+esc(m.body||"")+"</textarea></label>"
+      +"<label class=\"fld\"><span>회의 주제</span><textarea id=\"mfTopic\" rows=\"3\" placeholder=\"이번 회의에서 다룬 주제들\">"+esc(m.topic||"")+"</textarea></label>"
+      +"<label class=\"fld\"><span>결정 사항</span><textarea id=\"mfDecision\" rows=\"3\" placeholder=\"결정된 사항\">"+esc(m.decision||"")+"</textarea></label>"
+      +"<label class=\"fld\"><span>향후 논의사항</span><textarea id=\"mfFollowup\" rows=\"3\" placeholder=\"다음에 논의할 사항\">"+esc(m.followup||"")+"</textarea></label>"
+      +"<div class=\"edit-hint\">회의 내용(꼭지별) — 꼭지 제목과 세부 내용을 빈 줄로 구분해 입력하세요. 표/그림은 위 PDF 업로드 시 크롭해서 원하는 꼭지에 붙일 수 있어요.</div>"
+      +"<textarea class=\"agenda-edit\" id=\"mfBody\" placeholder=\"꼭지 제목\n- 세부 내용\n  ‣ 하위 내용\n\n다음 꼭지 제목\n- 세부 내용\">"+esc((m.sections&&m.sections.length)?serializeConsignSections(m.sections):(m.body||""))+"</textarea>"
       +"<div class=\"estatus status\" id=\"mfStatusMsg\"></div>";
   }
+  // ===== 회의록 PDF 자동 파싱 (weekly-meeting.html과 동일한 방식: pdf.js로 클라이언트에서 직접 처리, 무료) =====
+  // 실제 회의록 양식 문자 확인 결과: 위계1 "❑"(U+2751, □ 아님) / 위계2 "-" / 위계3 "‣"(U+2023)
+  if(window.pdfjsLib){ pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; }
+  async function consignPdfExtractLines(file){
+    if(!window.pdfjsLib) throw new Error("PDF 라이브러리 로딩 중입니다. 잠시 후 다시 시도하세요.");
+    var buf = await file.arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    var lines = [];
+    for(var i=1;i<=pdf.numPages;i++){
+      var page = await pdf.getPage(i);
+      var content = await page.getTextContent();
+      var items = content.items, curY=null, curLine="";
+      items.forEach(function(it){
+        var y=Math.round(it.transform[5]);
+        if(curY===null){ curY=y; curLine=it.str; }
+        else if(Math.abs(y-curY)<=3){ curLine+=it.str; }
+        else { lines.push(curLine); curLine=it.str; curY=y; }
+      });
+      if(curLine) lines.push(curLine);
+    }
+    return lines.filter(function(ln){ var t=ln.trim();
+      if(t==="") return false;
+      if(/^-\s*\d+\s*-$/.test(t)) return false; // 페이지 번호
+      if(/^회\s*의\s*내\s*용$/.test(t)) return false; // 표 왼쪽 행 라벨(병합 셀 중간에 끼어들어옴)
+      return true; });
+  }
+  function classifyConsignLevel(line){
+    if(/^❑/.test(line)) return 1;
+    if(/^-/.test(line)) return 2;
+    if(/^‣/.test(line)) return 3;
+    return 0;
+  }
+  // ❑(위계1)마다 새 그룹, -/‣ 는 하위로 들여쓰기(각 2/4칸). 하위 항목이 있으면 ❑ 그룹 사이에 빈 줄 삽입.
+  // 기호 없는 줄(PDF 줄바꿈으로 잘린 문장)은 직전 항목에 이어붙임. (회의주제/결정사항/향후논의사항처럼 짧은 영역용)
+  function formatConsignBody(lines){
+    var groups=[], cur=null;
+    lines.forEach(function(line){
+      var lvl=classifyConsignLevel(line);
+      if(lvl===1){ cur={text:line, children:[]}; groups.push(cur); }
+      else if(lvl===2||lvl===3){
+        if(!cur){ cur={text:"", children:[]}; groups.push(cur); }
+        cur.children.push({level:lvl, text:line});
+      } else if(cur){
+        if(cur.children.length) cur.children[cur.children.length-1].text += " "+line;
+        else cur.text += " "+line;
+      }
+    });
+    var hasDeep = groups.some(function(g){ return g.children.length>0; });
+    var out=[];
+    groups.forEach(function(g,i){
+      if(i>0 && hasDeep) out.push("");
+      out.push(g.text);
+      g.children.forEach(function(c){ out.push((c.level===2?"  ":"    ")+c.text); });
+    });
+    return out.join("\n");
+  }
+  // "회의 내용" 전용: ❑ 하나가 이미 별도 꼭지(heading)로 분리되므로, 그 안에서는 -(위계2)가 최상위, ‣(위계3)이 하위
+  function formatConsignSectionBody(lines){
+    var groups=[], cur=null;
+    lines.forEach(function(line){
+      var lvl=classifyConsignLevel(line);
+      if(lvl===2){ cur={text:line, children:[]}; groups.push(cur); }
+      else if(lvl===3){
+        if(!cur){ cur={text:"", children:[]}; groups.push(cur); }
+        cur.children.push({level:lvl, text:line});
+      } else if(cur){
+        if(cur.children.length) cur.children[cur.children.length-1].text += " "+line;
+        else cur.text += " "+line;
+      } else {
+        cur = { text: line, children: [] }; groups.push(cur);
+      }
+    });
+    var hasDeep = groups.some(function(g){ return g.children.length>0; });
+    var out=[];
+    groups.forEach(function(g,i){
+      if(i>0 && hasDeep) out.push("");
+      out.push(g.text);
+      g.children.forEach(function(c){ out.push("  "+c.text); });
+    });
+    return out.join("\n");
+  }
+  // "회의 내용" 블록을 ❑ 단위로 꼭지(heading) 분리 — 주간회의의 sections와 동일한 개념
+  function splitConsignSections(lines){
+    var sections=[], curHeading=null, curLines=[];
+    lines.forEach(function(line){
+      if(classifyConsignLevel(line)===1){
+        if(curHeading!==null) sections.push({ heading: curHeading, body: formatConsignSectionBody(curLines) });
+        curHeading = line.replace(/^❑\s*/, "").trim();
+        curLines = [];
+      } else if(curHeading!==null){
+        curLines.push(line);
+      }
+    });
+    if(curHeading!==null) sections.push({ heading: curHeading, body: formatConsignSectionBody(curLines) });
+    return sections;
+  }
+  // "회의 내용" 편집칸 ↔ sections 배열 변환. 경계는 "이 줄이 -/‣로 시작하는가"로 판단
+  // (본문 안의 가독성용 빈 줄과 꼭지 경계가 절대 안 헷갈림 — weekly-meeting과 동일한 원리)
+  function serializeConsignSections(sections){
+    return (sections||[]).map(function(s){ return s.heading+"\n"+(s.body||""); }).join("\n\n");
+  }
+  function parseConsignSectionsText(text){
+    var lines = (text||"").split("\n");
+    var items=[], cur=null;
+    lines.forEach(function(raw){
+      var trimmed = raw.trim();
+      if(trimmed===""){ if(cur) cur.bodyLines.push(""); return; }
+      var isBullet = classifyConsignLevel(trimmed) >= 2;
+      if(!isBullet){ cur = { heading: trimmed, bodyLines: [] }; items.push(cur); }
+      else if(cur){ cur.bodyLines.push(raw); }
+    });
+    return items.map(function(it){
+      return { heading: it.heading, body: it.bodyLines.join("\n").replace(/\n+$/,"").replace(/^\n+/,"") };
+    }).filter(function(s){ return s.heading; });
+  }
+  function todayKST(){
+    var kst = new Date(Date.now() + 9*60*60*1000);
+    function z(n){ return (n<10?"0":"")+n; }
+    return kst.getUTCFullYear()+"-"+z(kst.getUTCMonth()+1)+"-"+z(kst.getUTCDate());
+  }
+  // "기관 이름 직위" 순서 고정 형식에서 이름만 추출 (예: "한양대학교 박준영 교수" → "박준영")
+  // "OO 외 N명" 같은 꼬리는 이름 옆에 그대로 붙여서 유지 (예: "이숭봉 부연구위원 외 7명" → "이숭봉 외 7명")
+  function extractAttendeeNames(raw){
+    if(!raw) return "";
+    var segs = raw.split(",").map(function(s){ return s.trim(); }).filter(Boolean);
+    var names = segs.map(function(seg){
+      var tailMatch = seg.match(/(외\s*\d+\s*명)\s*$/);
+      var tail = tailMatch ? (" "+tailMatch[1]) : "";
+      var core = tailMatch ? seg.slice(0, tailMatch.index).trim() : seg;
+      var words = core.split(/\s+/).filter(Boolean);
+      var name = words.length >= 2 ? words[words.length-2] : (words[0] || "");
+      return name ? (name+tail) : "";
+    }).filter(Boolean);
+    return names.join(", ");
+  }
+  function parseConsignMeetingPdfLines(allLines){
+    var fullText = allLines.join("\n");
+    var titleMatch = fullText.match(/회\s*의\s*명\s*([^\n]+)/);
+    var title = titleMatch ? titleMatch[1].trim() : "";
+
+    // 표 레이아웃이라 pdf.js가 라벨/값 순서를 완벽히 보장 못 할 수 있어서,
+    // "일시" 라벨에 의존하지 않고 헤더 영역(첫 '[' 이전) 전체에서 날짜 패턴 자체를 바로 찾음
+    var headerText = fullText.split("[")[0];
+    var dateMatch = headerText.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+    var date = dateMatch ? (dateMatch[1]+"-"+("0"+dateMatch[2]).slice(-2)+"-"+("0"+dateMatch[3]).slice(-2)) : "";
+
+    var locMatch = headerText.match(/장\s*소\s*([^\n]+)/);
+    var location = locMatch ? locMatch[1].trim() : "";
+    var mode = /화상/.test(location) ? "화상" : "대면";
+
+    var status = date ? (date < todayKST() ? "완료" : "예정") : "예정";
+
+    var attendeesRaw = "";
+    // 라벨 바로 위/아래 한 줄씩만 보는 대신, "장소가 있는 줄" ~ "회의목적 줄" 사이 모든 줄을 통째로 모음
+    // (pdf.js가 참석자 목록을 몇 줄로 쪼개든 안전하게 다 잡힘)
+    var locLineIdx = allLines.findIndex(function(l){ return /장\s*소/.test(l); });
+    var purposeLineIdx = allLines.findIndex(function(l){ return /^회\s*의\s*목\s*적/.test(l.trim()); });
+    if(locLineIdx>=0 && purposeLineIdx>locLineIdx){
+      var attLines = [];
+      for(var k=locLineIdx+1; k<purposeLineIdx; k++){
+        var t = allLines[k].trim();
+        if(/^참\s*석\s*자$/.test(t)) continue; // 라벨 단독 줄이면 건너뜀
+        attLines.push(allLines[k]);
+      }
+      attendeesRaw = attLines.join(" ").replace(/참\s*석\s*자/, "").trim();
+    }
+    if(!attendeesRaw){
+      var attInline = headerText.match(/참\s*석\s*자\s*([^\n]+)/);
+      if(attInline) attendeesRaw = attInline[1].trim();
+    }
+    var attendees = extractAttendeeNames(attendeesRaw);
+
+    function extractBracket(name){
+      var re = new RegExp("\\["+name+"\\]([\\s\\S]*?)(?=\\[|$)");
+      var m = fullText.match(re);
+      return m ? m[1] : "";
+    }
+    function linesOf(raw){ return raw.split("\n").map(function(l){return l.trim();}).filter(Boolean); }
+
+    return {
+      title: title, date: date, mode: mode, status: status, attendees: attendees,
+      topic: formatConsignBody(linesOf(extractBracket("회의\\s*주제"))),
+      decision: formatConsignBody(linesOf(extractBracket("결정\\s*사항"))),
+      followup: formatConsignBody(linesOf(extractBracket("향후\\s*논의사항"))),
+      bodySections: splitConsignSections(linesOf(extractBracket("회의\\s*내용")))
+    };
+  }
+  if(window.pdfjsLib){ pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; }
+  // 이미지가 포함된 페이지 탐지(무료) — 대부분의 표/그림은 이미지로 삽입되므로 이걸로 걸러짐
+  async function detectConsignFigurePages(pdf){
+    var figures = [];
+    for(var i=1;i<=pdf.numPages;i++){
+      var page = await pdf.getPage(i);
+      var ops = await page.getOperatorList();
+      var hasImage = ops.fnArray.indexOf(pdfjsLib.OPS.paintImageXObject) >= 0
+        || ops.fnArray.indexOf(pdfjsLib.OPS.paintJpegXObject) >= 0;
+      if(hasImage) figures.push({ page: i, hint: "이미지 포함 페이지" });
+    }
+    return figures;
+  }
+  // 표/그림이 있는 페이지를 실제로 렌더링해서 보여주고, 사용자가 드래그로 크롭 영역을 잡아 pendingConsignImages에 담게 함
+  // (weekly-meeting과 동일한 반자동 방식 — 회의록은 아젠다 앵커가 없어서 "연결할 항목" 선택 없이 그냥 담기만 함)
+  async function renderConsignFigureCropUI(file, figures, sections){
+    var area = document.getElementById("mfFiguresCropArea");
+    area.innerHTML = "";
+    if(!figures || !figures.length){ area.style.display = "none"; return; }
+    area.style.display = "block";
+    if(!window.pdfjsLib){
+      area.innerHTML = '<div class="edit-hint">미리보기 라이브러리 로드 실패 — 저장 후 상세 화면에서 직접 이미지를 첨부해 주세요.</div>';
+      return;
+    }
+    var buf = await file.arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    var headingOpts = (sections||[]).map(function(s){ return s.heading; }).filter(Boolean);
+
+    figures.forEach(function(fig, idx){
+      var block = document.createElement("div"); block.className = "crop-block";
+      block.innerHTML =
+        '<div class="edit-hint" style="margin-bottom:6px">'+fig.page+'쪽 — '+esc(fig.hint||"표/그림")+' (드래그로 영역 선택)</div>'+
+        '<div class="crop-canvas-wrap" id="ccropWrap'+idx+'"></div>'+
+        '<div class="crop-tools">'+
+          '<span>연결할 꼭지:</span>'+
+          '<select id="ccropSec'+idx+'"><option value="">(연결 안 함 · 맨 끝에 첨부)</option>'+
+            headingOpts.map(function(h){ return '<option value="'+esc(h)+'">'+esc(h)+'</option>'; }).join("")+
+          '</select>'+
+          '<button type="button" class="mbtn ghost" id="ccropBtn'+idx+'">이 영역 크롭해서 담기</button>'+
+          '<span class="crop-status" id="ccropStatus'+idx+'"></span>'+
+        '</div>';
+      area.appendChild(block);
+
+      pdf.getPage(fig.page).then(function(page){
+        var viewport = page.getViewport({ scale: 1.3 });
+        var canvas = document.createElement("canvas");
+        canvas.width = viewport.width; canvas.height = viewport.height;
+        var wrap = document.getElementById("ccropWrap"+idx);
+        wrap.style.position = "relative";
+        wrap.appendChild(canvas);
+        page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport });
+
+        var selBox = null, startX = 0, startY = 0, curRect = null;
+        wrap.addEventListener("mousedown", function(e){
+          var r = canvas.getBoundingClientRect();
+          startX = e.clientX - r.left; startY = e.clientY - r.top;
+          if(selBox) selBox.remove();
+          selBox = document.createElement("div"); selBox.className = "crop-sel";
+          wrap.appendChild(selBox); curRect = null;
+          function onMove(ev){
+            var x = ev.clientX - r.left, y = ev.clientY - r.top;
+            var left = Math.min(x,startX), top = Math.min(y,startY);
+            var w = Math.abs(x-startX), h = Math.abs(y-startY);
+            selBox.style.left=left+"px"; selBox.style.top=top+"px";
+            selBox.style.width=w+"px"; selBox.style.height=h+"px";
+            curRect = { left:left, top:top, w:w, h:h };
+          }
+          function onUp(){ document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); }
+          document.addEventListener("mousemove", onMove);
+          document.addEventListener("mouseup", onUp);
+        });
+
+        document.getElementById("ccropBtn"+idx).addEventListener("click", function(){
+          var cst = document.getElementById("ccropStatus"+idx);
+          if(!curRect || curRect.w<5 || curRect.h<5){ cst.textContent = "먼저 영역을 드래그로 선택하세요"; return; }
+          var scaleX = canvas.width / canvas.clientWidth, scaleY = canvas.height / canvas.clientHeight;
+          var out = document.createElement("canvas");
+          out.width = Math.round(curRect.w*scaleX); out.height = Math.round(curRect.h*scaleY);
+          out.getContext("2d").drawImage(canvas,
+            Math.round(curRect.left*scaleX), Math.round(curRect.top*scaleY), out.width, out.height,
+            0, 0, out.width, out.height);
+          pendingConsignImages.push({ sectionHeading: document.getElementById("ccropSec"+idx).value, dataUrl: out.toDataURL("image/png"), filename: "figure_p"+fig.page+".png" });
+          cst.textContent = "✓ 담김 (현재 "+pendingConsignImages.length+"개)";
+        });
+      });
+    });
+  }
+  document.getElementById("meetBody").addEventListener("change", async function(e){
+    if(e.target.id!=="mfPdfInput") return;
+    var file = e.target.files && e.target.files[0];
+    if(!file) return;
+    var pst = document.getElementById("mfPdfStatus");
+    pst.className = "estatus status show info"; pst.textContent = "PDF 분석 중…";
+    pendingConsignImages = [];
+    try {
+      var buf0 = await file.arrayBuffer();
+      var pdfForFigs = await pdfjsLib.getDocument({ data: buf0 }).promise;
+      var lines = await consignPdfExtractLines(file);
+      var r = parseConsignMeetingPdfLines(lines);
+      var figures = await detectConsignFigurePages(pdfForFigs);
+      if(r.title) document.getElementById("mfTitle").value = r.title;
+      if(r.date) document.getElementById("mfDate").value = r.date;
+      if(r.mode) document.getElementById("mfMode").value = r.mode;
+      if(r.status) document.getElementById("mfStatus").value = r.status;
+      if(r.attendees) document.getElementById("mfAttendees").value = r.attendees;
+      if(r.topic) document.getElementById("mfTopic").value = r.topic;
+      if(r.decision) document.getElementById("mfDecision").value = r.decision;
+      if(r.followup) document.getElementById("mfFollowup").value = r.followup;
+      if(r.bodySections && r.bodySections.length) document.getElementById("mfBody").value = serializeConsignSections(r.bodySections);
+      var fh = document.getElementById("mfFiguresHint");
+      if(figures.length){
+        fh.style.display = "block";
+        fh.textContent = "이미지가 포함된 페이지 " + figures.length + "곳을 아래에서 직접 크롭해 담아 주세요.";
+      } else { fh.style.display="none"; fh.textContent=""; }
+      await renderConsignFigureCropUI(file, figures, r.bodySections);
+      pst.className = "estatus status show ok"; pst.textContent = "자동 채움 완료(무료·로컬 처리) — 내용 확인 후 저장하세요";
+    } catch(err){
+      pst.className = "estatus status show err"; pst.textContent = "분석 실패: " + err.message;
+    }
+  });
+
   function openMeetView(id){
     var m=findMeet(id); if(!m) return;
     MEDIT={id:id, mode:"view"};
@@ -668,8 +948,9 @@
     document.getElementById("meetOv").classList.add("open");
   }
   function openMeetAdd(){
-    var blank={kind:"월간회의",status:"예정",mode:"대면",date:"",title:"",attendees:"",body:""};
+    var blank={kind:"월간회의",status:"예정",mode:"대면",date:"",title:"",attendees:"",topic:"",decision:"",followup:"",body:""};
     MEDIT={id:null, mode:"edit"};
+    pendingConsignImages=[];
     document.getElementById("meetHead").textContent="회의 추가";
     document.getElementById("meetBody").innerHTML=meetEditHtml(blank);
     document.getElementById("meetFoot").innerHTML="<div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"meetCancelBtn\">취소</button><button class=\"mbtn primary\" id=\"meetSaveBtn\">저장</button>";
@@ -678,6 +959,7 @@
   function switchMeetToEdit(){
     var m=findMeet(MEDIT.id); if(!m) return;
     MEDIT.mode="edit";
+    pendingConsignImages=[];
     document.getElementById("meetHead").textContent="회의 수정";
     document.getElementById("meetBody").innerHTML=meetEditHtml(m);
     document.getElementById("meetFoot").innerHTML="<button class=\"mbtn danger\" id=\"meetDelBtn\">삭제</button><div style=\"flex:1\"></div>"
@@ -702,344 +984,47 @@
       var title=document.getElementById("mfTitle").value.trim();
       var st=document.getElementById("mfStatusMsg");
       if(!title){ st.className="estatus status show err"; st.textContent="주요 안건을 입력하세요."; return; }
+      var sections = parseConsignSectionsText(document.getElementById("mfBody").value);
       var item={
         id:MEDIT.id, project:SEL, kind:document.getElementById("mfType").value, status:document.getElementById("mfStatus").value,
         mode:document.getElementById("mfMode").value, date:document.getElementById("mfDate").value, title:title,
-        attendees:document.getElementById("mfAttendees").value.trim(), body:document.getElementById("mfBody").value.trim()
+        attendees:document.getElementById("mfAttendees").value.trim(),
+        topic:document.getElementById("mfTopic").value.trim(),
+        decision:document.getElementById("mfDecision").value.trim(),
+        followup:document.getElementById("mfFollowup").value.trim(),
+        sections:sections
       };
       st.className="estatus status show info"; st.textContent="저장 중…";
       try {
         var action=MEDIT.id?"consignMeetingUpdate":"consignMeetingCreate";
         var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:action,item:item})});
         var data=await res.json(); if(!data.ok) throw new Error(data.error||"실패");
+        var meetingId = MEDIT.id || (data.result && data.result.id);
+        if(meetingId && pendingConsignImages.length){
+          st.textContent = "이미지 첨부 중…";
+          var imgOk=0, imgFail=0, lastErr="";
+          for(var i=0;i<pendingConsignImages.length;i++){
+            var pi = pendingConsignImages[i];
+            var idx = sections.findIndex(function(s){ return s.heading === pi.sectionHeading; });
+            try {
+              var ires=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+                action:"consignMeetingAddImage", meetingId:meetingId,
+                sectionIndex: idx>=0 ? idx : null,
+                imageBase64: pi.dataUrl.split(",")[1], filename: pi.filename, mimeType:"image/png"
+              })});
+              var idata=await ires.json();
+              if(idata.ok) imgOk++; else { imgFail++; lastErr = idata.error||"알 수 없는 오류"; }
+            } catch(e){ imgFail++; lastErr = String(e); }
+          }
+          if(imgFail){
+            st.className="estatus status show err";
+            st.textContent="회의록은 저장됐지만 이미지 "+imgFail+"개 첨부 실패("+imgOk+"개 성공): "+lastErr;
+            setTimeout(function(){ closeMeet(); load(); }, 1800);
+            return;
+          }
+        }
         st.className="estatus status show ok"; st.textContent="저장 완료";
         setTimeout(function(){ closeMeet(); load(); }, 500);
-      } catch(err){ st.className="estatus status show err"; st.textContent="저장 실패: "+err.message; }
-    }
-  });
-
-  // ===== 요청자료 모달 =====
-  function findReq(id){ return DATA.requests.filter(function(r){return r.id===id;})[0]; }
-  function fileChip(url, cls, icon, label, name){
-    if(!name) return "";
-    var content = icon+" "+label+" · "+esc(name);
-    return url ? "<a class=\"filechip "+cls+"\" href=\""+esc(url)+"\" target=\"_blank\" rel=\"noopener\">"+content+"</a>"
-                : "<span class=\"filechip "+cls+"\">"+content+"</span>";
-  }
-  function reqViewHtml(r){
-    var files="";
-    files += fileChip(r.reqFileUrl, "req", "📤", "요청", r.reqFile);
-    files += fileChip(r.replyFileUrl, "reply", "📥", "회신", r.replyFile);
-    var allFigs=[];
-    (r.qa||[]).forEach(function(qa,qi){ (qa.figures||[]).forEach(function(f,gi){ allFigs.push(Object.assign({},f,{qaNo:qi+1, figNo:gi+1})); }); });
-    var figHtml = allFigs.length ? allFigs.map(function(f, fi){
-      var label = "답변 "+f.qaNo+"-"+f.figNo;
-      if(!f.url){
-        return "<div class=\"fig-item fig-broken\"><div class=\"fig-label\">"+esc(label)+"</div>그림 감지됨(형식: "+esc(f._rawType||"알수없음")+")<br>URL을 못 가져왔어요</div>";
-      }
-      var urlPreview = esc(f.url.length>70 ? f.url.slice(0,70)+"…" : f.url);
-      return "<div class=\"fig-item\" id=\"figItem"+fi+"\" data-fig-url=\""+esc(f.url)+"\" data-fig-cap=\""+esc(f.caption||"")+"\" data-url-preview=\""+urlPreview+"\">"
-        +"<div class=\"fig-label\">"+esc(label)+"</div>"
-        +"<div class=\"fig-loading\">불러오는 중…</div>"
-        +(f.caption?"<div class=\"fig-cap\">"+esc(f.caption)+"</div>":"")+"</div>";
-    }).join("") : "<div class=\"fig-empty\">첨부된 그림이 없습니다.</div>";
-    var qaHtml=(r.qa&&r.qa.length) ? r.qa.map(function(qa,i){
-      return "<div class=\"qa-detail\"><div class=\"q-row\"><span class=\"qa-n\">안건 "+(i+1)+"</span><div class=\"qa-q\">"+esc(qa.q)+"</div></div>"
-        +"<div class=\"a-row\"><span class=\"qa-a-badge\">답변 "+(i+1)+"</span><div class=\"qa-a-text\">"+highlightText(qa.a||"-")+"</div></div></div>";
-    }).join("") : "<div class=\"qa-empty\">아직 정리된 문의·답변이 없습니다.</div>";
-    return "<div style=\"padding:16px 20px 0\"><div style=\"display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px\">"
-      +"<span style=\"font-size:12px;color:var(--muted)\">요청 "+fmtYM(r.reqDate)+" · 회신 "+fmtYM(r.replyDate)+"</span>"+rstatBadge(r.status)+"</div>"
-      +(files?"<div class=\"req-files\">"+files+"</div>":"")+"</div>"
-      +"<div class=\"req-view-grid\">"
-        +"<div class=\"fig-col\"><div class=\"fig-lab\">FIGURES</div>"+figHtml+"</div>"
-        +"<div class=\"qa-col\">"+qaHtml+"</div>"
-      +"</div>";
-  }
-  function reqEditHtml(r){
-    function opt(arr,cur){ return arr.map(function(x){return "<option value=\""+esc(x)+"\""+(x===cur?" selected":"")+">"+esc(x)+"</option>";}).join(""); }
-    var qaHtml=(REDIT.qa||[]).map(function(qa,i){
-      var pendHtml = (qa.images&&qa.images.length) ? "<div class=\"qa-pend-wrap\">"+qa.images.map(function(img,pi){
-        return "<div class=\"qa-pend\"><img src=\"data:"+esc(img.mimeType)+";base64,"+img.base64+"\"><span class=\"qa-pend-x\" data-pend-del=\""+i+"\" data-pend-idx=\""+pi+"\">×</span></div>";
-      }).join("")+"</div>" : "";
-      return "<div style=\"border:1px solid var(--line-2);border-radius:7px;padding:12px 14px;margin-bottom:12px\">"
-        +"<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:8px\">"
-        +"<span class=\"qa-n\">안건 "+(i+1)+"</span><span class=\"qa-remove\" data-qa-del=\""+i+"\">항목 삭제</span></div>"
-        +"<textarea class=\"qa-q-in\" data-qi=\""+i+"\" rows=\"2\" placeholder=\"문의사항\" style=\"width:100%;border:1px solid var(--line-2);border-radius:5px;padding:8px 10px;font-size:13px;margin-bottom:9px;font-family:inherit\">"+esc(qa.q)+"</textarea>"
-        +"<div style=\"font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px\">답변 "+(i+1)+"</div>"
-        +"<textarea class=\"qa-a-in\" data-ai=\""+i+"\" rows=\"3\" placeholder=\"답변 (이미지는 Ctrl+V로 붙여넣기 가능)\" style=\"width:100%;border:1px solid var(--line-2);border-radius:5px;padding:8px 10px;font-size:13px;font-family:inherit\">"+esc(qa.a)+"</textarea>"
-        +pendHtml
-        +"<div class=\"qa-img-hint\" data-hi=\""+i+"\">그림을 복사한 뒤 답변란 안에서 Ctrl+V로 붙여넣으세요. (저장 버튼을 눌러야 실제로 반영됩니다)</div></div>";
-    }).join("");
-    return "<div class=\"fld-row\">"
-      +"<label class=\"fld\"><span>구분</span><select id=\"rfCategory\">"+opt(CAT_LIST,r.category)+"</select></label>"
-      +"<label class=\"fld\"><span>제목 <b>*</b></span><input type=\"text\" id=\"rfTitle\" value=\""+esc(r.title||"")+"\"></label></div>"
-      +"<div class=\"fld-row\">"
-      +"<label class=\"fld\"><span>요청일</span><input type=\"date\" id=\"rfReqDate\" value=\""+esc(r.reqDate||"")+"\"></label>"
-      +"<label class=\"fld\"><span>회신일</span><input type=\"date\" id=\"rfReplyDate\" value=\""+esc(r.replyDate||"")+"\"></label>"
-      +"<label class=\"fld\"><span>상태</span><select id=\"rfStatus\">"+opt(["회신완료","검토중"],r.status)+"</select></label></div>"
-      +"<div class=\"fld-row\">"
-      +"<label class=\"fld\"><span>요청 PDF</span><div class=\"file-pick-row\">"
-        +"<input type=\"text\" id=\"rfReqFile\" value=\""+esc(r.reqFile||"")+"\" placeholder=\"파일명 또는 아래에서 선택\">"
-        +"<button type=\"button\" class=\"file-pick-btn\" id=\"reqFilePickBtn\">파일 선택</button>"
-        +"<input type=\"file\" id=\"reqFilePick\" accept=\"application/pdf\" style=\"display:none\"></div>"
-        +"<div class=\"file-pick-status\" id=\"reqFileStatus\"></div></label>"
-      +"<label class=\"fld\"><span>회신 PDF</span><div class=\"file-pick-row\">"
-        +"<input type=\"text\" id=\"rfReplyFile\" value=\""+esc(r.replyFile||"")+"\" placeholder=\"파일명 또는 아래에서 선택\">"
-        +"<button type=\"button\" class=\"file-pick-btn\" id=\"replyFilePickBtn\">파일 선택</button>"
-        +"<input type=\"file\" id=\"replyFilePick\" accept=\"application/pdf\" style=\"display:none\"></div>"
-        +"<div class=\"file-pick-status\" id=\"replyFileStatus\"></div></label></div>"
-      +"<div style=\"border-top:1px solid var(--line-2);padding-top:12px;margin-top:4px\">"
-      +"<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\">"
-      +"<span style=\"font-size:11.5px;font-weight:700;color:var(--muted)\">안건 · 내용</span>"
-      +"<button class=\"qa-addbtn\" id=\"qaAddBtn\">+ 문의·답변 추가</button></div>"
-      +qaHtml+(REDIT.qa.length?"":"<div class=\"qa-empty\">\"+ 문의·답변 추가\"로 항목을 만드세요.</div>")
-      +"</div><div class=\"estatus status\" id=\"rfStatusMsg\"></div>";
-  }
-  function syncQaFromDom(){
-    document.querySelectorAll(".qa-q-in").forEach(function(el){ REDIT.qa[+el.dataset.qi].q = el.value; });
-    document.querySelectorAll(".qa-a-in").forEach(function(el){ REDIT.qa[+el.dataset.ai].a = el.value; });
-  }
-  function reqModalEl(){ return document.querySelector("#reqOv .modal"); }
-  async function openReqView(id){
-    var r=findReq(id); if(!r) return;
-    REDIT={id:id, mode:"view", qa:[]};
-    reqModalEl().classList.add("modal-wide");
-    document.getElementById("reqHead").innerHTML=catTag(r.category)+" &nbsp;"+esc(r.title);
-    document.getElementById("reqBody").innerHTML="<div class=\"state\">불러오는 중…</div>";
-    document.getElementById("reqFoot").innerHTML="<div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"reqCloseBtn\">닫기</button><button class=\"mbtn primary\" id=\"reqEditBtn\">편집</button>";
-    document.getElementById("reqOv").classList.add("open");
-    try {
-      var res=await fetch(WORKER_URL+"?scope=consignRequestDetail&id="+encodeURIComponent(id), {cache:"no-store"});
-      var data=await res.json();
-      if(!data.request) throw new Error(data.error||"불러오기 실패");
-      if(REDIT.id!==id || REDIT.mode!=="view") return; // 그 사이 다른 걸 열었으면 무시
-      document.getElementById("reqBody").innerHTML=reqViewHtml(data.request);
-      loadFigures(data.request);
-    } catch(err){
-      if(REDIT.id===id && REDIT.mode==="view") document.getElementById("reqBody").innerHTML="<div class=\"state\">불러오기 실패: "+esc(String(err.message||err))+"</div>";
-    }
-  }
-  // img 태그에만 맡기면 실패 시 브라우저가 아주 오래(수십 초~분 단위) 붙잡고 있을 수 있어서,
-  // fetch+8초 타임아웃으로 직접 불러와서 빠르게 성공/실패를 판단
-  function loadFigures(r){
-    var allFigs=[];
-    (r.qa||[]).forEach(function(qa){ (qa.figures||[]).forEach(function(f){ allFigs.push(f); }); });
-    allFigs.forEach(function(f, fi){
-      if(!f.url) return;
-      var el = document.getElementById("figItem"+fi);
-      if(!el) return;
-      var loadingEl = el.querySelector(".fig-loading");
-      var startedAt = Date.now();
-      var controller = new AbortController();
-      var timeoutId = setTimeout(function(){ controller.abort(); }, 12000);
-      var proxyUrl = WORKER_URL + "?scope=imageProxy&url=" + encodeURIComponent(f.url);
-      fetch(proxyUrl, { signal: controller.signal })
-        .then(function(res){
-          clearTimeout(timeoutId);
-          if(!res.ok) throw new Error("HTTP " + res.status);
-          return res.blob();
-        })
-        .then(function(blob){
-          var objUrl = URL.createObjectURL(blob);
-          var img = document.createElement("img");
-          img.src = objUrl; img.alt = f.caption || "그림";
-          img.style.cursor = "zoom-in";
-          img.addEventListener("click", function(){ openLightbox(objUrl, f.caption||""); });
-          if(loadingEl) loadingEl.replaceWith(img);
-        })
-        .catch(function(err){
-          clearTimeout(timeoutId);
-          var elapsed = ((Date.now()-startedAt)/1000).toFixed(1);
-          var reason = (err && err.name==="AbortError") ? "12초 내에 응답 없음(Worker 경유인데도 실패 — 다른 원인일 수 있음)" : String(err.message||err);
-          el.classList.add("fig-broken");
-          if(loadingEl){
-            loadingEl.innerHTML = "이미지를 불러올 수 없어요("+elapsed+"초 소요)<br><span class=\"fig-broken-url\"></span>";
-            loadingEl.querySelector(".fig-broken-url").textContent = reason + " — " + el.dataset.urlPreview;
-          }
-        });
-    });
-  }
-  function openReqAdd(){
-    var blank={category:"연구진행",title:"",reqDate:"",replyDate:"",status:"검토중",reqFile:"",replyFile:""};
-    REDIT={id:null, mode:"edit", qa:[], pendingReqFile:null, pendingReplyFile:null};
-    reqModalEl().classList.remove("modal-wide");
-    document.getElementById("reqHead").textContent="자료 추가";
-    document.getElementById("reqBody").innerHTML=reqEditHtml(blank);
-    document.getElementById("reqFoot").innerHTML="<div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"reqCancelBtn\">취소</button><button class=\"mbtn primary\" id=\"reqSaveBtn\">저장</button>";
-    document.getElementById("reqOv").classList.add("open");
-  }
-  async function openReqEdit(id){
-    var r=findReq(id); if(!r) return;
-    REDIT={id:id, mode:"edit", qa:[], pendingReqFile:null, pendingReplyFile:null};
-    reqModalEl().classList.remove("modal-wide");
-    document.getElementById("reqHead").textContent="자료 수정";
-    document.getElementById("reqBody").innerHTML="<div class=\"state\">불러오는 중…</div>";
-    document.getElementById("reqFoot").innerHTML="";
-    document.getElementById("reqOv").classList.add("open");
-    try {
-      var res=await fetch(WORKER_URL+"?scope=consignRequestDetail&id="+encodeURIComponent(id), {cache:"no-store"});
-      var data=await res.json();
-      if(!data.request) throw new Error(data.error||"불러오기 실패");
-      if(REDIT.id!==id || REDIT.mode!=="edit") return; // 그 사이 다른 걸 열었으면 무시
-      REDIT.qa = JSON.parse(JSON.stringify(data.request.qa||[]));
-      document.getElementById("reqBody").innerHTML=reqEditHtml(data.request);
-      document.getElementById("reqFoot").innerHTML="<button class=\"mbtn danger\" id=\"reqDelBtn\">삭제</button><div style=\"flex:1\"></div><button class=\"mbtn ghost\" id=\"reqCancelBtn\">취소</button><button class=\"mbtn primary\" id=\"reqSaveBtn\">저장</button>";
-    } catch(err){
-      if(REDIT.id===id && REDIT.mode==="edit") document.getElementById("reqBody").innerHTML="<div class=\"state\">불러오기 실패: "+esc(String(err.message||err))+"</div>";
-    }
-  }
-  function rerenderReqEditQa(){
-    var r=findReq(REDIT.id) || {category:"",title:document.getElementById("rfTitle")?document.getElementById("rfTitle").value:"",reqDate:"",replyDate:"",status:"",reqFile:"",replyFile:""};
-    // 현재 입력값 유지한 채 QA 영역만 다시 그림 (간단히 폼 전체를 다시 그리되 현재 값 반영)
-    var snapshot={
-      category:document.getElementById("rfCategory").value, title:document.getElementById("rfTitle").value,
-      reqDate:document.getElementById("rfReqDate").value, replyDate:document.getElementById("rfReplyDate").value,
-      status:document.getElementById("rfStatus").value, reqFile:document.getElementById("rfReqFile").value, replyFile:document.getElementById("rfReplyFile").value
-    };
-    document.getElementById("reqBody").innerHTML=reqEditHtml(snapshot);
-  }
-  function closeReq(){ document.getElementById("reqOv").classList.remove("open"); }
-  document.getElementById("reqX").addEventListener("click", closeReq);
-  document.getElementById("reqOv").addEventListener("click", function(e){ if(e.target.id==="reqOv") closeReq(); });
-  document.getElementById("reqBody").addEventListener("click", function(e){
-    var addQa=e.target.closest("#qaAddBtn");
-    if(addQa){ syncQaFromDom(); REDIT.qa.push({q:"",a:""}); rerenderReqEditQa(); return; }
-    var delQa=e.target.closest("[data-qa-del]");
-    if(delQa){ syncQaFromDom(); REDIT.qa.splice(+delQa.dataset.qaDel,1); rerenderReqEditQa(); return; }
-    var fig=e.target.closest("[data-zoom-url]");
-    if(fig){ openLightbox(fig.dataset.zoomUrl, fig.dataset.zoomCap); return; }
-  });
-  document.getElementById("reqBody").addEventListener("paste", function(e){
-    var ta = e.target.closest(".qa-a-in");
-    if(!ta) return; // 답변칸이 아니면 평소처럼 텍스트 붙여넣기
-    var items = (e.clipboardData || window.clipboardData).items || [];
-    var imgItem = null;
-    for(var i=0;i<items.length;i++){ if(items[i].type && items[i].type.indexOf("image/")===0){ imgItem=items[i]; break; } }
-    if(!imgItem) return; // 이미지가 아니면 평소처럼 텍스트 붙여넣기
-    e.preventDefault();
-    var qaIndex = +ta.dataset.ai;
-    var file = imgItem.getAsFile();
-    if(!file) return;
-    var reader = new FileReader();
-    reader.onload = function(){
-      var base64 = String(reader.result).split(",")[1];
-      syncQaFromDom(); // 지금까지 입력한 텍스트 먼저 보존
-      if(!REDIT.qa[qaIndex].images) REDIT.qa[qaIndex].images = [];
-      REDIT.qa[qaIndex].images.push({ base64: base64, filename: file.name||"pasted.png", mimeType: file.type||"image/png" });
-      rerenderReqEditQa(); // 미리보기로 바로 반영 (실제 노션 반영은 '저장' 눌러야 됨)
-    };
-    reader.readAsDataURL(file);
-  });
-  document.getElementById("reqBody").addEventListener("click", function(e){
-    var pendDel=e.target.closest("[data-pend-del]");
-    if(pendDel){
-      syncQaFromDom();
-      REDIT.qa[+pendDel.dataset.pendDel].images.splice(+pendDel.dataset.pendIdx, 1);
-      rerenderReqEditQa();
-    }
-    if(e.target.id==="reqFilePickBtn"){ document.getElementById("reqFilePick").click(); return; }
-    if(e.target.id==="replyFilePickBtn"){ document.getElementById("replyFilePick").click(); return; }
-  });
-  document.getElementById("reqBody").addEventListener("change", function(e){
-    if(e.target.id!=="reqFilePick" && e.target.id!=="replyFilePick") return;
-    var which = e.target.id==="reqFilePick" ? "req" : "reply";
-    var file = e.target.files && e.target.files[0];
-    if(!file) return;
-    var statusEl = document.getElementById(which==="req"?"reqFileStatus":"replyFileStatus");
-    var textEl = document.getElementById(which==="req"?"rfReqFile":"rfReplyFile");
-    var reader = new FileReader();
-    reader.onload = function(){
-      var base64 = String(reader.result).split(",")[1];
-      var pend = { base64:base64, filename:file.name, mimeType:file.type||"application/pdf" };
-      if(which==="req") REDIT.pendingReqFile = pend; else REDIT.pendingReplyFile = pend;
-      textEl.value = file.name;
-      statusEl.className = "file-pick-status up";
-      statusEl.textContent = "선택됨(저장 시 노션에 업로드됩니다): " + file.name;
-    };
-    reader.readAsDataURL(file);
-  });
-  function openLightbox(url, caption){
-    document.getElementById("lightboxImg").src=url;
-    document.getElementById("lightboxCap").textContent=caption||"";
-    document.getElementById("lightbox").classList.add("open");
-  }
-  document.getElementById("lightbox").addEventListener("click", function(){ document.getElementById("lightbox").classList.remove("open"); });
-  document.getElementById("reqFoot").addEventListener("click", async function(e){
-    if(e.target.id==="reqCloseBtn"||e.target.id==="reqCancelBtn"){ closeReq(); return; }
-    if(e.target.id==="reqEditBtn"){ openReqEdit(REDIT.id); return; }
-    if(e.target.id==="reqDelBtn"){
-      if(!confirm("이 자료를 삭제하시겠어요?")) return;
-      try {
-        var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"consignRequestDelete",id:REDIT.id})});
-        var data=await res.json(); if(!data.ok) throw new Error(data.error||"실패");
-        closeReq(); load();
-      } catch(err){ alert("삭제 실패: "+err.message); }
-      return;
-    }
-    if(e.target.id==="reqSaveBtn"){
-      syncQaFromDom();
-      var title=document.getElementById("rfTitle").value.trim();
-      var st=document.getElementById("rfStatusMsg");
-      if(!title){ st.className="estatus status show err"; st.textContent="제목을 입력하세요."; return; }
-      var item={
-        id:REDIT.id, project:SEL, category:document.getElementById("rfCategory").value, title:title,
-        reqDate:document.getElementById("rfReqDate").value, replyDate:document.getElementById("rfReplyDate").value,
-        status:document.getElementById("rfStatus").value, reqFile:document.getElementById("rfReqFile").value.trim(),
-        replyFile:document.getElementById("rfReplyFile").value.trim(),
-        qa:REDIT.qa.filter(function(x){return (x.q||"").trim();})
-      };
-      st.className="estatus status show info"; st.textContent="저장 중…";
-      var uploadErrors = [];
-      try {
-        var action=REDIT.id?"consignRequestUpdate":"consignRequestCreate";
-        var res=await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:action,item:item})});
-        var data=await res.json(); if(!data.ok) throw new Error(data.error||"실패");
-        // item.qa의 인덱스가 실제 저장된 안건 순서와 그대로 일치하므로, 붙여넣어둔 이미지들을 그 인덱스로 업로드
-        var pageId = REDIT.id || (data.result && data.result.id);
-        var pendingCount = item.qa.reduce(function(n,qa){ return n + ((qa.images&&qa.images.length)||0); }, 0);
-        if(pageId && pendingCount){
-          st.textContent="저장 완료 — 이미지 업로드 중…";
-          for(var qi=0; qi<item.qa.length; qi++){
-            var imgs = item.qa[qi].images || [];
-            for(var ii=0; ii<imgs.length; ii++){
-              try {
-                var imgRes = await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
-                  body: JSON.stringify({ action:"consignRequestAddImage", pageId:pageId, qaIndex:qi,
-                    imageBase64: imgs[ii].base64, filename: imgs[ii].filename, mimeType: imgs[ii].mimeType })});
-                var imgData = await imgRes.json();
-                if(!imgData.ok) uploadErrors.push("이미지(안건 "+(qi+1)+"): "+(imgData.error||"실패"));
-              } catch(e){ uploadErrors.push("이미지(안건 "+(qi+1)+"): "+e.message); }
-            }
-          }
-        }
-        if(pageId && (REDIT.pendingReqFile || REDIT.pendingReplyFile)){
-          st.textContent="저장 완료 — PDF 업로드 중…";
-          if(REDIT.pendingReqFile){
-            try {
-              var reqFRes = await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
-                body: JSON.stringify({ action:"consignRequestAttachFile", pageId:pageId, which:"req",
-                  fileBase64:REDIT.pendingReqFile.base64, filename:REDIT.pendingReqFile.filename, mimeType:REDIT.pendingReqFile.mimeType })});
-              var reqFData = await reqFRes.json();
-              if(!reqFData.ok) uploadErrors.push("요청 PDF: "+(reqFData.error||"실패"));
-            } catch(e){ uploadErrors.push("요청 PDF: "+e.message); }
-          }
-          if(REDIT.pendingReplyFile){
-            try {
-              var replyFRes = await fetch(WORKER_URL,{method:"POST",headers:{"Content-Type":"application/json"},
-                body: JSON.stringify({ action:"consignRequestAttachFile", pageId:pageId, which:"reply",
-                  fileBase64:REDIT.pendingReplyFile.base64, filename:REDIT.pendingReplyFile.filename, mimeType:REDIT.pendingReplyFile.mimeType })});
-              var replyFData = await replyFRes.json();
-              if(!replyFData.ok) uploadErrors.push("회신 PDF: "+(replyFData.error||"실패"));
-            } catch(e){ uploadErrors.push("회신 PDF: "+e.message); }
-          }
-        }
-        if(uploadErrors.length){
-          st.className="estatus status show err";
-          st.textContent="일부 첨부 실패 — "+uploadErrors.join(" / ");
-          return;
-        }
-        st.className="estatus status show ok"; st.textContent="저장 완료";
-        setTimeout(function(){ closeReq(); load(); }, 500);
       } catch(err){ st.className="estatus status show err"; st.textContent="저장 실패: "+err.message; }
     }
   });

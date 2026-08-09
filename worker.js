@@ -161,7 +161,6 @@ const MEETING_DB_ID = "782db68c-983d-82bf-b607-013f0314fcfb"; // 회의자료 DB
 const COMMENT_DB_ID = "b4edb68c-983d-82f2-a7ab-01cbba6245c1"; // 코멘트 DB
 const CONSIGN_DB_ID = "b2edb68c-983d-83fe-a580-815b224b17b9"; // 위탁과제 정보 DB
 const CONSIGN_MEETING_DB_ID = "206db68c-983d-82f0-ad12-01188a5dd72f"; // 위탁과제 회의록 DB
-const CONSIGN_REQUEST_DB_ID = "4ccdb68c-983d-831e-b5e7-0102bbce1354"; // 위탁과제 요청자료 DB
 const NOTION_VERSION = "2022-06-28";
 
 const TEAM = ["이종우","전준수","이채영","한효림","김예원","정승환"];
@@ -251,7 +250,7 @@ function parseConsignment(page){
 }
 
 // 위탁과제 회의록 파싱
-function parseConsignMeeting(page){
+async function parseConsignMeeting(page, token){
   const p = page.properties || {};
   const titleList = (p["제목"] && p["제목"].title) || [];
   const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
@@ -262,9 +261,23 @@ function parseConsignMeeting(page){
   const date = (p["일시"] && p["일시"].date && p["일시"].date.start) || "";
   const attRt = (p["참석"] && p["참석"].rich_text) || [];
   const attendees = attRt.map(function(t){return t.plain_text;}).join("");
+  // 예전 방식(속성 하나에 통째로) 회의록 — 새로 만든 회의록은 이 속성을 안 씀, 블록이 없을 때만 이걸로 표시
   const bodyRt = (p["내용"] && p["내용"].rich_text) || [];
-  const body = bodyRt.map(function(t){return t.plain_text;}).join("");
-  return { id: page.id, project: project, title: title, kind: kind, status: status, mode: mode, date: date, attendees: attendees, body: body };
+  const legacyBody = bodyRt.map(function(t){return t.plain_text;}).join("");
+  const topicRt = (p["회의주제"] && p["회의주제"].rich_text) || [];
+  const topic = topicRt.map(function(t){return t.plain_text;}).join("");
+  const decisionRt = (p["결정사항"] && p["결정사항"].rich_text) || [];
+  const decision = decisionRt.map(function(t){return t.plain_text;}).join("");
+  const followupRt = (p["향후논의사항"] && p["향후논의사항"].rich_text) || [];
+  const followup = followupRt.map(function(t){return t.plain_text;}).join("");
+  // 회의 내용: 주간회의처럼 꼭지(❑ 항목)별 heading+본문+이미지로 저장됨
+  let sections = [];
+  if(token){
+    const content = await getPageContentWithFigures(page.id, token);
+    for(const h in content){ sections.push({ heading: h, body: content[h].body, figures: content[h].figures || [] }); }
+  }
+  return { id: page.id, project: project, title: title, kind: kind, status: status, mode: mode, date: date, attendees: attendees,
+    topic: topic, decision: decision, followup: followup, body: legacyBody, sections: sections };
 }
 
 // 위탁과제 요청자료 파싱 (Q&A는 페이지 본문에서 heading=질문, 본문=답변으로 파싱)
@@ -295,26 +308,6 @@ async function getPageContentWithFigures(pageId, token){
   const out = {};
   for(const k in sections){ out[k] = { body: sections[k].body.join("\n"), figures: sections[k].figures }; }
   return out;
-}
-
-async function parseConsignRequest(page, token){
-  const p = page.properties || {};
-  const titleList = (p["제목"] && p["제목"].title) || [];
-  const title = titleList.map(function(t){return t.plain_text;}).join("").trim();
-  const project = firstRelationId(p["과제"]);
-  const category = (p["구분"] && p["구분"].select && p["구분"].select.name) || "기타";
-  const status = (p["상태"] && p["상태"].select && p["상태"].select.name) || "검토중";
-  const reqDate = (p["요청일"] && p["요청일"].date && p["요청일"].date.start) || "";
-  const replyDate = (p["회신일"] && p["회신일"].date && p["회신일"].date.start) || "";
-  const reqFileRt = (p["요청파일명"] && p["요청파일명"].rich_text) || [];
-  const reqFile = reqFileRt.map(function(t){return t.plain_text;}).join("");
-  const replyFileRt = (p["회신파일명"] && p["회신파일명"].rich_text) || [];
-  const replyFile = replyFileRt.map(function(t){return t.plain_text;}).join("");
-  const content = await getPageContentWithFigures(page.id, token);
-  const qa = [];
-  for(const q in content){ qa.push({ q: q, a: content[q].body, figures: content[q].figures }); }
-  return { id: page.id, project: project, title: title, category: category, status: status,
-    reqDate: reqDate, replyDate: replyDate, reqFile: reqFile, replyFile: replyFile, qa: qa };
 }
 
 // 회의자료 페이지 파싱 (꼭지별 본문 포함)
@@ -470,7 +463,7 @@ function parseProjectInfo(page){
 }
 
 // ===== 일정관리(구글 캘린더 기반) 분류 =====
-// 제목 규칙: "휴가(효림)" / "외출(효림)" / "재택근무(효림)" / "오전반차(효림)" 등 → 유형(효림)
+// 제목 규칙: "휴가(효림)" / "외출(효림)" / "오전반차(효림)" 등 → 유형(효림)
 // 출장 규칙: description(설명란)에 '출장' 단어 포함 → 유형=출장 (제목은 자유)
 // 그 외 제목에 과제명 키워드 있으면 과제, 없으면 기타(회의 등 자유 제목)
 const SCHED_PROJECT_KEYWORDS = [
@@ -484,7 +477,7 @@ const SCHED_PROJECT_KEYWORDS = [
 ];
 const SCHED_VAC_TYPES = ["휴가","오전반차","오후반차","병가","공가","건강검진"];
 // 팀원 짧은 이름("예원") → 풀네임("김예원") 정규화 (일정 제목/설명란에 짧게 적힌 경우 대비)
-const SCHED_TEAM = ["이종우","전준수","이채영","한효림","김예원","정승환","심지윤","정정호"];
+const SCHED_TEAM = ["이숭봉","이종우","전준수","이채영","한효림","김예원","정승환","심지윤","정정호"];
 function schedShortName(o){ return (o && o.length>=3) ? o.slice(1) : o; }
 function normalizePersonName(t){
   if(!t) return t;
@@ -496,11 +489,24 @@ function normalizePersonList(raw){
   if(!raw) return raw;
   return raw.split(/[,\s]+/).map(function(x){return x.trim();}).filter(Boolean).map(normalizePersonName).join(", ");
 }
-const SCHED_ATT_TYPES = SCHED_VAC_TYPES.concat(["외출","재택근무"]);
+const SCHED_ATT_TYPES = SCHED_VAC_TYPES.concat(["외출"]);
 // "휴가(효림)" / "외출(효림)" 등
 const SCHED_RE_PAREN = new RegExp("(" + SCHED_ATT_TYPES.join("|") + ")\\s*\\(([^)]+)\\)\\s*$");
 // 과거 형식 "효림 휴가" / "효림-외출" 등 (이름이 앞)
 const SCHED_RE_LEGACY = new RegExp("^([^\\s()]{2,6})\\s*[\\-\\s]?\\s*(" + SCHED_ATT_TYPES.join("|") + ")\\s*$");
+// "출장" 등 그 외 임의 제목 + "(이름)" 형식 — 위 SCHED_RE_PAREN에 안 걸린 나머지를 여기서 잡음 (예: "세종출장(효림)", "킥오프(효림, 예원)")
+const SCHED_RE_GENERIC_PAREN = /^(.+)\(([^()]+)\)\s*$/;
+// 괄호 안 텍스트가 실제 팀원 이름(들)인지 검증 (콤마/공백 구분, 전원 팀원이어야 통과) — 오탐 방지용
+function isKnownTeamName(t){
+  if(!t) return false;
+  t = t.trim();
+  return SCHED_TEAM.indexOf(t) >= 0 || SCHED_TEAM.some(function(o){ return schedShortName(o) === t; });
+}
+function isKnownTeamNameList(raw){
+  if(!raw) return false;
+  var parts = raw.split(/[,\s]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+  return parts.length > 0 && parts.every(isKnownTeamName);
+}
 
 function extractPersonFromDesc(desc){
   if(!desc) return "";
@@ -528,6 +534,7 @@ function classifySchedule(ev){
 
   var mp = title.match(SCHED_RE_PAREN);
   var ml = !mp && title.match(SCHED_RE_LEGACY);
+  var mg = !mp && !ml && title.match(SCHED_RE_GENERIC_PAREN);
   if(mp){
     type = (SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) ? "휴가" : mp[1];
     if(SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) vacation = mp[1];
@@ -538,6 +545,15 @@ function classifySchedule(ev){
     if(SCHED_VAC_TYPES.indexOf(ml[2]) >= 0) vacation = ml[2];
     var rawName2 = ml[1].trim();
     person = (rawName2.indexOf(",")>=0) ? normalizePersonList(rawName2) : normalizePersonName(rawName2);
+  } else if(mg && mg[1].trim() && isKnownTeamNameList(mg[2])){
+    // "휴가/오전반차/외출" 등(SCHED_RE_PAREN)에 안 걸린 "제목(이름)" 형식 → 괄호 안이 팀원이면 출장으로 처리
+    // (예: "출장(효림)", "세종 킥오프(효림, 예원)" 등 — 접두어는 자유 텍스트)
+    type = "출장";
+    var rawName3 = mg[2].trim();
+    person = (rawName3.indexOf(",")>=0) ? normalizePersonList(rawName3) : normalizePersonName(rawName3);
+    var prefix3 = mg[1].trim();
+    var matchedProj3 = SCHED_PROJECT_KEYWORDS.filter(function(x){ return prefix3.indexOf(x.kw) >= 0; })[0];
+    if(matchedProj3) project = matchedProj3.name;
   } else if(desc.indexOf("출장") >= 0){
     type = "출장";
     person = extractPersonFromDesc(desc);
@@ -583,7 +599,7 @@ function parseDoorayEvent(ev){
     var m2 = endedAt.match(/T(\d{2}):(\d{2})/); if(m2) timeEnd = m2[1]+":"+m2[2];
   }
   // 두레이 이벤트에는 구글의 "설명란"에 해당하는 필드가 없어 제목만으로 분류
-  // (휴가(이름)/외출(이름)/재택근무(이름)/과제 키워드 형식은 구글 쪽과 동일한 규칙을 그대로 따름)
+  // (휴가(이름)/외출(이름)/과제 키워드 형식은 구글 쪽과 동일한 규칙을 그대로 따름)
   var cls = classifySchedule({ title: title, desc: "" });
   var timeStr = time ? (time + (timeEnd && timeEnd!==time ? "~"+timeEnd : "")) : "";
   return {
@@ -918,7 +934,7 @@ function currentWeekRange(offsetWeeks){
 function currentWeekLabel(){ return currentWeekRange().label; }
 
 // 업무계획 캘린더 동기화: 이번 주(월~금) 팀 캘린더에서 "과제/기타"(회의 등 업무성) 일정만 대상.
-// 휴가/외출/재택근무/출장은 개인 일정관리용이라 제외. 이미 가져온 항목(캘린더ID로 연결)은 날짜·시간·제목만 갱신,
+// 휴가/외출/출장은 개인 일정관리용이라 제외. 이미 가져온 항목(캘린더ID로 연결)은 날짜·시간·제목만 갱신,
 // 아직 없는 항목은 새 업무계획으로 생성 (장소·내용·참석자는 비워둠 → 직접 채워넣기).
 async function syncPlansFromCalendar(env){
   const token = env.NOTION_TOKEN;
@@ -928,7 +944,7 @@ async function syncPlansFromCalendar(env){
   var events = await doorayList(env);
   events = events.filter(function(ev){
     return ev.start >= wk.planStart && ev.start <= wk.planEnd
-      && (ev.type === "과제" || ev.type === "기타"); // 휴가/외출/재택근무/출장 등은 제외
+      && (ev.type === "과제" || ev.type === "기타"); // 휴가/외출/출장 등은 제외
   });
 
   // 계획주 기존 업무계획 조회 — 캘린더ID로도, (날짜+제목)으로도 매칭 (PDF 등 다른 경로로 이미 들어온 항목과 중복 방지)
@@ -1202,17 +1218,24 @@ async function deletePerf(env, payload){
 // item: { id?, type, person, title, project, vacation, start, end, time('HH:MM' or 'HH:MM~HH:MM'), location }
 function schedSummary(item){
   if(SCHED_ATT_TYPES.indexOf(item.type) >= 0){
-    // 휴가/오전반차/오후반차/병가/공가/건강검진/외출/재택근무 → "유형(이름)" 고정 규칙
+    // 휴가/오전반차/오후반차/병가/공가/건강검진/외출 → "유형(이름)" 고정 규칙
     var label = (item.type === "휴가" && item.vacation) ? item.vacation : item.type;
     return label + "(" + (item.person || "") + ")";
   }
-  return item.title || "(제목 없음)"; // 과제·출장·기타는 자유 제목
+  if(item.type === "출장"){
+    // 출장도 제목 끝에 "(이름)"을 자동으로 붙여서 저장 → 재조회 시 오버라이드 없이 제목만으로 출장/담당자 인식 가능
+    // (두레이는 설명란을 다시 읽어올 수 없어서, 이름이 제목에 없으면 새로고침 후 유형을 잃어버림)
+    var base = (item.title || "출장").trim();
+    var names = (item.attendees || item.person || "").trim();
+    return names ? (base + "(" + names + ")") : base;
+  }
+  return item.title || "(제목 없음)"; // 과제·기타는 자유 제목
 }
 function schedDescription(item){
   var lines = [];
   if(item.type === "출장") lines.push("출장"); // 필수 키워드
   if((item.type === "과제" || item.type === "출장") && item.project) lines.push("과제: " + item.project);
-  // 휴가/외출/재택근무 등은 제목의 "유형(이름)"이 담당자의 유일한 출처 → 설명란에 중복 기록하지 않음
+  // 휴가/외출 등은 제목의 "유형(이름)"이 담당자의 유일한 출처 → 설명란에 중복 기록하지 않음
   if(item.person && SCHED_ATT_TYPES.indexOf(item.type) < 0) lines.push("담당자: " + item.person);
   if(item.attendees) lines.push("참석자: " + item.attendees);
   if(item.title && SCHED_ATT_TYPES.indexOf(item.type) >= 0) lines.push(item.title); // 휴가류 비고
@@ -1281,7 +1304,8 @@ async function createSchedule(env, payload){
   if(!data.header || !data.header.isSuccessful) throw new Error("일정 등록 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
   var newRawId = data.result && data.result.id;
   var overrideError = null;
-  if(item.type === "출장" || item.type === "과제"){
+  // 출장은 이제 제목에 "(이름)"이 자동으로 들어가므로 오버라이드 없이도 재조회 시 인식 가능 → 과제만 저장
+  if(item.type === "과제"){
     try { await upsertScheduleOverride(env, newRawId, item); } catch(e){ overrideError = String(e); }
   }
   return { created: true, id: "dooray-" + newRawId, overrideError: overrideError };
@@ -1302,8 +1326,9 @@ async function updateSchedule(env, payload){
   if(!data.header || !data.header.isSuccessful) throw new Error("일정 수정 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
   var overrideError = null;
   try {
-    if(item.type === "출장" || item.type === "과제") await upsertScheduleOverride(env, rawId, item);
-    else await deleteScheduleOverride(env, rawId); // 다른 유형으로 바뀌었으면 예전 오버라이드는 정리
+    // 출장은 제목에 "(이름)"이 자동으로 들어가므로 오버라이드 불필요 → 과제만 저장, 그 외(출장 포함)는 예전 오버라이드 정리
+    if(item.type === "과제") await upsertScheduleOverride(env, rawId, item);
+    else await deleteScheduleOverride(env, rawId);
   } catch(e){ overrideError = String(e); }
   return { updated: true, overrideError: overrideError };
 }
@@ -1555,21 +1580,68 @@ function consignMeetingProps(item){
     "형태": { select: { name: item.mode || "대면" } },
     "일시": item.date ? { date: { start: item.date } } : { date: null },
     "참석": { rich_text: rt(item.attendees || "") },
-    "내용": { rich_text: rt(item.body || "") },
+    "회의주제": { rich_text: rt(item.topic || "") },
+    "결정사항": { rich_text: rt(item.decision || "") },
+    "향후논의사항": { rich_text: rt(item.followup || "") },
   };
 }
+// 회의 내용(item.sections: [{heading, body}])은 주간회의와 동일하게 꼭지별 heading_3+paragraph 블록으로 저장
+// (예전 "내용" 속성 방식 대신 — 이미지가 각 꼭지 바로 아래에 붙을 수 있도록)
 async function createConsignMeeting(env, payload){
   const token = env.NOTION_TOKEN;
   const item = payload.item || {};
   if(!item.project) throw new Error("과제(project) 누락");
-  var res = await notionFetch("/pages", token, "POST", { parent:{ database_id: CONSIGN_MEETING_DB_ID }, properties: consignMeetingProps(item) });
+  const sections = item.sections || [];
+  const children = [];
+  sections.forEach(function(s){
+    children.push({ object:"block", type:"heading_3", heading_3:{ rich_text: rt(s.heading||"") } });
+    children.push({ object:"block", type:"paragraph", paragraph:{ rich_text: rt(s.body||"") } });
+  });
+  const body = { parent:{ database_id: CONSIGN_MEETING_DB_ID }, properties: consignMeetingProps(item) };
+  if(children.length) body.children = children;
+  var res = await notionFetch("/pages", token, "POST", body);
   return { created: true, id: res.id };
 }
+// 제자리 교체 방식(주간회의 updateMeeting과 동일 패턴) — 전체 삭제 후 재생성하지 않아 이미지 블록이 안 날아감
 async function updateConsignMeeting(env, payload){
   const token = env.NOTION_TOKEN;
   const item = payload.item || {};
   if(!item.id) throw new Error("page id 누락");
   await notionFetch("/pages/" + item.id, token, "PATCH", { properties: consignMeetingProps(item) });
+
+  const list = item.sections || [];
+  const sections = await getOrderedMeetingSections(item.id, token);
+  const n = Math.min(sections.length, list.length);
+  for(let i=0;i<n;i++){
+    const sec = sections[i], sItem = list[i];
+    var headingPatch = {}; headingPatch[sec.headingType] = { rich_text: rt(sItem.heading||"") };
+    await notionFetch("/blocks/" + sec.headingId, token, "PATCH", headingPatch);
+    if(sec.paragraphId){
+      var bodyPatch = {}; bodyPatch[sec.paragraphType] = { rich_text: rt(sItem.body||"") };
+      await notionFetch("/blocks/" + sec.paragraphId, token, "PATCH", bodyPatch);
+    } else {
+      await notionFetch("/blocks/" + item.id + "/children", token, "PATCH", { children: [{ object:"block", type:"paragraph", paragraph:{ rich_text: rt(sItem.body||"") } }], after: sec.headingId });
+    }
+    for(const extraId of (sec.extraBodyIds||[])){ try { await notionFetch("/blocks/" + extraId, token, "DELETE"); } catch(e){} }
+  }
+  if(sections.length > list.length){
+    var toDelete = [];
+    for(let i=list.length; i<sections.length; i++){
+      const sec = sections[i];
+      toDelete.push(sec.headingId);
+      if(sec.paragraphId) toDelete.push(sec.paragraphId);
+      toDelete = toDelete.concat(sec.extraBodyIds||[], sec.imageIds||[]);
+    }
+    await Promise.allSettled(toDelete.map(function(id){ return notionFetch("/blocks/" + id, token, "DELETE"); }));
+  }
+  if(list.length > sections.length){
+    const children = [];
+    for(let i=sections.length; i<list.length; i++){
+      children.push({ object:"block", type:"heading_3", heading_3:{ rich_text: rt(list[i].heading||"") } });
+      children.push({ object:"block", type:"paragraph", paragraph:{ rich_text: rt(list[i].body||"") } });
+    }
+    if(children.length) await notionFetch("/blocks/" + item.id + "/children", token, "PATCH", { children: children });
+  }
   return { updated: true };
 }
 async function deleteConsignMeeting(env, payload){
@@ -1579,81 +1651,7 @@ async function deleteConsignMeeting(env, payload){
   return { deleted: true };
 }
 
-// ===== 위탁과제 요청자료 CRUD (Q&A는 본문 블록으로 저장) =====
-function consignRequestProps(item){
-  return {
-    "제목": { title: rt(item.title || "") },
-    "과제": { relation: [{ id: item.project }] },
-    "구분": { select: { name: item.category || "기타" } },
-    "상태": { select: { name: item.status || "검토중" } },
-    "요청일": item.reqDate ? { date: { start: item.reqDate } } : { date: null },
-    "회신일": item.replyDate ? { date: { start: item.replyDate } } : { date: null },
-    "요청파일명": { rich_text: rt(item.reqFile || "") },
-    "회신파일명": { rich_text: rt(item.replyFile || "") },
-  };
-}
-// 현재 본문을 "꼭지 단위"(heading + 그 뒤 첫 paragraph + 그 뒤 image들)로 순서대로 묶어서 반환
-async function getOrderedQaSections(pageId, token){
-  const data = await notionFetch("/blocks/" + pageId + "/children?page_size=100", token);
-  const sections = []; let cur = null;
-  const BODY_TYPES = ["paragraph","bulleted_list_item","numbered_list_item","quote","callout"];
-  for(const b of (data.results || [])){
-    const t = b.type;
-    if(t && t.startsWith("heading")){
-      cur = { headingId: b.id, headingType: t, paragraphId: null, paragraphType: "paragraph", extraBodyIds: [], imageIds: [] };
-      sections.push(cur);
-    } else if(cur){
-      if(BODY_TYPES.indexOf(t) >= 0){
-        // 답변이 노션에서 여러 문단(블록)으로 나뉘어 있을 수 있음(Enter로 줄바꿈한 경우) — 전부 추적해야 저장 시 안 남고 지워짐
-        if(cur.paragraphId === null){ cur.paragraphId = b.id; cur.paragraphType = t; }
-        else cur.extraBodyIds.push(b.id);
-      }
-      else if(t === "image") cur.imageIds.push(b.id);
-    }
-  }
-  return sections;
-}
-
-// Q&A 저장: 기존 꼭지(질문/답변)는 그 블록을 "그 자리에서" 내용만 교체 → 사이에 있는 이미지 블록은 절대 안 건드림.
-// 답변이 여러 문단(블록)으로 나뉘어 있었으면 첫 블록에 전체 내용을 담고 나머지 옛 블록은 삭제(안 그러면 옛 내용이 남아서 뒤섞임).
-// 새로 추가된 항목은 맨 뒤에 덧붙이고, 삭제된 항목은 그 항목의 블록만 지움(이미지 포함).
-async function writeRequestQaBlocks(pageId, token, qa){
-  const list = qa || [];
-  const sections = await getOrderedQaSections(pageId, token);
-  const n = Math.min(sections.length, list.length);
-  for(let i=0;i<n;i++){
-    const sec = sections[i], item = list[i];
-    // 실제 블록 타입(heading_1/2/3 등)에 맞춰 패치해야 함 — 타입을 강제로 바꾸는 건 노션이 거부함
-    var headingPatch = {}; headingPatch[sec.headingType] = { rich_text: rt(item.q||"") };
-    await notionFetch("/blocks/" + sec.headingId, token, "PATCH", headingPatch);
-    if(sec.paragraphId){
-      var bodyPatch = {}; bodyPatch[sec.paragraphType] = { rich_text: rt(item.a||"") };
-      await notionFetch("/blocks/" + sec.paragraphId, token, "PATCH", bodyPatch);
-    } else {
-      await notionFetch("/blocks/" + pageId + "/children", token, "PATCH", { children: [{ object:"block", type:"paragraph", paragraph:{ rich_text: rt(item.a||"") } }], after: sec.headingId });
-    }
-    // 답변이 여러 블록으로 나뉘어 있었다면, 첫 블록에 전체 내용을 넣었으니 나머지는 삭제(안 그러면 옛 내용이 중복으로 남음)
-    for(const extraId of (sec.extraBodyIds||[])){ try { await notionFetch("/blocks/" + extraId, token, "DELETE"); } catch(e){} }
-  }
-  // 삭제된 항목(뒤쪽 남는 기존 섹션) 제거 — 이미지도 그 섹션 것만 같이 지움
-  for(let i=list.length; i<sections.length; i++){
-    const sec = sections[i];
-    try { await notionFetch("/blocks/" + sec.headingId, token, "DELETE"); } catch(e){}
-    if(sec.paragraphId){ try { await notionFetch("/blocks/" + sec.paragraphId, token, "DELETE"); } catch(e){} }
-    for(const extraId of (sec.extraBodyIds||[])){ try { await notionFetch("/blocks/" + extraId, token, "DELETE"); } catch(e){} }
-    for(const imgId of sec.imageIds){ try { await notionFetch("/blocks/" + imgId, token, "DELETE"); } catch(e){} }
-  }
-  // 새로 추가된 항목(기존보다 많아진 만큼) — 맨 뒤에 덧붙임
-  if(list.length > sections.length){
-    const children = [];
-    for(let i=sections.length; i<list.length; i++){
-      children.push({ object:"block", type:"heading_3", heading_3:{ rich_text: rt(list[i].q||"") } });
-      children.push({ object:"block", type:"paragraph", paragraph:{ rich_text: rt(list[i].a||"") } });
-    }
-    if(children.length) await notionFetch("/blocks/" + pageId + "/children", token, "PATCH", { children: children });
-  }
-}
-// ===== 노션 파일 업로드 API (Ctrl+V로 붙여넣은 그림을 요청자료 안건에 실제로 첨부) =====
+// ===== 노션 파일 업로드 API (그림을 실제로 첨부) =====
 // 파일 업로드 API는 기존 NOTION_VERSION(2022-06-28)보다 최근 버전이 필요해서 이 두 함수만 별도 버전 사용
 const NOTION_UPLOAD_VERSION = "2026-03-11";
 async function notionFileUploadCreate(token, filename, contentType){
@@ -1682,39 +1680,7 @@ async function notionFileUploadSend(token, uploadId, base64, filename, mimeType)
   if(data.status !== "uploaded") throw new Error("파일 전송 실패: " + JSON.stringify(data));
   return data;
 }
-// 답변란에 Ctrl+V로 붙여넣은 그림 하나를 실제로 노션에 업로드하고, 해당 안건(qaIndex) 바로 아래에 이미지 블록으로 붙임
-async function consignRequestAddImage(env, payload){
-  const token = env.NOTION_TOKEN;
-  const pageId = payload.pageId;
-  const qaIndex = payload.qaIndex;
-  if(!pageId) throw new Error("pageId 누락");
-  if(qaIndex === undefined || qaIndex === null) throw new Error("qaIndex 누락");
-  if(!payload.imageBase64) throw new Error("imageBase64 누락");
 
-  const created = await notionFileUploadCreate(token, payload.filename || "image.png", payload.mimeType || "image/png");
-  await notionFileUploadSend(token, created.id, payload.imageBase64, payload.filename || "image.png", payload.mimeType || "image/png");
-
-  const sections = await getOrderedQaSections(pageId, token);
-  const sec = sections[qaIndex];
-  if(!sec) throw new Error("해당 안건(qaIndex=" + qaIndex + ")을 찾을 수 없습니다");
-  // 그 안건의 마지막 블록(이미지 > 추가답변 > 답변 > 제목 순으로 있는 것) 바로 뒤에 새 이미지를 붙임
-  const anchorId = (sec.imageIds && sec.imageIds.length) ? sec.imageIds[sec.imageIds.length-1]
-    : (sec.extraBodyIds && sec.extraBodyIds.length) ? sec.extraBodyIds[sec.extraBodyIds.length-1]
-    : (sec.paragraphId || sec.headingId);
-
-  // "after" 파라미터는 최신 버전(NOTION_UPLOAD_VERSION)에서는 거부돼서, 이 요청만 예전 안정 버전으로 보냄
-  // (file_upload 참조 자체는 이미 생성된 파일을 가리키기만 하면 되므로 버전 상관없이 인식됨)
-  const appendRes = await fetch("https://api.notion.com/v1/blocks/" + pageId + "/children", {
-    method: "PATCH",
-    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json", "Notion-Version": NOTION_VERSION },
-    body: JSON.stringify({
-      after: anchorId,
-      children: [{ object:"block", type:"image", image:{ type:"file_upload", file_upload:{ id: created.id } } }]
-    })
-  });
-  if(!appendRes.ok){ const t = await appendRes.text(); throw new Error("이미지 블록 추가 실패: " + appendRes.status + " " + t); }
-  return { added: true };
-}
 // 회의자료 페이지의 heading_3(꼭지)+paragraph(본문) 순서를 그대로 읽어옴 — createMeeting이 만드는 구조와 1:1로 대응
 async function getOrderedMeetingSections(pageId, token){
   const data = await notionFetch("/blocks/" + pageId + "/children?page_size=100", token);
@@ -1735,7 +1701,7 @@ async function getOrderedMeetingSections(pageId, token){
   }
   return sections;
 }
-// PDF에서 크롭한 표/그림 이미지를 지정한 꼭지(sectionIndex) 바로 뒤에 붙임
+// PDF에서 크롭한 표/그림 이미지를 지정한 꼭지(sectionIndex) 바로 뒤에 붙임 (주간회의자료용)
 // (사용자가 미리보기에서 크롭 영역을 확인/수정한 뒤 저장 시 호출 — 반자동 방식)
 async function meetingAddImage(env, payload){
   const token = env.NOTION_TOKEN;
@@ -1764,28 +1730,46 @@ async function meetingAddImage(env, payload){
   return { added: true };
 }
 
-async function createConsignRequest(env, payload){
-  const token = env.NOTION_TOKEN;
-  const item = payload.item || {};
-  if(!item.project) throw new Error("과제(project) 누락");
-  var res = await notionFetch("/pages", token, "POST", { parent:{ database_id: CONSIGN_REQUEST_DB_ID }, properties: consignRequestProps(item) });
-  await writeRequestQaBlocks(res.id, token, item.qa);
-  return { created: true, id: res.id };
+// 회의록 본문 전체에서 이미지 블록만 순서대로 수집 (본문이 속성 하나뿐이라 "꼭지별 앵커"가 없어서 그냥 순서대로 쌓음)
+async function getPageImages(pageId, token){
+  const data = await notionFetch("/blocks/" + pageId + "/children?page_size=100", token);
+  const figures = [];
+  for(const b of (data.results || [])){
+    if(b.type === "image"){
+      const img = b.image;
+      const url = (img.type === "external") ? (img.external && img.external.url) : (img.file && img.file.url);
+      const capRich = img.caption || [];
+      const caption = capRich.map(function(x){return x.plain_text;}).join("").trim();
+      if(url) figures.push({ url: url, caption: caption });
+    }
+  }
+  return figures;
 }
-async function updateConsignRequest(env, payload){
+// PDF에서 크롭한 표/그림을 회의록 페이지 본문 맨 끝에 순서대로 붙임 (주간회의의 meetingAddImage와 동일한 업로드 패턴)
+async function consignMeetingAddImage(env, payload){
   const token = env.NOTION_TOKEN;
-  const item = payload.item || {};
-  if(!item.id) throw new Error("page id 누락");
-  await notionFetch("/pages/" + item.id, token, "PATCH", { properties: consignRequestProps(item) });
-  await writeRequestQaBlocks(item.id, token, item.qa);
-  return { updated: true };
+  const meetingId = payload.meetingId;
+  const sectionIndex = payload.sectionIndex;
+  if(!meetingId) throw new Error("meetingId 누락");
+  if(!payload.imageBase64) throw new Error("imageBase64 누락");
+  const created = await notionFileUploadCreate(token, payload.filename || "figure.png", payload.mimeType || "image/png");
+  await notionFileUploadSend(token, created.id, payload.imageBase64, payload.filename || "figure.png", payload.mimeType || "image/png");
+
+  const sections = await getOrderedMeetingSections(meetingId, token);
+  const sec = (typeof sectionIndex === "number") ? sections[sectionIndex] : null;
+  const anchorId = sec ? (sec.imageIds.length ? sec.imageIds[sec.imageIds.length-1] : (sec.paragraphId || sec.headingId)) : null;
+
+  const body = { children: [{ object:"block", type:"image", image:{ type:"file_upload", file_upload:{ id: created.id } } }] };
+  if(anchorId) body.after = anchorId;
+  const appendRes = await fetch("https://api.notion.com/v1/blocks/" + meetingId + "/children", {
+    method: "PATCH",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json", "Notion-Version": NOTION_VERSION },
+    body: JSON.stringify(body)
+  });
+  if(!appendRes.ok){ const t = await appendRes.text(); throw new Error("이미지 블록 추가 실패: " + appendRes.status + " " + t); }
+  return { added: true };
 }
-async function deleteConsignRequest(env, payload){
-  const token = env.NOTION_TOKEN;
-  if(!payload.id) throw new Error("page id 누락");
-  await notionFetch("/pages/" + payload.id, token, "PATCH", { archived: true });
-  return { deleted: true };
-}
+
 
 export default {
   async fetch(request, env){
@@ -1850,18 +1834,12 @@ export default {
           result = await updateConsignMeeting(env, payload);
         } else if(payload.action === "consignMeetingDelete"){
           result = await deleteConsignMeeting(env, payload);
-        } else if(payload.action === "consignRequestCreate"){
-          result = await createConsignRequest(env, payload);
-        } else if(payload.action === "consignRequestAddImage"){
-          result = await consignRequestAddImage(env, payload);
+        } else if(payload.action === "consignMeetingAddImage"){
+          result = await consignMeetingAddImage(env, payload);
         } else if(payload.action === "downloadHwpx"){
           const wkR = currentWeekRange(payload.weekOffset || 0);
           const hwpxBytes = await generateWeeklyHwpx(payload.achievements || [], payload.plans || [], wkR);
           result = { hwpxBase64: bytesToBase64(hwpxBytes) };
-        } else if(payload.action === "consignRequestUpdate"){
-          result = await updateConsignRequest(env, payload);
-        } else if(payload.action === "consignRequestDelete"){
-          result = await deleteConsignRequest(env, payload);
         } else {
           result = await saveWork(env, payload);
         }
@@ -1953,19 +1931,6 @@ export default {
         }
       }
 
-      // 위탁과제 요청자료 상세(보기/수정 팝업 전용) - 1건만 가볍게 조회
-      if(scope === "consignRequestDetail"){
-        const reqId = url.searchParams.get("id");
-        if(!reqId) return new Response(JSON.stringify({ error:"id 누락" }), { status:400, headers: corsHeaders() });
-        try {
-          const page = await notionFetch("/pages/" + reqId, token, "GET");
-          const request = await parseConsignRequest(page, token);
-          return new Response(JSON.stringify({ request: request }), { headers: corsHeaders() });
-        } catch(e){
-          return new Response(JSON.stringify({ error: String(e) }), { status:500, headers: corsHeaders() });
-        }
-      }
-
       // 이미지 프록시 - 노션에 올라간 그림(특히 내부 업로드 이미지의 서명된 S3 URL)은 브라우저에서 직접 fetch하면 CORS에 막혀서
       // 워커가 대신 받아와서 그대로 흘려보내줌
       if(scope === "imageProxy"){
@@ -2034,10 +1999,9 @@ export default {
       }
 
       if(want("outsourced")){
-        const [cRes, cmRes, crRes] = await Promise.allSettled([
+        const [cRes, cmRes] = await Promise.allSettled([
           getAllPages(CONSIGN_DB_ID, token),
           getAllPages(CONSIGN_MEETING_DB_ID, token),
-          getAllPages(CONSIGN_REQUEST_DB_ID, token),
         ]);
         if(cRes.status==="fulfilled"){
           var consignments = cRes.value.map(parseConsignment).filter(function(c){ return c.title; });
@@ -2046,14 +2010,11 @@ export default {
         } else { body.consignments = []; body.consignError = String(cRes.reason); }
 
         if(cmRes.status==="fulfilled"){
-          body.consignMeetings = cmRes.value.map(parseConsignMeeting).filter(function(m){ return m.title; });
-        } else { body.consignMeetings = []; body.consignMeetingError = String(cmRes.reason); }
-
-        if(crRes.status==="fulfilled"){
           try {
-            body.consignRequests = await Promise.all(crRes.value.map(function(pg){ return parseConsignRequest(pg, token); }));
-          } catch(e){ body.consignRequests = []; body.consignRequestError = String(e); }
-        } else { body.consignRequests = []; body.consignRequestError = String(crRes.reason); }
+            const parsed = await Promise.all(cmRes.value.map(function(pg){ return parseConsignMeeting(pg, token); }));
+            body.consignMeetings = parsed.filter(function(m){ return m.title; });
+          } catch(e){ body.consignMeetings = []; body.consignMeetingError = String(e); }
+        } else { body.consignMeetings = []; body.consignMeetingError = String(cmRes.reason); }
       }
 
       return new Response(JSON.stringify(body), { headers: corsHeaders() });

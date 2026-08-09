@@ -258,11 +258,11 @@
   .agenda-item{padding:14px 0;border-bottom:1px solid var(--line-2)}
   .agenda-item:last-child{border-bottom:none}
   .agenda-item .head{font-size:14.5px;font-weight:700;color:var(--navy);margin-bottom:6px;line-height:1.5}
-  .agenda-item .body{font-size:13.5px;color:var(--text);white-space:pre-wrap;line-height:1.8}
+  .agenda-item .body{font-size:14.5px;color:var(--text);white-space:pre-wrap;line-height:1.8}
   .agenda-empty{padding:24px;text-align:center;color:var(--muted);font-size:12.5px}
 
   /* 요약 카드(자유 텍스트) */
-  .summary-box{padding:16px 20px;font-size:13.5px;color:var(--text);white-space:pre-wrap;line-height:1.7}
+  .summary-box{padding:16px 20px;font-size:14.5px;color:var(--text);white-space:pre-wrap;line-height:1.7}
   .summary-box.empty{color:var(--muted);font-style:italic}
 
   /* 코멘트 */
@@ -669,6 +669,19 @@
   }
 
   // ===== 상세 =====
+  // 위계별 들여쓰기 + 내어쓰기(hanging indent): 줄바꿈된 두 번째 줄부터는 표식(-/→/․) 위치가 아니라
+  // 첫 줄의 실제 글자 시작 위치에 맞춰지게 padding-left + text-indent 조합 사용 (outsourced.html과 동일 수치)
+  function renderIndentedText(text){
+    if(!text || !text.trim()) return "";
+    var HANG = 11; // 표식("- " 등) 실제 너비에 맞춘 내어쓰기 폭
+    return text.split("\n").map(function(ln){
+      if(ln.trim()===""){ return '<div style="height:8px"></div>'; }
+      var m = ln.match(/^( *)/);
+      var level = m[1].length>=4 ? 2 : (m[1].length>=2 ? 1 : 0);
+      var base = level*18;
+      return '<div style="padding-left:'+(base+HANG)+'px;text-indent:-'+HANG+'px">'+esc(ln.replace(/^ +/,""))+'</div>';
+    }).join("");
+  }
   function renderDetail(m){
     var st=projStyle(m.project);
     var agendaHtml = m.agenda.length ? m.agenda.map(function(a){
@@ -676,16 +689,16 @@
         var src = WORKER_URL + "?scope=imageProxy&url=" + encodeURIComponent(f.url);
         return '<img src="'+esc(src)+'" alt="'+esc(f.caption||"")+'" style="max-width:100%;border-radius:6px;border:1px solid var(--line-2);margin-top:8px;display:block">';
       }).join("");
-      return '<div class="agenda-item"><div class="head">'+esc(a.head)+'</div><div class="body">'+esc(a.body)+'</div>'+figsHtml+'</div>';
+      return '<div class="agenda-item"><div class="head">'+esc(a.head)+'</div><div class="body">'+renderIndentedText(a.body)+'</div>'+figsHtml+'</div>';
     }).join("") : '<div class="agenda-empty">등록된 회의 내용이 없습니다.</div>';
 
     var sm=displaySummary(m);
     var summaryHtml = m.summary && m.summary.trim()
-      ? '<div class="summary-box">'+esc(m.summary)+'</div>'
+      ? '<div class="summary-box">'+renderIndentedText(m.summary)+'</div>'
       : '<div class="summary-box empty">아직 요약이 작성되지 않았습니다.'+(m.headingList?' (참고 - 꼭지 목록: '+esc(m.headingList)+')':'')+'</div>';
     // 결정사항: 회의요약과 동일한 전용 필드 — 옛 방식(PDF 기능 이전)으로 만든 회의는 이 속성 자체가 없어서 공란으로 뜨는 게 정상
     var decisionHtml = m.decision && m.decision.trim()
-      ? '<div class="summary-box">'+esc(m.decision)+'</div>'
+      ? '<div class="summary-box">'+renderIndentedText(m.decision)+'</div>'
       : '<div class="summary-box empty">결정사항이 아직 없습니다.</div>';
 
     var commentsHtml = m.comments.length ? m.comments.map(function(c){
