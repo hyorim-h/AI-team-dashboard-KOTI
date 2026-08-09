@@ -484,7 +484,7 @@ const SCHED_PROJECT_KEYWORDS = [
 ];
 const SCHED_VAC_TYPES = ["휴가","오전반차","오후반차","병가","공가","건강검진"];
 // 팀원 짧은 이름("예원") → 풀네임("김예원") 정규화 (일정 제목/설명란에 짧게 적힌 경우 대비)
-const SCHED_TEAM = ["이종우","전준수","이채영","한효림","김예원","정승환","심지윤","정정호"];
+const SCHED_TEAM = ["이숭봉","이종우","전준수","이채영","한효림","김예원","정승환","심지윤","정정호"];
 function schedShortName(o){ return (o && o.length>=3) ? o.slice(1) : o; }
 function normalizePersonName(t){
   if(!t) return t;
@@ -501,6 +501,19 @@ const SCHED_ATT_TYPES = SCHED_VAC_TYPES.concat(["외출","재택근무"]);
 const SCHED_RE_PAREN = new RegExp("(" + SCHED_ATT_TYPES.join("|") + ")\\s*\\(([^)]+)\\)\\s*$");
 // 과거 형식 "효림 휴가" / "효림-외출" 등 (이름이 앞)
 const SCHED_RE_LEGACY = new RegExp("^([^\\s()]{2,6})\\s*[\\-\\s]?\\s*(" + SCHED_ATT_TYPES.join("|") + ")\\s*$");
+// "출장" 등 그 외 임의 제목 + "(이름)" 형식 — 위 SCHED_RE_PAREN에 안 걸린 나머지를 여기서 잡음 (예: "세종출장(효림)", "킥오프(효림, 예원)")
+const SCHED_RE_GENERIC_PAREN = /^(.+)\(([^()]+)\)\s*$/;
+// 괄호 안 텍스트가 실제 팀원 이름(들)인지 검증 (콤마/공백 구분, 전원 팀원이어야 통과) — 오탐 방지용
+function isKnownTeamName(t){
+  if(!t) return false;
+  t = t.trim();
+  return SCHED_TEAM.indexOf(t) >= 0 || SCHED_TEAM.some(function(o){ return schedShortName(o) === t; });
+}
+function isKnownTeamNameList(raw){
+  if(!raw) return false;
+  var parts = raw.split(/[,\s]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+  return parts.length > 0 && parts.every(isKnownTeamName);
+}
 
 function extractPersonFromDesc(desc){
   if(!desc) return "";
@@ -528,6 +541,7 @@ function classifySchedule(ev){
 
   var mp = title.match(SCHED_RE_PAREN);
   var ml = !mp && title.match(SCHED_RE_LEGACY);
+  var mg = !mp && !ml && title.match(SCHED_RE_GENERIC_PAREN);
   if(mp){
     type = (SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) ? "휴가" : mp[1];
     if(SCHED_VAC_TYPES.indexOf(mp[1]) >= 0) vacation = mp[1];
@@ -538,6 +552,15 @@ function classifySchedule(ev){
     if(SCHED_VAC_TYPES.indexOf(ml[2]) >= 0) vacation = ml[2];
     var rawName2 = ml[1].trim();
     person = (rawName2.indexOf(",")>=0) ? normalizePersonList(rawName2) : normalizePersonName(rawName2);
+  } else if(mg && mg[1].trim() && isKnownTeamNameList(mg[2])){
+    // "휴가/오전반차/외출" 등(SCHED_RE_PAREN)에 안 걸린 "제목(이름)" 형식 → 괄호 안이 팀원이면 출장으로 처리
+    // (예: "출장(효림)", "세종 킥오프(효림, 예원)" 등 — 접두어는 자유 텍스트)
+    type = "출장";
+    var rawName3 = mg[2].trim();
+    person = (rawName3.indexOf(",")>=0) ? normalizePersonList(rawName3) : normalizePersonName(rawName3);
+    var prefix3 = mg[1].trim();
+    var matchedProj3 = SCHED_PROJECT_KEYWORDS.filter(function(x){ return prefix3.indexOf(x.kw) >= 0; })[0];
+    if(matchedProj3) project = matchedProj3.name;
   } else if(desc.indexOf("출장") >= 0){
     type = "출장";
     person = extractPersonFromDesc(desc);
@@ -1206,7 +1229,14 @@ function schedSummary(item){
     var label = (item.type === "휴가" && item.vacation) ? item.vacation : item.type;
     return label + "(" + (item.person || "") + ")";
   }
-  return item.title || "(제목 없음)"; // 과제·출장·기타는 자유 제목
+  if(item.type === "출장"){
+    // 출장도 제목 끝에 "(이름)"을 자동으로 붙여서 저장 → 재조회 시 오버라이드 없이 제목만으로 출장/담당자 인식 가능
+    // (두레이는 설명란을 다시 읽어올 수 없어서, 이름이 제목에 없으면 새로고침 후 유형을 잃어버림)
+    var base = (item.title || "출장").trim();
+    var names = (item.attendees || item.person || "").trim();
+    return names ? (base + "(" + names + ")") : base;
+  }
+  return item.title || "(제목 없음)"; // 과제·기타는 자유 제목
 }
 function schedDescription(item){
   var lines = [];
@@ -1281,7 +1311,8 @@ async function createSchedule(env, payload){
   if(!data.header || !data.header.isSuccessful) throw new Error("일정 등록 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
   var newRawId = data.result && data.result.id;
   var overrideError = null;
-  if(item.type === "출장" || item.type === "과제"){
+  // 출장은 이제 제목에 "(이름)"이 자동으로 들어가므로 오버라이드 없이도 재조회 시 인식 가능 → 과제만 저장
+  if(item.type === "과제"){
     try { await upsertScheduleOverride(env, newRawId, item); } catch(e){ overrideError = String(e); }
   }
   return { created: true, id: "dooray-" + newRawId, overrideError: overrideError };
@@ -1302,8 +1333,9 @@ async function updateSchedule(env, payload){
   if(!data.header || !data.header.isSuccessful) throw new Error("일정 수정 실패: " + (data.header && data.header.resultMessage ? data.header.resultMessage : JSON.stringify(data)));
   var overrideError = null;
   try {
-    if(item.type === "출장" || item.type === "과제") await upsertScheduleOverride(env, rawId, item);
-    else await deleteScheduleOverride(env, rawId); // 다른 유형으로 바뀌었으면 예전 오버라이드는 정리
+    // 출장은 제목에 "(이름)"이 자동으로 들어가므로 오버라이드 불필요 → 과제만 저장, 그 외(출장 포함)는 예전 오버라이드 정리
+    if(item.type === "과제") await upsertScheduleOverride(env, rawId, item);
+    else await deleteScheduleOverride(env, rawId);
   } catch(e){ overrideError = String(e); }
   return { updated: true, overrideError: overrideError };
 }

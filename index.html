@@ -680,10 +680,16 @@
       +"<span class=\"r\">"+list.length+"건 진행중 ›</span></div>"+rows+"</div>";
   }
 
-  // ===== 근태(휴가/외출/출장/재택근무) 분류 =====
-  var ATT_GROUP = { "출장":"출장", "외출":"외출", "재택근무":"재택근무",
-    "휴가":"휴가","오전반차":"휴가","오후반차":"휴가","병가":"휴가","공가":"휴가","건강검진":"휴가" };
-  var ATT_TYPE_STYLE = { "출장":{c:"#0f766e",bg:"#d9f0ec"}, "외출":{c:"#7c3aed",bg:"#efe8fb"}, "휴가":{c:"#b45309",bg:"#fdeede"}, "재택근무":{c:"#0369a1",bg:"#e0f2fe"} };
+  // ===== 근태(휴가/외출/출장/공가) 분류 =====
+  // "휴가" 칸: 휴가/오전반차/오후반차 / "공가" 칸: 병가·공가·건강검진을 묶어서 표시(칸 안에서 설명으로 구분)
+  var VAC_SEPARATE_SUB = ["병가","공가","건강검진"];
+  function attGroupOf(ev){
+    if(ev.type==="출장") return "출장";
+    if(ev.type==="외출") return "외출";
+    if(ev.type==="휴가") return (VAC_SEPARATE_SUB.indexOf(ev.vacation)>=0) ? "공가" : "휴가";
+    return null;
+  }
+  var ATT_TYPE_STYLE = { "출장":{c:"#0f766e",bg:"#d9f0ec"}, "외출":{c:"#7c3aed",bg:"#efe8fb"}, "휴가":{c:"#b45309",bg:"#fdeede"}, "공가":{c:"#0369a1",bg:"#e0f2fe"} };
   function endOf(ev){ return ev.end || ev.start; }
   function isMulti(ev){ return ev.end && ev.end!==ev.start; }
   function containsDay(ev, dIso){ return ev.start && ev.start<=dIso && endOf(ev)>=dIso; }
@@ -691,9 +697,9 @@
   function startTime(ev){ return (ev.time||"").split("~")[0].trim(); }
   function displayPerson(ev){ return ev.attendees || ev.person || ""; }
   function attTodayByType(dIso){
-    var out={출장:[], 외출:[], 휴가:[], 재택근무:[]};
+    var out={출장:[], 외출:[], 휴가:[], 공가:[]};
     (DATA.schedule||[]).forEach(function(s){
-      var g=ATT_GROUP[s.type];
+      var g=attGroupOf(s);
       if(g && containsDay(s, dIso)) out[g].push(s);
     });
     return out;
@@ -720,10 +726,9 @@
         +"<span class=\"sub\">"+esc(dateTimeText(ev))+"</span>"
         +(purpose?"<span class=\"sub\">"+esc(purpose)+"</span>":"")+"</div>";
     }
-    // 휴가/재택근무: 이름 · 날짜(휴가는 구분도 같은 줄에 표기)
+    // 휴가/공가: 이름 · 날짜(공가 칸 안에서는 병가/공가/건강검진 구분 표시)
     var dateLine = isMulti(ev) ? (fmtMD(ev.start)+" ~ "+fmtMD(ev.end)) : fmtMDW(ev.start);
-    // "휴가" 칸 안에서는 굳이 또 "휴가"라고 반복 표시할 필요 없음 → 오전반차/병가 등 구체적인 구분만 표시
-    if(ev.type==="휴가" && ev.vacation && ev.vacation!=="휴가") dateLine += " · "+ev.vacation;
+    if(ev.type==="휴가" && VAC_SEPARATE_SUB.indexOf(ev.vacation)>=0) dateLine += " · "+ev.vacation;
     return "<div class=\"cal-col-ev\"><span class=\"nm\">"+esc(nm)+"</span>"
       +"<span class=\"sub\">"+esc(dateLine)+"</span></div>";
   }
@@ -752,7 +757,7 @@
     var upcoming=(DATA.schedule||[])
       .filter(function(e){ return (e.start||e.date)===selIso; })
       .filter(function(e){
-        if(ATT_GROUP[e.type]) return false; // 휴가/오전반차/오후반차/병가/공가/건강검진/외출/재택근무는 근태 4칸에서 별도 표시
+        if(attGroupOf(e)) return false; // 휴가/오전반차/오후반차/병가/공가/건강검진/외출/출장은 근태 4칸에서 별도 표시
         if(e.title && ATT_TITLE_EXCLUDE.some(function(k){ return e.title.indexOf(k)>=0; })) return false;
         return true;
       })
@@ -768,7 +773,7 @@
       +"<div class=\"cal-grid\">"
       +"<div><div class=\"minical-dow\">"+dowHtml+"</div><div class=\"minical-days\">"+cells+"</div></div>"
       +"<div class=\"cal-side-col\"><div class=\"cal-col-lab\">"+selLabel+" 일정</div><div class=\"cal-col-body\">"+(upcoming||"<span class=\"cal-col-empty\">없음</span>")+"</div></div>"
-      +attColumn("출장",att.출장)+attColumn("외출",att.외출)+attColumn("휴가",att.휴가)+attColumn("재택근무",att.재택근무)
+      +attColumn("출장",att.출장)+attColumn("외출",att.외출)+attColumn("휴가",att.휴가)+attColumn("공가",att.공가)
       +"</div></div>";
   }
 
